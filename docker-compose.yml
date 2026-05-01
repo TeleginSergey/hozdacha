@@ -2,10 +2,8 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: hozdacha_db
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
-      POSTGRES_DB: ${DB_NAME:-hozdacha}
+    env_file:
+      - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations:/docker-entrypoint-initdb.d
@@ -40,25 +38,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: hozdacha_app
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:-postgres}
-      DB_NAME: ${DB_NAME:-hozdacha}
-      DB_SSLMODE: disable
-      SERVER_PORT: 8080
-      SERVER_HOST: 0.0.0.0
-      JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-24h}
-      MOYSKLAD_TOKEN: ${MOYSKLAD_TOKEN:-}
-      MOYSKLAD_BASE_URL: ${MOYSKLAD_BASE_URL:-https://api.moysklad.ru/api/remap/1.2}
-      MOYSKLAD_WEBHOOK_SECRET: ${MOYSKLAD_WEBHOOK_SECRET:-}
-      MOYSKLAD_STOCK_BUFFER: ${MOYSKLAD_STOCK_BUFFER:-5.0}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_DB: ${REDIS_DB:-0}
+    env_file:
+      - .env
     ports:
       - "${SERVER_PORT:-8080}:8080"
     depends_on:
