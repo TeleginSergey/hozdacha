@@ -1,0 +1,162 @@
+package usecase
+
+import (
+	"context"
+	"fmt"
+
+	"go.uber.org/zap"
+
+	"github.com/TeleginSergey/hozdacha/internal/cache"
+	"github.com/TeleginSergey/hozdacha/internal/db"
+	"github.com/TeleginSergey/hozdacha/internal/moysklad"
+	"github.com/TeleginSergey/hozdacha/internal/telegram"
+)
+
+// OrderRepository — контракт работы с заказами.
+type OrderRepository interface {
+	InsertWithItems(ctx context.Context, order *db.Order, items []db.OrderItem) (*db.Order, error)
+	Update(ctx context.Context, order *db.Order, id int64) (*db.Order, error)
+}
+
+// ProductReadRepository — контракт чтения товаров; совместим с db.ProductQuery.
+type ProductReadRepository interface {
+	db.ProductQuery
+}
+
+type OrderUsecase struct {
+	orders      OrderRepository
+	products    ProductReadRepository
+	stockCache  *cache.StockCache
+	moysklad    *moysklad.Client
+	telegramBot *telegram.Bot
+	logger      *zap.Logger
+}
+
+func NewOrderUsecase(
+	orderRepo OrderRepository,
+	productRepo ProductReadRepository,
+	stockCache *cache.StockCache,
+	moyskladClient *moysklad.Client,
+	telegramBot *telegram.Bot,
+	logger *zap.Logger,
+) *OrderUsecase {
+	return &OrderUsecase{
+		orders:      orderRepo,
+		products:    productRepo,
+		stockCache:  stockCache,
+		moysklad:    moyskladClient,
+		telegramBot: telegramBot,
+		logger:      logger,
+	}
+}
+
+// Локальные типы запроса повторяют структуру services.CreateOrderRequest,
+// чтобы не тянуть сервисный слой внутрь usecase и избежать циклов импорта.
+type CreateOrderItem struct {
+	ProductID int64 `json:"product_id"`
+	Quantity  int   `json:"quantity"`
+}
+
+type CreateOrderRequest struct {
+	UserID       int64             `json:"user_id"`
+	CustomerName string            `json:"customer_name"`
+	Phone        string            `json:"phone"`
+	Address      *string           `json:"address"`
+	Comment      *string           `json:"comment"`
+	Items        []CreateOrderItem `json:"items"`
+}
+
+func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) (*db.Order, error) {
+	// Простая локальная валидация (чтобы не тянуть сервисы и не создавать циклы импорта)
+	if req.CustomerName == "" {
+		return nil, fmt.Errorf("customer name is required")
+	}
+	if req.Phone == "" {
+		return nil, fmt.Errorf("phone is required")
+	}
+	if len(req.Items) == 0 {
+		return nil, fmt.Errorf("at least one item is required")
+	}
+
+	var totalPrice float64
+	items := make([]db.OrderItem, 0, len(req.Items))
+
+	// Резервируем товары и проверяем доступность
+	for _, item := range req.Items {
+		product, err := u.products.GetByID(ctx, item.ProductID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get product %d: %w", item.ProductID, err)
+		}
+		if product == nil {
+			return nil, fmt.Errorf("product %d not found", item.ProductID)
+		}
+		if !product.Active {
+			return nil, fmt.Errorf("product %d is not active", item.ProductID)
+		}
+
+		// Проверяем доступный остаток
+		availableStock, err := u.stockCache.GetAvailableStock(ctx, item.ProductID, u.products)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check available stock for product %d: %w", item.ProductID, err)
+		}
+
+		if availableStock < item.Quantity {
+			return nil, fmt.Errorf("insufficient stock for product %d. Available: %d, Requested: %d", item.ProductID, availableStock, item.Quantity)
+		}
+
+		// Резервируем товар
+		if err := u.stockCache.ReserveStock(ctx, item.ProductID, item.Quantity); err != nil {
+			return nil, fmt.Errorf("failed to reserve stock for product %d: %w", item.ProductID, err)
+		}
+
+		itemPrice := product.Price * float64(item.Quantity)
+		totalPrice += itemPrice
+
+		items = append(items, db.OrderItem{
+			ProductID: item.ProductID,
+			Quantity:  item.Quantity,
+			Price:     product.Price,
+		})
+	}
+
+	order := &db.Order{
+		UserID:       &req.UserID,
+		Status:       "pending",
+		TotalPrice:   totalPrice,
+		CustomerName: req.CustomerName,
+		Phone:        req.Phone,
+		Address:      req.Address,
+		Comment:      req.Comment,
+	}
+
+	order, err := u.orders.InsertWithItems(ctx, order, items)
+	if err != nil {
+		// При ошибке освобождаем все резервирования
+		for _, item := range req.Items {
+			u.stockCache.ReleaseStock(ctx, item.ProductID, item.Quantity)
+		}
+		return nil, fmt.Errorf("failed to create order: %w", err)
+	}
+
+	// Telegram-уведомление
+	if u.telegramBot != nil {
+		if err := u.telegramBot.SendOrderNotification(ctx, order); err != nil {
+			u.logger.Warn("Failed to send telegram notification", zap.Error(err))
+		}
+	}
+
+	// Создание заказа в МойСклад
+	if u.moysklad != nil {
+		moyskladID, err := u.moysklad.CreateOrderFromDB(ctx, order, u.products)
+		if err != nil {
+			u.logger.Warn("Failed to create order in Moysklad", zap.Error(err))
+		} else if moyskladID != nil {
+			order.MoyskladID = moyskladID
+			if _, err := u.orders.Update(ctx, order, order.ID); err != nil {
+				u.logger.Warn("Failed to update order with Moysklad ID", zap.Error(err))
+			}
+		}
+	}
+
+	return order, nil
+}

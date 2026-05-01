@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.title}} - Телегинс Шоп</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/admin.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Админ-панель</h1>
+            <nav>
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div id="loginSection" class="login-section">
+            <h2>Вход в админ-панель</h2>
+            <form id="loginForm">
+                <input type="text" name="username" placeholder="Логин" required>
+                <input type="password" name="password" placeholder="Пароль" required>
+                <button type="submit" class="btn">Войти</button>
+            </form>
+        </div>
+
+        <div id="adminSection" class="admin-section" style="display: none;">
+            <h2>Управление акциями</h2>
+            <button class="btn" onclick="showCreatePromotionForm()">Создать акцию</button>
+            
+            <div id="promotionsList"></div>
+
+            <h2 style="margin-top: 3rem;">Синхронизация с МойСклад</h2>
+            <button class="btn" onclick="syncProducts()" id="syncBtn">🔄 Обновить товары сейчас</button>
+            <div id="syncResult" style="margin-top: 1rem;"></div>
+        </div>
+    </main>
+
+    <!-- Модальное окно создания/редактирования акции -->
+    <div id="promotionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closePromotionModal()">&times;</span>
+            <h2 id="promotionModalTitle">Создать акцию</h2>
+            <form id="promotionForm">
+                <input type="hidden" id="promotionId">
+                <input type="text" id="promotionTitle" placeholder="Название акции" required>
+                <textarea id="promotionDescription" placeholder="Описание"></textarea>
+                <input type="number" id="promotionDiscount" placeholder="Скидка (%)" step="0.01" min="0" max="100">
+                <input type="url" id="promotionImageURL" placeholder="URL изображения">
+                <label>
+                    <input type="checkbox" id="promotionActive"> Активна
+                </label>
+                <input type="datetime-local" id="promotionStartDate" placeholder="Дата начала">
+                <input type="datetime-local" id="promotionEndDate" placeholder="Дата окончания">
+                <button type="submit" class="btn">Сохранить</button>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Телегинс Шоп. Все права защищены.</p>
+        </div>
+    </footer>
+
+    <script src="/static/js/admin.js"></script>
+</body>
+</html>
+

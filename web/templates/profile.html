@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Личный кабинет - Телегинс Шоп</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .profile-container {
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .profile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        .profile-info {
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #007bff;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            font-weight: bold;
+        }
+        .profile-details h2 {
+            margin: 0 0 10px 0;
+            color: #333;
+        }
+        .profile-details p {
+            margin: 5px 0;
+            color: #666;
+        }
+        .profile-section {
+            margin-bottom: 30px;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 5px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .btn {
+            background: #28a745;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .btn:hover {
+            background: #218838;
+        }
+        .btn-secondary {
+            background: #6c757d;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .orders-section {
+            margin-top: 30px;
+        }
+        .order-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            border-left: 4px solid #007bff;
+        }
+        .order-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .order-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .status-pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status-cancelled {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .logout-btn {
+            background: #dc3545;
+        }
+        .logout-btn:hover {
+            background: #c82333;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Telegins Shop</h1>
+            <nav class="main-nav">
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+                <a href="/cart">Корзина</a>
+            </nav>
+            <div class="user-area" id="userArea">
+                <div class="auth-buttons" id="authButtons">
+                    <a href="/register" class="btn btn-outline">Регистрация</a>
+                    <a href="/login" class="btn btn-primary">Вход</a>
+                </div>
+                <div class="user-menu" id="userMenu" style="display: none;">
+                    <div class="user-avatar" id="userAvatar">
+                        <span id="avatarLetter">U</span>
+                    </div>
+                    <div class="dropdown-menu" id="dropdownMenu">
+                        <a href="/profile">Профиль</a>
+                        <a href="#" onclick="logout()">Выход</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="profile-container">
+            <div class="profile-header">
+                <div class="profile-info">
+                    <div class="avatar">
+                        <span id="user-initial">U</span>
+                    </div>
+                    <div class="profile-details">
+                        <h2 id="user-name">Загрузка...</h2>
+                        <p id="user-email">email@example.com</p>
+                        <p id="user-phone">+7 XXX XXX-XX-XX</p>
+                        <p id="user-address">Адрес не указан</p>
+                    </div>
+                </div>
+                <button class="btn logout-btn" onclick="logout()">Выйти</button>
+            </div>
+
+            <div id="error-message" class="error-message" style="display: none;"></div>
+            <div id="success-message" class="success-message" style="display: none;"></div>
+
+            <div class="profile-section">
+                <h3 class="section-title">Редактирование профиля</h3>
+                <form id="profile-form">
+                    <div class="form-group">
+                        <label for="name">Полное имя *</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Телефон *</label>
+                        <input type="tel" id="phone" name="phone" required placeholder="+7 XXX XXX-XX-XX">
+                    </div>
+                    <div class="form-group">
+                        <label for="address">Адрес</label>
+                        <input type="text" id="address" name="address">
+                    </div>
+                    <button type="submit" class="btn">Сохранить изменения</button>
+                </form>
+            </div>
+
+            <div class="orders-section">
+                <h3 class="section-title">Мои заказы</h3>
+                <div id="orders-list">
+                    <p>Загрузка заказов...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Проверяем авторизацию с валидацией токена
+        async function checkAuth() {
+            const token = localStorage.getItem('auth_token');
+            const user = localStorage.getItem('user');
+            
+            if (!token || !user) {
+                window.location.href = '/login';
+                return false;
+            }
+            
+            // Проверяем валидность токена
+            try {
+                const response = await fetch('/api/auth/verify', {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                
+                if (!response.ok) {
+                    // Токен недействителен, удаляем и перенаправляем
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user');
+                    window.location.href = '/login';
+                    return false;
+                }
+                
+                return JSON.parse(user);
+            } catch (error) {
+                console.error('Token verification failed:', error);
+                localStorage.removeItem('auth_token');
+                localStorage.removeItem('user');
+                window.location.href = '/login';
+                return false;
+            }
+        }
+
+        // Загружаем профиль
+        async function loadProfile() {
+            const user = await checkAuth();
+            if (!user) return;
+
+            document.getElementById('user-name').textContent = user.name || user.username || 'Имя не указано';
+            document.getElementById('user-email').textContent = user.email || 'Email не указан';
+            document.getElementById('user-phone').textContent = user.phone || 'Телефон не указан';
+            document.getElementById('user-address').textContent = user.address || 'Адрес не указан';
+            
+            // First letter of name for avatar (prefer name, then username, then email)
+            const initial = (user.name || user.username || user.email || 'U').charAt(0).toUpperCase();
+            document.getElementById('user-initial').textContent = initial;
+            
+            // Заполняем форму
+            document.getElementById('name').value = user.name || '';
+            document.getElementById('phone').value = user.phone || '';
+            document.getElementById('address').value = user.address || '';
+            
+            // Загружаем заказы
+            loadOrders();
+        }
+
+        // Загружаем заказы
+        async function loadOrders() {
+            try {
+                const response = await fetch('/api/orders', {
+                    headers: {
+                        'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
+                    }
+                });
+                
+                if (response.ok) {
+                    const orders = await response.json();
+                    displayOrders(orders);
+                } else {
+                    document.getElementById('orders-list').innerHTML = '<p>Ошибка загрузки заказов</p>';
+                }
+            } catch (error) {
+                document.getElementById('orders-list').innerHTML = '<p>Ошибка соединения</p>';
+            }
+        }
+
+        // Отображаем заказы
+        function displayOrders(orders) {
+            if (!orders || orders.length === 0) {
+                document.getElementById('orders-list').innerHTML = '<p>У вас пока нет заказов</p>';
+                return;
+            }
+
+            const ordersHtml = orders.map(order => `
+                <div class="order-item">
+                    <div class="order-header">
+                        <div>
+                            <strong>Заказ #${order.id}</strong>
+                            <span>${new Date(order.created_at).toLocaleDateString('ru-RU')}</span>
+                        </div>
+                        <div class="order-status status-${order.status}">
+                            ${getStatusText(order.status)}
+                        </div>
+                    </div>
+                    <div>
+                        <strong>Сумма:</strong> ${order.total_price} ₽
+                    </div>
+                    ${order.customer_name ? `<div><strong>Имя:</strong> ${order.customer_name}</div>` : ''}
+                    ${order.phone ? `<div><strong>Телефон:</strong> ${order.phone}</div>` : ''}
+                    ${order.address ? `<div><strong>Адрес:</strong> ${order.address}</div>` : ''}
+                    ${order.comment ? `<div><strong>Комментарий:</strong> ${order.comment}</div>` : ''}
+                </div>
+            `).join('');
+
+            document.getElementById('orders-list').innerHTML = ordersHtml;
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'pending': 'В обработке',
+                'completed': 'Выполнен',
+                'cancelled': 'Отменен'
+            };
+            return statusMap[status] || status;
+        }
+
+        // Обновление профиля
+        document.getElementById('profile-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                address: document.getElementById('address').value
+            };
+            
+            try {
+                const response = await fetch('/api/auth/profile', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + localStorage.getItem('auth_token')
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showMessage('success', 'Профиль успешно обновлен!');
+                    // Update local data
+                    const user = JSON.parse(localStorage.getItem('user'));
+                    Object.assign(user, formData);
+                    localStorage.setItem('user', JSON.stringify(user));
+                    
+                    // Update avatar letter if name was changed
+                    updateAvatarLetter(user);
+                    loadProfile();
+                } else {
+                    showMessage('error', data.error || 'Ошибка обновления профиля');
+                }
+            } catch (error) {
+                showMessage('error', 'Ошибка соединения');
+            }
+        });
+
+        function showMessage(type, message) {
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            if (type === 'error') {
+                errorDiv.textContent = message;
+                errorDiv.style.display = 'block';
+            } else {
+                successDiv.textContent = message;
+                successDiv.style.display = 'block';
+            }
+            
+            // Скрываем через 3 секунды
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+                successDiv.style.display = 'none';
+            }, 3000);
+        }
+
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            window.location.href = '/login';
+        }
+
+        // Update avatar letter when user data changes
+        function updateAvatarLetter(user) {
+            const avatarLetter = document.getElementById('avatarLetter');
+            const userInitial = document.getElementById('user-initial');
+            
+            // Get name for avatar (prefer name, then username, then email)
+            const name = user.name || user.username || user.email || 'U';
+            const letter = name.charAt(0).toUpperCase();
+            
+            // Update both avatar letters (header and profile)
+            if (avatarLetter) avatarLetter.textContent = letter;
+            if (userInitial) userInitial.textContent = letter;
+        }
+
+        // Check user authentication state
+        function checkAuthState() {
+            const token = localStorage.getItem('auth_token');
+            const user = localStorage.getItem('user');
+            
+            if (token && user) {
+                showUserMenu(JSON.parse(user));
+            } else {
+                showAuthButtons();
+            }
+        }
+
+        // Show user menu with avatar
+        function showUserMenu(user) {
+            const authButtons = document.getElementById('authButtons');
+            const userMenu = document.getElementById('userMenu');
+            const avatarLetter = document.getElementById('avatarLetter');
+            
+            // Hide auth buttons, show user menu
+            authButtons.style.display = 'none';
+            userMenu.style.display = 'flex';
+            
+            // Set avatar letter (first letter of name, then username, then email)
+            const name = user.name || user.username || user.email || 'U';
+            avatarLetter.textContent = name.charAt(0).toUpperCase();
+        }
+
+        // Show auth buttons for guests
+        function showAuthButtons() {
+            const authButtons = document.getElementById('authButtons');
+            const userMenu = document.getElementById('userMenu');
+            
+            // Show auth buttons, hide user menu
+            authButtons.style.display = 'flex';
+            userMenu.style.display = 'none';
+        }
+
+        // Toggle dropdown menu
+        document.getElementById('userAvatar')?.addEventListener('click', function() {
+            const dropdown = document.getElementById('dropdownMenu');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const userMenu = document.getElementById('userMenu');
+            const dropdown = document.getElementById('dropdownMenu');
+            
+            if (!userMenu.contains(event.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAuthState();
+            loadProfile();
+        });
+    </script>
+</body>
+</html>

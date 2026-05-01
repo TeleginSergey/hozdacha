@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{.product.Name}} - Телегинс Шоп</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/product-detail.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>Телегинс Шоп</h1>
+            <nav>
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="product-detail">
+            <div class="product-detail-image">
+                {{if .product.ImageURL}}
+                    <img src="{{.product.ImageURL}}" alt="{{.product.Name}}" id="productImage">
+                {{else}}
+                    <div class="no-image">Нет изображения</div>
+                {{end}}
+            </div>
+            
+            <div class="product-detail-info">
+                <h1>{{.product.Name}}</h1>
+                
+                {{if .product.Description}}
+                    <div class="product-description">
+                        <h3>Описание</h3>
+                        <p>{{.product.Description}}</p>
+                    </div>
+                {{end}}
+                
+                <div class="product-price-stock">
+                    <p class="price">Цена: <span>{{printf "%.2f" .product.Price}} руб.</span></p>
+                    {{if gt .product.Stock 0}}
+                        <p class="stock">В наличии: <span>{{.product.Stock}} шт.</span></p>
+                    {{else}}
+                        <p class="stock out-of-stock">Сейчас нет в наличии</p>
+                    {{end}}
+                </div>
+                
+                <div class="product-actions">
+                    <button class="btn btn-primary" onclick="addToCartFromDetail({{.product.ID}}, '{{.product.Name}}', {{.product.Price}})" 
+                            {{if or (not .product.Active) (eq .product.Stock 0)}}disabled{{end}}>
+                        В корзину
+                    </button>
+                    <a href="/catalog" class="btn btn-secondary">Вернуться в каталог</a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 Телегинс Шоп. Все права защищены.</p>
+        </div>
+    </footer>
+
+    <script src="/static/js/catalog.js?v=2"></script>
+    <script>
+        function addToCartFromDetail(productId, name, price) {
+            addToCart(productId, name, price);
+            alert('Товар добавлен в корзину!');
+        }
+    </script>
+</body>
+</html>
+
