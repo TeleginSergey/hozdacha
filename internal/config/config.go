@@ -64,10 +64,10 @@ func Load() (*Config, error) {
 
 	return &Config{
 		DB: DBConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
+			Host:     getEnv("DB_HOST", "postgres"),
 			Port:     port,
 			User:     getEnv("DB_USER", "postgres"),
-			Password: getEnv("DB_PASSWORD", "postgres"),
+			Password: getEnv("DB_PASSWORD", "wT+wh1D3wm13EbzKdbnLo0iLQUrDAbuqsJAtrdJSroo="),
 			Name:     getEnv("DB_NAME", "hozdacha"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
@@ -76,15 +76,15 @@ func Load() (*Config, error) {
 			Host: getEnv("SERVER_HOST", "localhost"),
 		},
 		JWT: JWTConfig{
-			Secret:     getEnv("JWT_SECRET", "change-me-in-production"),
+			Secret:     getEnv("JWT_SECRET", "cb86c5a5cd3f79c0dce45edbc29046858fda85cc02a206112ca76b6cfba8d812"),
 			Expiration: expiration,
 		},
 		Moysklad: MoyskladConfig{
-			Token:             getEnv("MOYSKLAD_TOKEN", ""),
+			Token:             getEnv("MOYSKLAD_TOKEN", "47ce83c983ae81c9da6caaf2d7a28a5bf4124775"),
 			BaseURL:           getEnv("MOYSKLAD_BASE_URL", "https://api.moysklad.ru/api/remap/1.2"),
 			AutoSync:          getEnv("MOYSKLAD_AUTO_SYNC", "true") == "true",
 			SyncInterval:      parseDuration(getEnv("MOYSKLAD_SYNC_INTERVAL", "1h")), // Резервная синхронизация каждые 1 час
-			WebhookSecret:     getEnv("MOYSKLAD_WEBHOOK_SECRET", ""),
+			WebhookSecret:     getEnv("MOYSKLAD_WEBHOOK_SECRET", "a15b3006e171f232b232acbb230c397a6e5368c40317f4a3e528b81768936e4c"),
 			StockBuffer:       parseFloat(getEnv("MOYSKLAD_STOCK_BUFFER", "3.0")),         // Уменьшили буфер до 3%
 			RequestsPerSecond: parseFloat(getEnv("MOYSKLAD_REQUESTS_PER_SECOND", "10.0")), // 10/сек = 600/минуту (75% от 800 лимита)
 			MaxRetries:        parseInt(getEnv("MOYSKLAD_MAX_RETRIES", "3")),              // 3 попытки
@@ -92,7 +92,7 @@ func Load() (*Config, error) {
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "redis"),
 			Port:     getEnv("REDIS_PORT", "6379"),
-			Password: getEnv("REDIS_PASSWORD", ""),
+			Password: getEnv("REDIS_PASSWORD", "flpWSUaPsbHZ3A"),
 			DB:       parseInt(getEnv("REDIS_DB", "0")),
 		},
 	}, nil
