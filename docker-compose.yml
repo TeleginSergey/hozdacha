@@ -1,7 +1,6 @@
 services:
-  postgres:
+  hozdacha_db:
     image: postgres:15-alpine
-    container_name: hozdacha_db
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
@@ -45,7 +44,7 @@ services:
     ports:
       - "${SERVER_PORT:-8080}:8080"
     depends_on:
-      postgres:
+      hozdacha_db:
         condition: service_healthy
       redis:
         condition: service_healthy
