@@ -31,6 +31,8 @@ const (
 	UsersUpdatedAt              = "users_updated_at"
 	UsersEmailVerified          = "users_email_verified"
 	UsersEmailVerificationToken = "users_email_verification_token"
+	UsersEmailVerificationCode  = "users_email_verification_code"
+	UsersVerificationExpiresAt  = "users_verification_expires_at"
 	UsersWebsite                = "users_website"
 )
 
@@ -49,6 +51,8 @@ type User struct {
 	UpdatedAt              *time.Time `db:"users_updated_at" updateAuth:"users_updated_at" update:"users_updated_at"`
 	EmailVerified          bool       `db:"users_email_verified" insert:"users_email_verified"`
 	EmailVerificationToken *string    `db:"users_email_verification_token" insert:"users_email_verification_token"`
+	EmailVerificationCode  *string    `db:"users_email_verification_code" insert:"users_email_verification_code"`
+	VerificationExpiresAt  *time.Time `db:"users_verification_expires_at" insert:"users_verification_expires_at"`
 	Website                *string    `db:"users_website" insert:"users_website"` // Honeypot field
 }
 
@@ -75,6 +79,9 @@ type UserQuery interface {
 	Delete(ctx context.Context, id int64) error
 	GetByEmailVerificationToken(ctx context.Context, token string) (*User, error)
 	UpdateEmailVerification(ctx context.Context, userID int64, verified bool, token *string) error
+	UpdateVerificationCode(ctx context.Context, userID int64, code string, expiresAt time.Time) error
+	GetByEmailAndCode(ctx context.Context, email string, code string) (*User, error)
+	VerifyEmailByCode(ctx context.Context, userID int64) error
 }
 
 type userQuery struct {
@@ -514,6 +521,88 @@ func (u *userQuery) DeleteUnverifiedUsers(ctx context.Context, cutoff time.Time)
 	rowsAffected := result.RowsAffected()
 	u.logger.Info("Deleted unverified users", zap.Int64("count", rowsAffected))
 	return rowsAffected, nil
+}
+
+func (u *userQuery) UpdateVerificationCode(ctx context.Context, userID int64, code string, expiresAt time.Time) error {
+	u.logger.Debug("Updating verification code", zap.Int64("user_id", userID))
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	qb, args, err := u.sq.Update(UsersTable).
+		Set(UsersEmailVerificationCode, code).
+		Set(UsersVerificationExpiresAt, expiresAt).
+		Where(squirrel.Eq{UsersID: userID}).
+		ToSql()
+	if err != nil {
+		u.logger.Error("Failed to build query", zap.Error(err))
+		return fmt.Errorf("failed to build query: %w", err)
+	}
+
+	_, err = u.runner.Exec(ctx, qb, args...)
+	if err != nil {
+		u.logger.Error("Failed to update verification code", zap.Int64("user_id", userID), zap.Error(err))
+		return fmt.Errorf("failed to execute query: %w", err)
+	}
+
+	u.logger.Info("Verification code updated", zap.Int64("user_id", userID))
+	return nil
+}
+
+func (u *userQuery) GetByEmailAndCode(ctx context.Context, email string, code string) (*User, error) {
+	u.logger.Debug("Getting user by email and code", zap.String("email", email))
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	qb, args, err := u.sq.Select(stomUserSelect.TagValues()...).
+		From(UsersTable).
+		Where(squirrel.And{
+			squirrel.Eq{UsersEmail: email},
+			squirrel.Eq{UsersEmailVerificationCode: code},
+			squirrel.Gt{UsersVerificationExpiresAt: time.Now()},
+		}).
+		ToSql()
+	if err != nil {
+		u.logger.Error("Failed to build query", zap.Error(err))
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+
+	var user User
+	err = pgxscan.Get(ctx, u.runner, &user, qb, args...)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, fmt.Errorf("invalid or expired verification code")
+		}
+		u.logger.Error("Failed to get user by email and code", zap.Error(err))
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+
+	return &user, nil
+}
+
+func (u *userQuery) VerifyEmailByCode(ctx context.Context, userID int64) error {
+	u.logger.Debug("Verifying email by code", zap.Int64("user_id", userID))
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	qb, args, err := u.sq.Update(UsersTable).
+		Set(UsersEmailVerified, true).
+		Set(UsersEmailVerificationCode, nil).
+		Set(UsersVerificationExpiresAt, nil).
+		Where(squirrel.Eq{UsersID: userID}).
+		ToSql()
+	if err != nil {
+		u.logger.Error("Failed to build query", zap.Error(err))
+		return fmt.Errorf("failed to build query: %w", err)
+	}
+
+	_, err = u.runner.Exec(ctx, qb, args...)
+	if err != nil {
+		u.logger.Error("Failed to verify email", zap.Int64("user_id", userID), zap.Error(err))
+		return fmt.Errorf("failed to execute query: %w", err)
+	}
+
+	u.logger.Info("Email verified successfully", zap.Int64("user_id", userID))
+	return nil
 }
 
 func GenerateSecretKey() (string, error) {

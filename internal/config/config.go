@@ -15,6 +15,7 @@ type Config struct {
 	JWT      JWTConfig
 	Moysklad MoyskladConfig
 	Redis    RedisConfig
+	SMTP     SMTPConfig
 }
 
 type DBConfig struct {
@@ -52,6 +53,15 @@ type RedisConfig struct {
 	Port     string
 	Password string
 	DB       int
+}
+
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	From     string
+	UseTLS   bool
 }
 
 func Load() (*Config, error) {
@@ -94,6 +104,14 @@ func Load() (*Config, error) {
 			Port:     getEnv("REDIS_PORT", "6379"),
 			Password: getEnv("REDIS_PASSWORD", "flpWSUaPsbHZ3A"),
 			DB:       parseInt(getEnv("REDIS_DB", "0")),
+		},
+		SMTP: SMTPConfig{
+			Host:     getEnv("SMTP_HOST", "smtp.gmail.com"),
+			Port:     parseInt(getEnv("SMTP_PORT", "587")),
+			Username: getEnv("SMTP_USERNAME", ""),
+			Password: getEnv("SMTP_PASSWORD", ""),
+			From:     getEnv("SMTP_FROM", "noreply@hozdacha.ru"),
+			UseTLS:   getEnv("SMTP_USE_TLS", "true") == "true",
 		},
 	}, nil
 }

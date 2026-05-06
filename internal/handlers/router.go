@@ -98,6 +98,11 @@ func SetupRouter(
 		{
 			auth.POST("/register", userHandler.Register)
 			auth.POST("/login", userHandler.Login)
+			auth.POST("/logout", middleware.AuthMiddleware(jwtSecret), userHandler.Logout)
+			auth.POST("/verify-email", userHandler.VerifyEmail)
+			auth.POST("/resend-code", userHandler.ResendVerificationCode)
+			auth.POST("/forgot-password", userHandler.ForgotPassword)
+			auth.POST("/reset-password", userHandler.ResetPassword)
 			// Profile endpoints require authentication
 			authProfile := auth.Group("/profile")
 			authProfile.Use(middleware.AuthMiddleware(jwtSecret))

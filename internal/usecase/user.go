@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
+	mathrand "math/rand"
 	"strings"
 	"time"
 
@@ -87,14 +89,14 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 		return nil, fmt.Errorf("failed to hash password: %w", err)
 	}
 
-	// Создаем пользователя (сразу активного)
+	// Создаем пользователя (требуется верификация email)
 	now := time.Now()
 	user := &db.User{
 		Username:      req.Username,
 		Email:         req.Email,
 		Password:      string(hashedPassword),
-		RoleID:        2,    // Роль "user" (обычно ID 2)
-		EmailVerified: true, // Сразу верифицирован
+		RoleID:        2,     // Роль "user" (обычно ID 2)
+		EmailVerified: false, // Требуется верификация email
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
@@ -104,8 +106,46 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 		return nil, fmt.Errorf("failed to create user: %w", err)
 	}
 
-	// Пользователь сразу активен - email верификация не нужна
-	u.logger.Info("User registered successfully",
+	u.logger.Info("User registered, awaiting email verification",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email))
+
+	return user, nil
+}
+
+// GenerateVerificationCode генерирует 6-значный код верификации
+func (u *UserUsecase) GenerateVerificationCode() string {
+	// Генерируем случайное число от 100000 до 999999
+	code := 100000 + mathrand.Intn(900000)
+	return fmt.Sprintf("%06d", code)
+}
+
+// SaveVerificationCode сохраняет код верификации в БД
+func (u *UserUsecase) SaveVerificationCode(ctx context.Context, userID int64, code string) error {
+	expiresAt := time.Now().Add(30 * time.Minute) // Код действителен 30 минут
+	return u.users.UpdateVerificationCode(ctx, userID, code, expiresAt)
+}
+
+// VerifyEmailByCode проверяет код верификации и активирует аккаунт
+func (u *UserUsecase) VerifyEmailByCode(ctx context.Context, email, code string) (*db.User, error) {
+	// Ищем пользователя с указанным email и кодом
+	user, err := u.users.GetByEmailAndCode(ctx, email, code)
+	if err != nil {
+		return nil, fmt.Errorf("invalid or expired verification code")
+	}
+
+	// Помечаем email как верифицированный
+	err = u.users.VerifyEmailByCode(ctx, user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to verify email: %w", err)
+	}
+
+	// Обновляем данные пользователя
+	user.EmailVerified = true
+	user.EmailVerificationCode = nil
+	user.VerificationExpiresAt = nil
+
+	u.logger.Info("Email verified successfully",
 		zap.Int64("user_id", user.ID),
 		zap.String("email", user.Email))
 
@@ -140,8 +180,19 @@ func (u *UserUsecase) Login(ctx context.Context, req LoginRequest) (*AuthRespons
 		return nil, fmt.Errorf("invalid username or password")
 	}
 
-	// Генерируем JWT токен
-	token, err := generateJWTToken(user.ID, user.Username, user.Email, u.jwtSecret)
+	// Проверяем, что email верифицирован
+	if !user.EmailVerified {
+		return nil, fmt.Errorf("email not verified. Please verify your email before logging in")
+	}
+
+	// Определяем роль пользователя
+	role := "user"
+	if user.RoleID == 1 {
+		role = "admin"
+	}
+
+	// Генерируем JWT токен с ролью
+	token, err := generateJWTTokenWithRole(user.ID, user.Username, user.Email, role, u.jwtSecret)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate token: %w", err)
 	}
@@ -165,16 +216,55 @@ func (u *UserUsecase) Login(ctx context.Context, req LoginRequest) (*AuthRespons
 	}, nil
 }
 
+// GenerateJWTToken генерирует JWT токен для пользователя
+func (u *UserUsecase) GenerateJWTToken(userID int64, username, email string) (string, error) {
+	// По умолчанию роль "user"
+	return generateJWTTokenWithRole(userID, username, email, "user", u.jwtSecret)
+}
+
+// GetUserByEmail получает пользователя по email
+func (u *UserUsecase) GetUserByEmail(ctx context.Context, email string) (*db.User, error) {
+	user, err := u.users.GetByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	if user == nil {
+		return nil, fmt.Errorf("user not found")
+	}
+	return user, nil
+}
+
 func generateJWTToken(userID int64, username, email, secret string) (string, error) {
+	// Для обратной совместимости - генерируем токен без роли
+	return generateJWTTokenWithRole(userID, username, email, "user", secret)
+}
+
+// generateJWTTokenWithRole генерирует JWT токен с указанием роли
+func generateJWTTokenWithRole(userID int64, username, email, role, secret string) (string, error) {
+	now := time.Now()
+
+	// Генерируем уникальный JTI (JWT ID) для возможности отзыва токена
+	jti := generateJTI()
+
 	claims := jwt.MapClaims{
 		"user_id":  userID,
 		"username": username,
 		"email":    email,
-		"exp":      time.Now().Add(time.Hour * 24).Unix(),
+		"role":     role,                           // Роль пользователя
+		"jti":      jti,                            // Уникальный ID токена
+		"exp":      now.Add(time.Hour * 24).Unix(), // 24 часа
+		"iat":      now.Unix(),                     // Время выпуска
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
+}
+
+// generateJTI создаёт уникальный идентификатор для JWT токена
+func generateJTI() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }
 
 func (u *UserUsecase) GetProfile(ctx context.Context, userID int64) (*db.User, error) {
@@ -259,4 +349,49 @@ func generateSecret() string {
 	key := make([]byte, 32)
 	rand.Read(key)
 	return base64.URLEncoding.EncodeToString(key)
+}
+
+// GetByEmailAndCode возвращает пользователя по email и коду верификации
+func (u *UserUsecase) GetByEmailAndCode(ctx context.Context, email, code string) (*db.User, error) {
+	return u.users.GetByEmailAndCode(ctx, email, code)
+}
+
+// ResetPassword сбрасывает пароль пользователя
+func (u *UserUsecase) ResetPassword(ctx context.Context, userID int64, newPassword string) error {
+	// Проверяем сложность пароля
+	if !u.isPasswordStrong(newPassword) {
+		return fmt.Errorf("password is too weak")
+	}
+
+	// Хешируем новый пароль
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Получаем пользователя
+	user, err := u.users.GetByID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get user: %w", err)
+	}
+
+	// Обновляем пароль
+	user.Password = string(hashedPassword)
+	now := time.Now()
+	user.UpdatedAt = &now
+
+	_, err = u.users.Update(ctx, user, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update password: %w", err)
+	}
+
+	u.logger.Info("Password reset successfully",
+		zap.Int64("user_id", userID))
+
+	return nil
+}
+
+// ClearVerificationCode очищает код верификации после использования
+func (u *UserUsecase) ClearVerificationCode(ctx context.Context, userID int64) error {
+	return u.users.VerifyEmailByCode(ctx, userID)
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/config"
 	"github.com/TeleginSergey/hozdacha/internal/db"
 	"github.com/TeleginSergey/hozdacha/internal/handlers"
+	"github.com/TeleginSergey/hozdacha/internal/middleware"
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
 	"github.com/TeleginSergey/hozdacha/internal/services"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
@@ -98,9 +99,21 @@ func NewApp() (*App, error) {
 		scheduler = services.NewScheduler(moyskladSyncService, cfg.Moysklad.SyncInterval, logger)
 	}
 
+	// Email Service
+	emailService := services.NewEmailService(cfg.SMTP, logger)
+
+	// Blacklist Service (для отзыва токенов)
+	var blacklistService *services.TokenBlacklistService
+	if cfg.Redis.Host != "" && stockCache != nil {
+		// Используем тот же Redis клиент
+		blacklistService = services.NewTokenBlacklistService(stockCache.GetRedisClient(), logger)
+		middleware.SetBlacklistChecker(blacklistService)
+		logger.Info("Token blacklist service initialized")
+	}
+
 	// Handlers поверх usecase // Handlers
 	authHandler := handlers.NewAuthHandler(authService, logger)
-	userHandler := handlers.NewUserHandler(userUC, logger)
+	userHandler := handlers.NewUserHandler(userUC, emailService, blacklistService, logger)
 	productHandler := handlers.NewProductHandlerWithUsecase(productUC, logger)
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo, logger)
 	orderHandler := handlers.NewOrderHandlerWithUsecase(orderUC, logger)

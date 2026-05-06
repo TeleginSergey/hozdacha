@@ -8,18 +8,23 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"github.com/TeleginSergey/hozdacha/internal/services"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
 )
 
 type UserHandler struct {
-	userUC *usecase.UserUsecase
-	logger *zap.Logger
+	userUC           *usecase.UserUsecase
+	emailService     *services.EmailService
+	blacklistService *services.TokenBlacklistService
+	logger           *zap.Logger
 }
 
-func NewUserHandler(userUC *usecase.UserUsecase, logger *zap.Logger) *UserHandler {
+func NewUserHandler(userUC *usecase.UserUsecase, emailService *services.EmailService, blacklistService *services.TokenBlacklistService, logger *zap.Logger) *UserHandler {
 	return &UserHandler{
-		userUC: userUC,
-		logger: logger,
+		userUC:           userUC,
+		emailService:     emailService,
+		blacklistService: blacklistService,
+		logger:           logger,
 	}
 }
 
@@ -102,23 +107,56 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// Генерируем 6-значный код верификации
+	code := h.userUC.GenerateVerificationCode()
+
+	// Сохраняем код в БД
+	err = h.userUC.SaveVerificationCode(c.Request.Context(), user.ID, code)
+	if err != nil {
+		h.logger.Error("Failed to save verification code",
+			zap.Int64("user_id", user.ID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save verification code"})
+		return
+	}
+
+	// Отправляем email асинхронно в горутине
+	go func() {
+		name := user.Username
+		if name == "" {
+			name = user.Email
+		}
+
+		err := h.emailService.SendVerificationCode(user.Email, name, code)
+		if err != nil {
+			h.logger.Error("Failed to send verification email",
+				zap.Int64("user_id", user.ID),
+				zap.String("email", user.Email),
+				zap.Error(err))
+		} else {
+			h.logger.Info("Verification email sent",
+				zap.Int64("user_id", user.ID),
+				zap.String("email", user.Email))
+		}
+	}()
+
 	// Обновляем время регистрации
 	lastRegistrationTime[clientIP] = time.Now()
 	registrationAttempts[clientIP] = 0
 
-	h.logger.Info("User registered successfully",
+	h.logger.Info("User registered, verification code sent",
 		zap.Int64("user_id", user.ID),
 		zap.String("username", user.Username),
 		zap.String("email", user.Email),
 		zap.String("ip", clientIP))
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "Registration successful - you can now login",
+		"message": "Registration successful. Please check your email and enter the verification code.",
 		"user": gin.H{
 			"id":       user.ID,
 			"username": user.Username,
 			"email":    user.Email,
-			"active":   true, // Пользователь сразу активен
+			"verified": false,
 		},
 	})
 }
@@ -186,7 +224,123 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 	})
 }
 
-// Email verification removed - users are now activated immediately
+// VerifyEmailRequest - запрос на верификацию email
+type VerifyEmailRequest struct {
+	Email string `json:"email" binding:"required,email"`
+	Code  string `json:"code" binding:"required,len=6"`
+}
+
+// ResendCodeRequest - запрос на повторную отправку кода
+type ResendCodeRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// VerifyEmail проверяет код верификации и активирует аккаунт
+func (h *UserHandler) VerifyEmail(c *gin.Context) {
+	var req VerifyEmailRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format. Email and 6-digit code required."})
+		return
+	}
+
+	// Проверяем код и активируем аккаунт
+	user, err := h.userUC.VerifyEmailByCode(c.Request.Context(), req.Email, req.Code)
+	if err != nil {
+		h.logger.Warn("Email verification failed",
+			zap.String("email", req.Email),
+			zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired verification code"})
+		return
+	}
+
+	// Генерируем JWT токен после успешной верификации
+	token, err := h.userUC.GenerateJWTToken(user.ID, user.Username, user.Email)
+	if err != nil {
+		h.logger.Error("Failed to generate token after verification", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate authentication token"})
+		return
+	}
+
+	h.logger.Info("Email verified successfully",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email))
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Email verified successfully. You are now logged in.",
+		"token":   token,
+		"user": gin.H{
+			"id":       user.ID,
+			"username": user.Username,
+			"email":    user.Email,
+			"verified": true,
+		},
+	})
+}
+
+// ResendVerificationCode повторно отправляет код верификации
+func (h *UserHandler) ResendVerificationCode(c *gin.Context) {
+	var req ResendCodeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Valid email required"})
+		return
+	}
+
+	// Получаем пользователя по email
+	user, err := h.userUC.GetUserByEmail(c.Request.Context(), req.Email)
+	if err != nil {
+		h.logger.Warn("Resend code failed - user not found",
+			zap.String("email", req.Email))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found or email already verified"})
+		return
+	}
+
+	// Проверяем, что email еще не верифицирован
+	if user.EmailVerified {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already verified"})
+		return
+	}
+
+	// Генерируем новый код
+	code := h.userUC.GenerateVerificationCode()
+
+	// Сохраняем новый код
+	err = h.userUC.SaveVerificationCode(c.Request.Context(), user.ID, code)
+	if err != nil {
+		h.logger.Error("Failed to save new verification code",
+			zap.Int64("user_id", user.ID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate new code"})
+		return
+	}
+
+	// Отправляем email асинхронно
+	go func() {
+		name := user.Username
+		if name == "" {
+			name = user.Email
+		}
+
+		err := h.emailService.SendVerificationCode(user.Email, name, code)
+		if err != nil {
+			h.logger.Error("Failed to resend verification email",
+				zap.Int64("user_id", user.ID),
+				zap.String("email", user.Email),
+				zap.Error(err))
+		} else {
+			h.logger.Info("Verification email resent",
+				zap.Int64("user_id", user.ID),
+				zap.String("email", user.Email))
+		}
+	}()
+
+	h.logger.Info("Verification code resent",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email))
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Verification code sent. Please check your email.",
+	})
+}
 
 func (h *UserHandler) VerifyToken(c *gin.Context) {
 	// Проверяем авторизацию
@@ -288,4 +442,171 @@ func isWeakPassword(password string) bool {
 	}
 
 	return false
+}
+
+// LogoutRequest - запрос на выход
+// Logout добавляет текущий токен в чёрный список
+func (h *UserHandler) Logout(c *gin.Context) {
+	// Получаем JTI из контекста
+	jti, exists := c.Get("jti")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "No token to revoke"})
+		return
+	}
+
+	// Получаем время истечения токена из контекста
+	exp, exists := c.Get("exp")
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid token"})
+		return
+	}
+
+	// Вычисляем TTL для записи в blacklist
+	var ttl time.Duration
+	if expFloat, ok := exp.(float64); ok {
+		ttl = time.Until(time.Unix(int64(expFloat), 0))
+		if ttl <= 0 {
+			ttl = time.Second // Минимальное время
+		}
+	} else {
+		ttl = 24 * time.Hour // По умолчанию 24 часа
+	}
+
+	// Добавляем токен в чёрный список
+	if h.blacklistService != nil {
+		err := h.blacklistService.AddToBlacklist(c.Request.Context(), jti.(string), ttl)
+		if err != nil {
+			h.logger.Error("Failed to add token to blacklist",
+				zap.String("jti", jti.(string)),
+				zap.Error(err))
+			// Не возвращаем ошибку клиенту, но логируем
+		}
+	}
+
+	h.logger.Info("Token revoked",
+		zap.String("jti", jti.(string)),
+		zap.Duration("ttl", ttl))
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Logged out successfully",
+	})
+}
+
+// ForgotPasswordRequest - запрос на сброс пароля
+type ForgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// ForgotPassword отправляет код для сброса пароля
+func (h *UserHandler) ForgotPassword(c *gin.Context) {
+	var req ForgotPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Valid email required"})
+		return
+	}
+
+	// Ищем пользователя по email
+	user, err := h.userUC.GetUserByEmail(c.Request.Context(), req.Email)
+	if err != nil {
+		// Не раскрываем информацию о существовании пользователя
+		h.logger.Warn("Forgot password - user not found",
+			zap.String("email", req.Email))
+		c.JSON(http.StatusOK, gin.H{
+			"message": "If the email exists, a reset code has been sent",
+		})
+		return
+	}
+
+	// Генерируем код для сброса пароля
+	code := h.userUC.GenerateVerificationCode()
+
+	// Сохраняем код как код верификации (можно использовать тот же механизм)
+	err = h.userUC.SaveVerificationCode(c.Request.Context(), user.ID, code)
+	if err != nil {
+		h.logger.Error("Failed to save reset code",
+			zap.Int64("user_id", user.ID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process request"})
+		return
+	}
+
+	// Отправляем email асинхронно
+	go func() {
+		name := user.Username
+		if name == "" {
+			name = user.Email
+		}
+
+		err := h.emailService.SendPasswordResetCode(user.Email, name, code)
+		if err != nil {
+			h.logger.Error("Failed to send reset email",
+				zap.Int64("user_id", user.ID),
+				zap.String("email", user.Email),
+				zap.Error(err))
+		} else {
+			h.logger.Info("Reset email sent",
+				zap.Int64("user_id", user.ID),
+				zap.String("email", user.Email))
+		}
+	}()
+
+	h.logger.Info("Password reset requested",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email))
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "If the email exists, a reset code has been sent",
+	})
+}
+
+// ResetPasswordRequest - запрос на установку нового пароля
+type ResetPasswordRequest struct {
+	Email       string `json:"email" binding:"required,email"`
+	Code        string `json:"code" binding:"required,len=6"`
+	NewPassword string `json:"new_password" binding:"required,min=8"`
+}
+
+// ResetPassword устанавливает новый пароль после подтверждения кода
+func (h *UserHandler) ResetPassword(c *gin.Context) {
+	var req ResetPasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		return
+	}
+
+	// Проверяем код
+	user, err := h.userUC.GetByEmailAndCode(c.Request.Context(), req.Email, req.Code)
+	if err != nil {
+		h.logger.Warn("Reset password - invalid code",
+			zap.String("email", req.Email),
+			zap.Error(err))
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired code"})
+		return
+	}
+
+	// Сбрасываем пароль
+	err = h.userUC.ResetPassword(c.Request.Context(), user.ID, req.NewPassword)
+	if err != nil {
+		h.logger.Error("Failed to reset password",
+			zap.Int64("user_id", user.ID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		return
+	}
+
+	// Очищаем код верификации
+	err = h.userUC.ClearVerificationCode(c.Request.Context(), user.ID)
+	if err != nil {
+		h.logger.Warn("Failed to clear verification code after reset",
+			zap.Int64("user_id", user.ID),
+			zap.Error(err))
+	}
+
+	h.logger.Info("Password reset successful",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email))
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Password reset successfully. Please login with your new password.",
+	})
 }

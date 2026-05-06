@@ -49,6 +49,11 @@ func (c *StockCache) Close() error {
 	return c.client.Close()
 }
 
+// GetRedisClient возвращает Redis клиент для использования в других сервисах
+func (c *StockCache) GetRedisClient() *redis.Client {
+	return c.client
+}
+
 // SetStock кэширует остаток товара
 func (c *StockCache) SetStock(ctx context.Context, productID int64, moyskladID string, stock int) error {
 	key := fmt.Sprintf("stock:%d", productID)
