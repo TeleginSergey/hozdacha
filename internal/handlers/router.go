@@ -84,8 +84,8 @@ func SetupRouter(
 		})
 	})
 
-	// Админ-панель (требует авторизации)
-	router.GET("/admin", middleware.RequireAuth(), func(c *gin.Context) {
+	// Админ-панель (требует роли администратора)
+	router.GET("/admin", middleware.RequireAdmin(), func(c *gin.Context) {
 		c.HTML(http.StatusOK, "admin.html", gin.H{
 			"title": "Админ-панель",
 		})
