@@ -120,6 +120,12 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
+	// Логируем код в консоль для тестирования (если email не настроен)
+	h.logger.Info("VERIFICATION CODE (for testing)",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email),
+		zap.String("code", code))
+
 	// Отправляем email асинхронно в горутине
 	go func() {
 		name := user.Username
