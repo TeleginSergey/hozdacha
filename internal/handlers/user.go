@@ -97,7 +97,76 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Регистрируем пользователя
+	// Проверяем, существует ли пользователь с таким email
+	existingUser, err := h.userUC.GetUserByEmail(c.Request.Context(), req.Email)
+	if err == nil {
+		// Пользователь существует
+		if existingUser.EmailVerified {
+			// Email уже подтвержден
+			h.logger.Warn("Registration attempted for existing verified user",
+				zap.String("email", req.Email))
+			c.JSON(http.StatusBadRequest, gin.H{"error": "User with this email already exists and is verified. Please log in."})
+			return
+		} else {
+			// Email не подтвержден - отправляем новый код и возвращаем специальный ответ
+			h.logger.Info("User exists but not verified, resending code",
+				zap.Int64("user_id", existingUser.ID),
+				zap.String("email", req.Email))
+
+			// Генерируем новый код верификации
+			code := h.userUC.GenerateVerificationCode()
+
+			// Сохраняем код в БД
+			err = h.userUC.SaveVerificationCode(c.Request.Context(), existingUser.ID, code)
+			if err != nil {
+				h.logger.Error("Failed to save verification code for existing user",
+					zap.Int64("user_id", existingUser.ID),
+					zap.Error(err))
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification code"})
+				return
+			}
+
+			// Отправляем email асинхронно
+			go func() {
+				name := existingUser.Username
+				if name == "" {
+					name = existingUser.Email
+				}
+
+				err := h.emailService.SendVerificationCode(existingUser.Email, name, code)
+				if err != nil {
+					h.logger.Error("Failed to send verification email for existing user",
+						zap.Int64("user_id", existingUser.ID),
+						zap.String("email", existingUser.Email),
+						zap.Error(err))
+				} else {
+					h.logger.Info("Verification email resent for existing user",
+						zap.Int64("user_id", existingUser.ID),
+						zap.String("email", existingUser.Email))
+				}
+			}()
+
+			// Логируем код для тестирования
+			h.logger.Info("VERIFICATION CODE (for testing)",
+				zap.Int64("user_id", existingUser.ID),
+				zap.String("email", existingUser.Email),
+				zap.String("code", code))
+
+			c.JSON(http.StatusAccepted, gin.H{
+				"message":               "User with this email already exists but is not verified. A new verification code has been sent to your email.",
+				"requires_verification": true,
+				"user": gin.H{
+					"id":       existingUser.ID,
+					"username": existingUser.Username,
+					"email":    existingUser.Email,
+					"verified": false,
+				},
+			})
+			return
+		}
+	}
+
+	// Регистрируем нового пользователя
 	user, err := h.userUC.Register(c.Request.Context(), req)
 	if err != nil {
 		h.logger.Warn("Registration failed",

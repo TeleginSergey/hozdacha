@@ -259,7 +259,31 @@
                     btn.textContent = 'Подтвердить регистрацию';
                     registrationStep = 2;
                     
-                    successDiv.textContent = 'Код подтверждения отправлен на вашу почту! Проверьте email и введите код ниже.';
+                    // Проверяем специальный случай - существующий пользователь
+                    if (data.requires_verification) {
+                        successDiv.textContent = data.message || 'Пользователь с таким email уже существует, но не подтвержден. Новый код отправлен на вашу почту!';
+                    } else {
+                        successDiv.textContent = 'Код подтверждения отправлен на вашу почту! Проверьте email и введите код ниже.';
+                    }
+                    successDiv.style.display = 'block';
+                    
+                    // Очищаем поля email/пароль
+                    document.getElementById('email').value = '';
+                    document.getElementById('password').value = '';
+                    document.getElementById('password-strength').textContent = '';
+                } else if (response.status === 202) {
+                    // Специальный случай: пользователь существует но не подтвержден
+                    const data = await response.json();
+                    
+                    // Сохраняем email для верификации
+                    pendingRegistration = { email: formData.email };
+                    
+                    // Показываем поле для ввода кода
+                    document.getElementById('verification-group').style.display = 'block';
+                    btn.textContent = 'Подтвердить регистрацию';
+                    registrationStep = 2;
+                    
+                    successDiv.textContent = data.message || 'Пользователь с таким email уже существует, но не подтвержден. Новый код отправлен на вашу почту!';
                     successDiv.style.display = 'block';
                     
                     // Очищаем поля email/пароль
