@@ -15,17 +15,3 @@ CREATE INDEX IF NOT EXISTS idx_cart_items_user_product ON cart_items(cart_items_
 
 -- Уникальный индекс для предотвращения дубликатов
 CREATE UNIQUE INDEX IF NOT EXISTS idx_cart_items_user_product_unique ON cart_items(cart_items_user_id_fk, cart_items_product_id_fk);
-
--- Триггер для обновления updated_at
-CREATE OR REPLACE FUNCTION update_cart_items_updated_at()
-RETURNS TRIGGER AS $$
-BEGIN
-    NEW.cart_items_updated_at = NOW();
-    RETURN NEW;
-END;
-$$ language 'plpgsql';
-
-CREATE TRIGGER cart_items_updated_at_trigger
-    BEFORE UPDATE ON cart_items
-    FOR EACH ROW
-    EXECUTE FUNCTION update_cart_items_updated_at();
