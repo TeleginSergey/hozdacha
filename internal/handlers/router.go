@@ -92,12 +92,14 @@ func SetupRouter(
 	})
 
 	// Health check endpoint для Traefik/Docker
-	router.GET("/health", func(c *gin.Context) {
+	healthHandler := func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"status":    "healthy",
+			"status":    "ok",
 			"timestamp": time.Now().Unix(),
 		})
-	})
+	}
+	router.GET("/health", healthHandler)
+	router.HEAD("/health", healthHandler)
 
 	// Публичные API
 	api := router.Group("/api")
