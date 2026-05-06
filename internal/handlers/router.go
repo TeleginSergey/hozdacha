@@ -78,7 +78,7 @@ func SetupRouter(
 	// Verify email page removed
 
 	// Профиль (требует авторизации)
-	router.GET("/profile", middleware.RequireAuth(), func(c *gin.Context) {
+	router.GET("/profile", middleware.AuthMiddleware(jwtSecret), func(c *gin.Context) {
 		c.HTML(http.StatusOK, "profile.html", gin.H{
 			"title": "Личный кабинет - Телегинс Шоп",
 		})
