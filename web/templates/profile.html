@@ -219,19 +219,18 @@
     </div>
 
     <script>
-        // Проверяем авторизацию с валидацией токена
+        // Проверяем авторизацию с валидацией токена и загружаем данные пользователя
         async function checkAuth() {
             const token = localStorage.getItem('auth_token');
-            const user = localStorage.getItem('user');
             
-            if (!token || !user) {
+            if (!token) {
                 window.location.href = '/login';
-                return false;
+                return null;
             }
             
-            // Проверяем валидность токена
+            // Проверяем валидность токена и получаем данные пользователя
             try {
-                const response = await fetch('/api/auth/verify', {
+                const response = await fetch('/api/auth/profile', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -242,16 +241,21 @@
                     localStorage.removeItem('auth_token');
                     localStorage.removeItem('user');
                     window.location.href = '/login';
-                    return false;
+                    return null;
                 }
                 
-                return true;
+                const data = await response.json();
+                const user = data.user;
+                
+                // Сохраняем актуальные данные в localStorage
+                localStorage.setItem('user', JSON.stringify(user));
+                
+                return user;
             } catch (error) {
                 console.error('Token validation failed:', error);
                 // При ошибке валидации, не вылогиваем
+                return null;
             }
-            
-            return true;
         }
 
         // Обновление профиля
