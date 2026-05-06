@@ -394,28 +394,28 @@ func (u *userQuery) InsertWithTx(ctx context.Context, tx pgx.Tx, user *User) (*U
 	}
 	defer rows.Close()
 
-	// Сканируем результат вручную по полям
+	// Сканируем результат вручную по полям в порядке структуры User
 	for rows.Next() {
 		err = rows.Scan(
-			&user.ID,
-			&user.Username,
-			&user.Password,
-			&user.Email,
-			&user.RoleID,
-			&user.AccessTokenSecret,
-			&user.RefreshTokenSecret,
-			&user.AccessTokenJTI,
-			&user.RefreshTokenJTI,
-			&user.AuthTime,
-			&user.CreatedAt,
-			&user.UpdatedAt,
-			&user.EmailVerified, // bool поле
-			&user.EmailVerificationToken,
-			&user.EmailVerificationCode,
-			&user.VerificationExpiresAt,
-			&user.Website,
-			&user.FullName,
-			&user.Phone,
+			&user.ID,                     // users_id_pk
+			&user.Username,               // users_username
+			&user.Password,               // users_password_hash
+			&user.Email,                  // users_email
+			&user.RoleID,                 // users_roles_id_fk
+			&user.AccessTokenSecret,      // users_access_token_secret
+			&user.RefreshTokenSecret,     // users_refresh_token_secret
+			&user.AccessTokenJTI,         // users_access_token_jti
+			&user.RefreshTokenJTI,        // users_refresh_token_jti
+			&user.AuthTime,               // users_auth_time
+			&user.CreatedAt,              // users_created_at
+			&user.UpdatedAt,              // users_updated_at
+			&user.EmailVerified,          // users_email_verified (bool)
+			&user.EmailVerificationToken, // users_email_verification_token
+			&user.EmailVerificationCode,  // users_email_verification_code
+			&user.VerificationExpiresAt,  // users_verification_expires_at
+			&user.Website,                // users_website
+			&user.FullName,               // users_full_name
+			&user.Phone,                  // users_phone
 		)
 		if err != nil {
 			return nil, fmt.Errorf("failed to scan result: %w", err)
