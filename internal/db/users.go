@@ -376,7 +376,9 @@ func (u *userQuery) InsertWithTx(ctx context.Context, tx pgx.Tx, user *User) (*U
 		u.logger.Error("Failed to build query", zap.Error(err))
 		return nil, fmt.Errorf("failed to build query: %w", err)
 	}
-	err = tx.QueryRow(ctx, qb, args...).Scan(user)
+
+	// Выполняем запрос через транзакцию
+	rows, err := tx.Query(ctx, qb, args...)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -390,6 +392,37 @@ func (u *userQuery) InsertWithTx(ctx context.Context, tx pgx.Tx, user *User) (*U
 		}
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
+	defer rows.Close()
+
+	// Сканируем результат вручную по полям
+	for rows.Next() {
+		err = rows.Scan(
+			&user.ID,
+			&user.Username,
+			&user.Password,
+			&user.Email,
+			&user.RoleID,
+			&user.AccessTokenSecret,
+			&user.RefreshTokenSecret,
+			&user.AccessTokenJTI,
+			&user.RefreshTokenJTI,
+			&user.AuthTime,
+			&user.CreatedAt,
+			&user.UpdatedAt,
+			&user.EmailVerified,
+			&user.EmailVerificationToken,
+			&user.EmailVerificationCode,
+			&user.VerificationExpiresAt,
+			&user.Website,
+			&user.FullName,
+			&user.Phone,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan result: %w", err)
+		}
+		break // RETURNING * возвращает только одну строку
+	}
+
 	u.logger.Info("User inserted successfully with transaction", zap.Int64("user_id", user.ID))
 	return user, nil
 }
