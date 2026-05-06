@@ -54,6 +54,8 @@ type User struct {
 	EmailVerificationCode  *string    `db:"users_email_verification_code" insert:"users_email_verification_code"`
 	VerificationExpiresAt  *time.Time `db:"users_verification_expires_at" insert:"users_verification_expires_at"`
 	Website                *string    `db:"users_website" insert:"users_website"` // Honeypot field
+	FullName               *string    `db:"users_full_name" insert:"users_full_name" update:"users_full_name"`
+	Phone                  *string    `db:"users_phone" insert:"users_phone" update:"users_phone"`
 }
 
 var (

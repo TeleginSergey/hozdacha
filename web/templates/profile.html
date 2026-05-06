@@ -186,7 +186,6 @@
                         <h2 id="user-name">Загрузка...</h2>
                         <p id="user-email">email@example.com</p>
                         <p id="user-phone">+7 XXX XXX-XX-XX</p>
-                        <p id="user-address">Адрес не указан</p>
                     </div>
                 </div>
                 <button class="btn logout-btn" onclick="logout()">Выйти</button>
@@ -199,16 +198,12 @@
                 <h3 class="section-title">Редактирование профиля</h3>
                 <form id="profile-form">
                     <div class="form-group">
-                        <label for="name">Полное имя *</label>
-                        <input type="text" id="name" name="name" required>
+                        <label for="full_name">Полное имя *</label>
+                        <input type="text" id="full_name" name="full_name" required>
                     </div>
                     <div class="form-group">
                         <label for="phone">Телефон *</label>
                         <input type="tel" id="phone" name="phone" required placeholder="+7 XXX XXX-XX-XX">
-                    </div>
-                    <div class="form-group">
-                        <label for="address">Адрес</label>
-                        <input type="text" id="address" name="address">
                     </div>
                     <button type="submit" class="btn">Сохранить изменения</button>
                 </form>
@@ -244,19 +239,106 @@
                 
                 if (!response.ok) {
                     // Токен недействителен, удаляем и перенаправляем
-                    localStorage.removeItem('auth_token');
-                    localStorage.removeItem('user');
                     window.location.href = '/login';
                     return false;
                 }
                 
-                return JSON.parse(user);
-            } catch (error) {
-                console.error('Token verification failed:', error);
+                // Проверяем валидность токена
+                try {
+                    const response = await fetch('/api/auth/verify', {
+                        headers: {
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+                    
+                    if (!response.ok) {
+                        // Токен недействителен, удаляем и перенаправляем
+                        localStorage.removeItem('auth_token');
+                        localStorage.removeItem('user');
+                        window.location.href = '/login';
+                        return false;
+                    }
+                    
+                    return true;
+                } catch (error) {
+                    console.error('Token validation failed:', error);
+                    // При ошибке валидации, не вылогиваем
+                }
+                
+                return true;
+            }
+
+            // Обновление профиля
+            async function updateProfile() {
+                const token = localStorage.getItem('auth_token');
+                if (!token) {
+                    alert('Сначала войдите в аккаунт');
+                    return;
+                }
+
+                const fullName = document.getElementById('full_name').value;
+                const phone = document.getElementById('phone').value;
+
+                try {
+                    const response = await fetch('/api/auth/profile', {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({
+                            full_name: fullName,
+                            phone: phone
+                        })
+                    });
+
+                    const data = await response.json();
+                    if (response.ok) {
+                        // Обновляем данные в localStorage
+                        const userData = JSON.parse(localStorage.getItem('user'));
+                        userData.full_name = fullName;
+                        userData.phone = phone;
+                        localStorage.setItem('user', JSON.stringify(userData));
+                        
+                        // Обновляем отображение
+                        document.getElementById('user-name').textContent = fullName || 'Имя не указано';
+                        document.getElementById('user-phone').textContent = phone || 'Телефон не указан';
+                        
+                        showMessage('Профиль успешно обновлен!', 'success');
+                    } else {
+                        showMessage(data.error || 'Ошибка при обновлении профиля', 'error');
+                    }
+                } catch (error) {
+                    showMessage('Ошибка сети. Попробуйте еще раз.', 'error');
+                }
+            }
+
+            function showMessage(message, type) {
+                const errorDiv = document.getElementById('error-message');
+                const successDiv = document.getElementById('success-message');
+                
+                errorDiv.style.display = 'none';
+                successDiv.style.display = 'none';
+                
+                if (type === 'error') {
+                    errorDiv.textContent = message;
+                    errorDiv.style.display = 'block';
+                } else {
+                    successDiv.textContent = message;
+                    successDiv.style.display = 'block';
+                }
+            }
+
+            document.getElementById('profile-form').addEventListener('submit', async function(e) {
+                e.preventDefault();
+                await updateProfile();
+            });
+
+            // Logout
+            function logout() {
                 localStorage.removeItem('auth_token');
                 localStorage.removeItem('user');
                 window.location.href = '/login';
-                return false;
             }
         }
 
@@ -268,16 +350,14 @@
             document.getElementById('user-name').textContent = user.name || user.username || 'Имя не указано';
             document.getElementById('user-email').textContent = user.email || 'Email не указан';
             document.getElementById('user-phone').textContent = user.phone || 'Телефон не указан';
-            document.getElementById('user-address').textContent = user.address || 'Адрес не указан';
             
             // First letter of name for avatar (prefer name, then username, then email)
             const initial = (user.name || user.username || user.email || 'U').charAt(0).toUpperCase();
             document.getElementById('user-initial').textContent = initial;
             
             // Заполняем форму
-            document.getElementById('name').value = user.name || '';
+            document.getElementById('full_name').value = user.full_name || '';
             document.getElementById('phone').value = user.phone || '';
-            document.getElementById('address').value = user.address || '';
             
             // Загружаем заказы
             loadOrders();
@@ -326,7 +406,6 @@
                     </div>
                     ${order.customer_name ? `<div><strong>Имя:</strong> ${order.customer_name}</div>` : ''}
                     ${order.phone ? `<div><strong>Телефон:</strong> ${order.phone}</div>` : ''}
-                    ${order.address ? `<div><strong>Адрес:</strong> ${order.address}</div>` : ''}
                     ${order.comment ? `<div><strong>Комментарий:</strong> ${order.comment}</div>` : ''}
                 </div>
             `).join('');
@@ -348,9 +427,8 @@
             e.preventDefault();
             
             const formData = {
-                name: document.getElementById('name').value,
-                phone: document.getElementById('phone').value,
-                address: document.getElementById('address').value
+                full_name: document.getElementById('full_name').value,
+                phone: document.getElementById('phone').value
             };
             
             try {

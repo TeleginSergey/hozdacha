@@ -34,8 +34,8 @@ type RegisterRequest struct {
 	Username string `json:"username" binding:"omitempty,min=3,max=50"`
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
-	Phone    string `json:"phone" binding:"omitempty"`
-	Name     string `json:"name" binding:"omitempty"`
+	Phone    string `json:"phone" binding:"required"`
+	Name     string `json:"name" binding:"required"`
 	Website  string `json:"website"` // Honeypot field - должно быть пустым
 }
 
@@ -62,8 +62,8 @@ type AuthResponse struct {
 
 func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.User, error) {
 	// Валидация
-	if req.Email == "" || req.Password == "" {
-		return nil, fmt.Errorf("email and password are required")
+	if req.Email == "" || req.Password == "" || req.Name == "" || req.Phone == "" {
+		return nil, fmt.Errorf("email, password, name and phone are required")
 	}
 
 	// Honeypot проверка - если поле website заполнено, это бот
@@ -109,6 +109,8 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 		Password:      string(hashedPassword),
 		RoleID:        2,     // Роль "user" (обычно ID 2)
 		EmailVerified: false, // Требуется верификация email
+		FullName:      &req.Name,
+		Phone:         &req.Phone,
 		CreatedAt:     &now,
 		UpdatedAt:     &now,
 	}
@@ -307,8 +309,13 @@ func (u *UserUsecase) UpdateProfile(ctx context.Context, userID int64, req map[s
 		return nil, fmt.Errorf("user not found")
 	}
 
-	// В структуре User нет полей Name, Phone, Address - пропускаем обновление
-	// Можно добавить дополнительные поля в БД если нужно
+	// Обновляем поля если они переданы
+	if fullName, ok := req["full_name"].(string); ok {
+		user.FullName = &fullName
+	}
+	if phone, ok := req["phone"].(string); ok {
+		user.Phone = &phone
+	}
 
 	return u.users.Update(ctx, user, userID)
 }
