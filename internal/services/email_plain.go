@@ -7,6 +7,11 @@ import (
 
 // sendPlain отправляет email через обычный SMTP без TLS
 func (s *EmailService) sendPlain(addr, from, to string, msg []byte) error {
+	// Форсировать IPv4, чтобы избежать подключения к ::1
+	if addr == "localhost:25" || addr == "localhost:587" {
+		addr = "127.0.0.1:25"
+	}
+
 	client, err := smtp.Dial(addr)
 	if err != nil {
 		return fmt.Errorf("failed to connect to SMTP server: %w", err)
