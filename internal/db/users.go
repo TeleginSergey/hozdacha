@@ -377,8 +377,9 @@ func (u *userQuery) InsertWithTx(ctx context.Context, tx pgx.Tx, user *User) (*U
 		return nil, fmt.Errorf("failed to build query: %w", err)
 	}
 
-	// Выполняем запрос через транзакцию
-	rows, err := tx.Query(ctx, qb, args...)
+	// Создаем адаптер для транзакции, который реализует интерфейс pgxscan.Querier
+	txAdapter := &txQuerier{tx: tx}
+	err = pgxscan.Get(ctx, txAdapter, user, qb, args...)
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) {
@@ -392,39 +393,26 @@ func (u *userQuery) InsertWithTx(ctx context.Context, tx pgx.Tx, user *User) (*U
 		}
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
-	defer rows.Close()
-
-	// Сканируем результат вручную по полям в порядке структуры User
-	for rows.Next() {
-		err = rows.Scan(
-			&user.ID,                     // users_id_pk
-			&user.Username,               // users_username
-			&user.Password,               // users_password_hash
-			&user.Email,                  // users_email
-			&user.RoleID,                 // users_roles_id_fk
-			&user.AccessTokenSecret,      // users_access_token_secret
-			&user.RefreshTokenSecret,     // users_refresh_token_secret
-			&user.AccessTokenJTI,         // users_access_token_jti
-			&user.RefreshTokenJTI,        // users_refresh_token_jti
-			&user.AuthTime,               // users_auth_time
-			&user.CreatedAt,              // users_created_at
-			&user.UpdatedAt,              // users_updated_at
-			&user.EmailVerified,          // users_email_verified (bool)
-			&user.EmailVerificationToken, // users_email_verification_token
-			&user.EmailVerificationCode,  // users_email_verification_code
-			&user.VerificationExpiresAt,  // users_verification_expires_at
-			&user.Website,                // users_website
-			&user.FullName,               // users_full_name
-			&user.Phone,                  // users_phone
-		)
-		if err != nil {
-			return nil, fmt.Errorf("failed to scan result: %w", err)
-		}
-		break // RETURNING * возвращает только одну строку
-	}
 
 	u.logger.Info("User inserted successfully with transaction", zap.Int64("user_id", user.ID))
 	return user, nil
+}
+
+// txQuerier адаптер для транзакции, реализующий интерфейс pgxscan.Querier
+type txQuerier struct {
+	tx pgx.Tx
+}
+
+func (t *txQuerier) Query(ctx context.Context, sql string, args ...interface{}) (pgx.Rows, error) {
+	return t.tx.Query(ctx, sql, args...)
+}
+
+func (t *txQuerier) Exec(ctx context.Context, sql string, args ...interface{}) (pgconn.CommandTag, error) {
+	return t.tx.Exec(ctx, sql, args...)
+}
+
+func (t *txQuerier) QueryRow(ctx context.Context, sql string, args ...interface{}) pgx.Row {
+	return t.tx.QueryRow(ctx, sql, args...)
 }
 
 func (u *userQuery) Update(ctx context.Context, user *User, id int64) (*User, error) {
