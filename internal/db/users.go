@@ -409,7 +409,7 @@ func (u *userQuery) InsertWithTx(ctx context.Context, tx pgx.Tx, user *User) (*U
 			&user.AuthTime,
 			&user.CreatedAt,
 			&user.UpdatedAt,
-			&user.EmailVerified,
+			&user.EmailVerified, // bool поле
 			&user.EmailVerificationToken,
 			&user.EmailVerificationCode,
 			&user.VerificationExpiresAt,
