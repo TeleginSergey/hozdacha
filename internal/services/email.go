@@ -111,11 +111,9 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 		ServerName: s.cfg.Host,
 	}
 
-	// Используем host.docker.internal для Docker
+	// Используем IP хоста для Docker (host.docker.internal не работает)
 	smtpHost := s.cfg.Host
-	if smtpHost == "172.17.0.1" || smtpHost == "localhost" {
-		smtpHost = "host.docker.internal"
-	}
+	// Оставляем как есть - 172.17.0.1 или localhost
 
 	// Подключаемся к SMTP серверу
 	addr := smtpHost + ":" + strconv.Itoa(s.cfg.Port)
