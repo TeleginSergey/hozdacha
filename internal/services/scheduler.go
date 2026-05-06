@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"go.uber.org/zap"
@@ -72,6 +73,30 @@ func (s *Scheduler) syncOnce(ctx context.Context) {
 	} else {
 		s.logger.Debug("Backup sync completed - no changes (webhooks working correctly)")
 	}
+}
+
+// FullSync выполняет полную синхронизацию всех продуктов с МойСклад
+func (s *Scheduler) FullSync(ctx context.Context) error {
+	if s.syncService == nil {
+		return fmt.Errorf("sync service not initialized")
+	}
+
+	s.logger.Info("Starting full product sync on startup")
+
+	// Выполняем полную синхронизацию
+	result, err := s.syncService.SyncProducts(ctx)
+	if err != nil {
+		s.logger.Error("Full sync failed", zap.Error(err))
+		return err
+	}
+
+	s.logger.Info("Full sync completed successfully",
+		zap.Int("processed", result.Created+result.Updated),
+		zap.Int("created", result.Created),
+		zap.Int("updated", result.Updated),
+		zap.Int("errors", result.Errors))
+
+	return nil
 }
 
 func (s *Scheduler) Stop() {
