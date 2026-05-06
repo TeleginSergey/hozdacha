@@ -308,7 +308,10 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ token: verificationCode })
+                    body: JSON.stringify({
+                        email: pendingRegistration.email,
+                        code: verificationCode
+                    })
                 });
                 
                 const data = await response.json();

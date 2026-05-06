@@ -31,9 +31,11 @@ func NewUserUsecase(userRepo db.UserQuery, logger *zap.Logger, jwtSecret string)
 }
 
 type RegisterRequest struct {
-	Username string `json:"username" binding:"required,min=3,max=50"`
-	Email    string `json:"email" binding:"omitempty,email"`
+	Username string `json:"username" binding:"omitempty,min=3,max=50"`
+	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
+	Phone    string `json:"phone" binding:"omitempty"`
+	Name     string `json:"name" binding:"omitempty"`
 	Website  string `json:"website"` // Honeypot field - должно быть пустым
 }
 
@@ -60,8 +62,8 @@ type AuthResponse struct {
 
 func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.User, error) {
 	// Валидация
-	if req.Username == "" || req.Password == "" {
-		return nil, fmt.Errorf("username and password are required")
+	if req.Email == "" || req.Password == "" {
+		return nil, fmt.Errorf("email and password are required")
 	}
 
 	// Honeypot проверка - если поле website заполнено, это бот
@@ -74,8 +76,18 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 		return nil, fmt.Errorf("password is too weak. Use at least 8 characters with letters, numbers and symbols.")
 	}
 
+	// Генерируем username из email, если не указан
+	username := req.Username
+	if username == "" {
+		// Берём часть до @ из email
+		parts := strings.Split(req.Email, "@")
+		username = parts[0]
+		// Добавляем случайные цифры для уникальности
+		username = fmt.Sprintf("%s%d", username, mathrand.Intn(10000))
+	}
+
 	// Проверяем существует ли пользователь
-	exists, err := u.users.ExistsByUsernameOrEmail(ctx, req.Username, req.Email)
+	exists, err := u.users.ExistsByUsernameOrEmail(ctx, username, req.Email)
 	if err != nil {
 		return nil, fmt.Errorf("failed to check user existence: %w", err)
 	}
@@ -92,7 +104,7 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 	// Создаем пользователя (требуется верификация email)
 	now := time.Now()
 	user := &db.User{
-		Username:      req.Username,
+		Username:      username,
 		Email:         req.Email,
 		Password:      string(hashedPassword),
 		RoleID:        2,     // Роль "user" (обычно ID 2)

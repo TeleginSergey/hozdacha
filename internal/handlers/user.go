@@ -226,8 +226,9 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 
 // VerifyEmailRequest - запрос на верификацию email
 type VerifyEmailRequest struct {
-	Email string `json:"email" binding:"required,email"`
-	Code  string `json:"code" binding:"required,len=6"`
+	Email string `json:"email" binding:"omitempty,email"`
+	Code  string `json:"code" binding:"omitempty,len=6"`
+	Token string `json:"token" binding:"omitempty,len=6"` // Для совместимости с фронтом (code или token)
 }
 
 // ResendCodeRequest - запрос на повторную отправку кода
@@ -243,11 +244,29 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
+	// Поддерживаем как code, так и token (для совместимости с фронтом)
+	code := req.Code
+	if code == "" && req.Token != "" {
+		code = req.Token
+	}
+
+	if code == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification code is required"})
+		return
+	}
+
+	// Если email не передан, ищем по коду
+	email := req.Email
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required for verification"})
+		return
+	}
+
 	// Проверяем код и активируем аккаунт
-	user, err := h.userUC.VerifyEmailByCode(c.Request.Context(), req.Email, req.Code)
+	user, err := h.userUC.VerifyEmailByCode(c.Request.Context(), email, code)
 	if err != nil {
 		h.logger.Warn("Email verification failed",
-			zap.String("email", req.Email),
+			zap.String("email", email),
 			zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired verification code"})
 		return

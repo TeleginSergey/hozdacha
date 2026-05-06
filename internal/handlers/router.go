@@ -112,6 +112,7 @@ func SetupRouter(
 			auth.POST("/logout", middleware.AuthMiddleware(jwtSecret), userHandler.Logout)
 			auth.POST("/verify-email", userHandler.VerifyEmail)
 			auth.POST("/resend-code", userHandler.ResendVerificationCode)
+			auth.POST("/send-verification", userHandler.ResendVerificationCode) // Alias для совместимости с фронтом
 			auth.POST("/forgot-password", userHandler.ForgotPassword)
 			auth.POST("/reset-password", userHandler.ResetPassword)
 			// Profile endpoints require authentication
