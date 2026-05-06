@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -87,6 +88,14 @@ func SetupRouter(
 	router.GET("/admin", middleware.RequireAuth(), func(c *gin.Context) {
 		c.HTML(http.StatusOK, "admin.html", gin.H{
 			"title": "Админ-панель",
+		})
+	})
+
+	// Health check endpoint для Traefik/Docker
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"status":    "healthy",
+			"timestamp": time.Now().Unix(),
 		})
 	})
 
