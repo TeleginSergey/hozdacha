@@ -54,6 +54,15 @@ func (s *Scheduler) Start(ctx context.Context) {
 }
 
 func (s *Scheduler) syncOnce(ctx context.Context) {
+	// Защищаемся от паник
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("syncOnce panicked",
+				zap.Any("panic", r),
+				zap.String("stack", fmt.Sprintf("%+v", r)))
+		}
+	}()
+
 	s.logger.Info("Starting backup product sync (webhooks handle real-time updates)")
 
 	// Используем дельта-синхронизацию как резервный механизм
@@ -77,6 +86,15 @@ func (s *Scheduler) syncOnce(ctx context.Context) {
 
 // FullSync выполняет полную синхронизацию всех продуктов с МойСклад
 func (s *Scheduler) FullSync(ctx context.Context) error {
+	// Защищаемся от паник
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("FullSync panicked",
+				zap.Any("panic", r),
+				zap.String("stack", fmt.Sprintf("%+v", r)))
+		}
+	}()
+
 	if s.syncService == nil {
 		return fmt.Errorf("sync service not initialized")
 	}

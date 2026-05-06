@@ -171,18 +171,44 @@ func (a *App) Run() {
 	// Выполняем полную синхронизацию с МойСклад при запуске
 	if a.Scheduler != nil {
 		a.Logger.Info("Starting initial full sync with Moysklad on startup")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-		err := a.Scheduler.FullSync(ctx)
-		cancel()
 
-		if err != nil {
-			a.Logger.Error("Initial full sync failed", zap.Error(err))
-		} else {
-			a.Logger.Info("Initial full sync completed successfully")
-		}
+		// Защищаемся от паник при синхронизации
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					a.Logger.Error("Initial full sync panicked",
+						zap.Any("panic", r),
+						zap.String("stack", fmt.Sprintf("%+v", r)))
+					a.Logger.Warn("Application will continue despite sync panic")
+				}
+			}()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			defer cancel()
+
+			err := a.Scheduler.FullSync(ctx)
+			if err != nil {
+				a.Logger.Error("Initial full sync failed",
+					zap.Error(err),
+					zap.String("note", "Application will continue without initial sync"))
+			} else {
+				a.Logger.Info("Initial full sync completed successfully")
+			}
+		}()
 
 		// Запускаем планировщик для периодической синхронизации
-		go a.Scheduler.Start(context.Background())
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					a.Logger.Error("Scheduler panicked",
+						zap.Any("panic", r),
+						zap.String("stack", fmt.Sprintf("%+v", r)))
+				}
+			}()
+
+			a.Scheduler.Start(context.Background())
+		}()
+
 		a.Logger.Info("Auto-sync scheduler started",
 			zap.Duration("interval", a.Config.Moysklad.SyncInterval),
 			zap.Float64("stock_buffer", a.Config.Moysklad.StockBuffer))
