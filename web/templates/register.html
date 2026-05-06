@@ -115,6 +115,16 @@
                 </div>
                 
                 <div class="form-group">
+                    <label for="name">Полное имя *</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Телефон *</label>
+                    <input type="tel" id="phone" name="phone" required placeholder="+7 XXX XXX-XX-XX">
+                </div>
+                
+                <div class="form-group">
                     <label for="password">Пароль</label>
                     <input type="password" id="password" name="password" required>
                     <div id="password-strength" class="password-strength"></div>
@@ -236,6 +246,8 @@
             
             const formData = {
                 email: document.getElementById('email').value,
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
                 password: document.getElementById('password').value
             };
             
