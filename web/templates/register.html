@@ -279,8 +279,7 @@
                     }
                     successDiv.style.display = 'block';
                     
-                    // Очищаем поля email/пароль
-                    document.getElementById('email').value = '';
+                    // Очищаем только поле пароля для безопасности
                     document.getElementById('password').value = '';
                     document.getElementById('password-strength').textContent = '';
                 } else if (response.status === 202) {
@@ -298,8 +297,7 @@
                     successDiv.textContent = data.message || 'Пользователь с таким email уже существует, но не подтвержден. Новый код отправлен на вашу почту!';
                     successDiv.style.display = 'block';
                     
-                    // Очищаем поля email/пароль
-                    document.getElementById('email').value = '';
+                    // Очищаем только поле пароля для безопасности
                     document.getElementById('password').value = '';
                     document.getElementById('password-strength').textContent = '';
                 } else {

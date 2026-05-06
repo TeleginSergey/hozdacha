@@ -239,37 +239,23 @@
                 
                 if (!response.ok) {
                     // Токен недействителен, удаляем и перенаправляем
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('user');
                     window.location.href = '/login';
                     return false;
                 }
                 
-                // Проверяем валидность токена
-                try {
-                    const response = await fetch('/api/auth/verify', {
-                        headers: {
-                            'Authorization': `Bearer ${token}`
-                        }
-                    });
-                    
-                    if (!response.ok) {
-                        // Токен недействителен, удаляем и перенаправляем
-                        localStorage.removeItem('auth_token');
-                        localStorage.removeItem('user');
-                        window.location.href = '/login';
-                        return false;
-                    }
-                    
-                    return true;
-                } catch (error) {
-                    console.error('Token validation failed:', error);
-                    // При ошибке валидации, не вылогиваем
-                }
-                
                 return true;
+            } catch (error) {
+                console.error('Token validation failed:', error);
+                // При ошибке валидации, не вылогиваем
             }
+            
+            return true;
+        }
 
-            // Обновление профиля
-            async function updateProfile() {
+        // Обновление профиля
+        async function updateProfile() {
                 const token = localStorage.getItem('auth_token');
                 if (!token) {
                     alert('Сначала войдите в аккаунт');
@@ -340,19 +326,18 @@
                 localStorage.removeItem('user');
                 window.location.href = '/login';
             }
-        }
 
         // Загружаем профиль
         async function loadProfile() {
             const user = await checkAuth();
             if (!user) return;
 
-            document.getElementById('user-name').textContent = user.name || user.username || 'Имя не указано';
+            document.getElementById('user-name').textContent = user.full_name || user.username || 'Имя не указано';
             document.getElementById('user-email').textContent = user.email || 'Email не указан';
             document.getElementById('user-phone').textContent = user.phone || 'Телефон не указан';
             
-            // First letter of name for avatar (prefer name, then username, then email)
-            const initial = (user.name || user.username || user.email || 'U').charAt(0).toUpperCase();
+            // First letter of name for avatar (prefer full_name, then username, then email)
+            const initial = (user.full_name || user.username || user.email || 'U').charAt(0).toUpperCase();
             document.getElementById('user-initial').textContent = initial;
             
             // Заполняем форму
