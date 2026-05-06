@@ -286,8 +286,8 @@
                     if (response.ok) {
                         // Обновляем данные в localStorage
                         const userData = JSON.parse(localStorage.getItem('user'));
-                        userData.full_name = fullName;
-                        userData.phone = phone;
+                        userData.FullName = fullName;
+                        userData.Phone = phone;
                         localStorage.setItem('user', JSON.stringify(userData));
                         
                         // Обновляем отображение
@@ -336,17 +336,17 @@
             const user = await checkAuth();
             if (!user) return;
 
-            document.getElementById('user-name').textContent = user.full_name || user.username || 'Имя не указано';
-            document.getElementById('user-email').textContent = user.email || 'Email не указан';
-            document.getElementById('user-phone').textContent = user.phone || 'Телефон не указан';
+            document.getElementById('user-name').textContent = user.FullName || user.Username || 'Имя не указано';
+            document.getElementById('user-email').textContent = user.Email || 'Email не указан';
+            document.getElementById('user-phone').textContent = user.Phone || 'Телефон не указан';
             
-            // First letter of name for avatar (prefer full_name, then username, then email)
-            const initial = (user.full_name || user.username || user.email || 'U').charAt(0).toUpperCase();
+            // First letter of name for avatar (prefer FullName, then Username, then Email)
+            const initial = (user.FullName || user.Username || user.Email || 'U').charAt(0).toUpperCase();
             document.getElementById('user-initial').textContent = initial;
             
             // Заполняем форму
-            document.getElementById('full_name').value = user.full_name || '';
-            document.getElementById('phone').value = user.phone || '';
+            document.getElementById('full_name').value = user.FullName || '';
+            document.getElementById('phone').value = user.Phone || '';
             
             // Загружаем заказы
             loadOrders();
