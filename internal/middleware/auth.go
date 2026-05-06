@@ -80,11 +80,12 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 			if jti, ok := claims["jti"].(string); ok && blacklistChecker != nil {
 				isBlacklisted, err := blacklistChecker.IsBlacklisted(c.Request.Context(), jti)
 				if err != nil {
+					// Ошибка Redis не должна блокировать доступ
 					c.Next()
 					return
 				}
 				if isBlacklisted {
-					// Токен отозван
+					// Токен отозван - логируем и продолжаем
 					c.Next()
 					return
 				}
