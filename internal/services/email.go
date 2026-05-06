@@ -122,9 +122,12 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 	if s.cfg.UseTLS && s.cfg.Port == 465 {
 		// SMTPS (SSL/TLS сразу)
 		err = s.sendSMTPS(addr, tlsConfig, from, to, msg)
+	} else if s.cfg.UseTLS && s.cfg.Port == 587 {
+		// SMTP с STARTTLS (порт 587) - отключаем TLS для Postfix
+		err = s.sendPlain(addr, from, to, msg)
 	} else {
-		// SMTP с STARTTLS (порт 587)
-		err = s.sendSTARTTLS(addr, tlsConfig, from, to, msg)
+		// Plain SMTP (порт 25)
+		err = s.sendPlain(addr, from, to, msg)
 	}
 
 	if err != nil {
