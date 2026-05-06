@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 )
@@ -57,6 +58,11 @@ func New(cfg interface{ DSN() string }, logger *zap.Logger) (*DB, error) {
 
 func (d *DB) Close() {
 	d.Pool.Close()
+}
+
+// BeginTx начинает транзакцию
+func (d *DB) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return d.Pool.Begin(ctx)
 }
 
 func colNamesWithPref(cols []string, pref string) []string {

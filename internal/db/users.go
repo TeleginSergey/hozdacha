@@ -75,6 +75,7 @@ type UserQuery interface {
 	GetByEmail(ctx context.Context, email string) (*User, error)
 	ExistsByUsernameOrEmail(ctx context.Context, username string, email string) (bool, error)
 	Insert(ctx context.Context, user *User) (*User, error)
+	InsertWithTx(ctx context.Context, tx pgx.Tx, user *User) (*User, error)
 	Update(ctx context.Context, user *User, id int64) (*User, error)
 	UpdateAuthTime(ctx context.Context, id int64) (*User, error)
 	UpdateLoginOrLogout(ctx context.Context, user *User, id int64) (*User, error)
@@ -84,12 +85,17 @@ type UserQuery interface {
 	UpdateVerificationCode(ctx context.Context, userID int64, code string, expiresAt time.Time) error
 	GetByEmailAndCode(ctx context.Context, email string, code string) (*User, error)
 	VerifyEmailByCode(ctx context.Context, userID int64) error
+	BeginTx(ctx context.Context) (pgx.Tx, error)
 }
 
 type userQuery struct {
 	runner *pgxpool.Pool
 	sq     squirrel.StatementBuilderType
 	logger *zap.Logger
+}
+
+func (u *userQuery) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return u.runner.Begin(ctx)
 }
 
 func (u *userQuery) GetByEmailVerificationToken(ctx context.Context, token string) (*User, error) {
@@ -351,6 +357,40 @@ func (u *userQuery) Insert(ctx context.Context, user *User) (*User, error) {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	u.logger.Info("User inserted successfully", zap.Int64("user_id", user.ID))
+	return user, nil
+}
+
+func (u *userQuery) InsertWithTx(ctx context.Context, tx pgx.Tx, user *User) (*User, error) {
+	u.logger.Debug("Inserting user with transaction", zap.Any("user", user))
+
+	insertMap, err := stomUserInsert.ToMap(user)
+	if err != nil {
+		u.logger.Error("Failed to map struct", zap.Error(err))
+		return nil, fmt.Errorf("failed to map struct: %w", err)
+	}
+	qb, args, err := u.sq.Insert(UsersTable).
+		SetMap(insertMap).
+		Suffix("RETURNING *").
+		ToSql()
+	if err != nil {
+		u.logger.Error("Failed to build query", zap.Error(err))
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+	err = tx.QueryRow(ctx, qb, args...).Scan(user)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			u.logger.Warn("Database error",
+				zap.Any("user", user),
+				zap.String("pg_error_code", pgErr.Code),
+				zap.Error(err),
+			)
+		} else {
+			u.logger.Error("Failed to insert user with transaction", zap.Any("user", user), zap.Error(err))
+		}
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	u.logger.Info("User inserted successfully with transaction", zap.Int64("user_id", user.ID))
 	return user, nil
 }
 

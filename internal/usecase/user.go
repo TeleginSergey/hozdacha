@@ -166,6 +166,88 @@ func (u *UserUsecase) VerifyEmailByCode(ctx context.Context, email, code string)
 	return user, nil
 }
 
+// RegisterWithTransaction регистрирует пользователя в одной транзакции для защиты от race conditions
+func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterRequest) (*db.User, error) {
+	// Валидация
+	if req.Email == "" || req.Password == "" || req.Name == "" || req.Phone == "" {
+		return nil, fmt.Errorf("email, password, name and phone are required")
+	}
+
+	// Honeypot проверка - если поле website заполнено, это бот
+	if strings.TrimSpace(req.Website) != "" {
+		return nil, fmt.Errorf("bot detected")
+	}
+
+	// Проверяем сложность пароля
+	if !u.isPasswordStrong(req.Password) {
+		return nil, fmt.Errorf("password is too weak. Use at least 8 characters with letters, numbers and symbols.")
+	}
+
+	// Генерируем username из email, если не указан
+	username := req.Username
+	if username == "" {
+		// Берём часть до @ из email
+		parts := strings.Split(req.Email, "@")
+		username = parts[0]
+		// Добавляем случайные цифры для уникальности
+		username = fmt.Sprintf("%s%d", username, mathrand.Intn(10000))
+	}
+
+	// Проверяем существует ли пользователь (в транзакции)
+	exists, err := u.users.ExistsByUsernameOrEmail(ctx, username, req.Email)
+	if err != nil {
+		return nil, fmt.Errorf("failed to check user existence: %w", err)
+	}
+	if exists {
+		return nil, fmt.Errorf("user with this username or email already exists")
+	}
+
+	// Хешируем пароль
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
+
+	// Начинаем транзакцию
+	tx, err := u.users.BeginTx(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Создаем пользователя (требуется верификация email)
+	now := time.Now()
+	user := &db.User{
+		Username:      username,
+		Email:         req.Email,
+		Password:      string(hashedPassword),
+		RoleID:        2,     // Роль "user" (обычно ID 2)
+		EmailVerified: false, // Требуется верификация email
+		FullName:      &req.Name,
+		Phone:         &req.Phone,
+		CreatedAt:     &now,
+		UpdatedAt:     &now,
+	}
+
+	// Вставляем пользователя в транзакции
+	user, err = u.users.InsertWithTx(ctx, tx, user)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create user: %w", err)
+	}
+
+	// Коммитим транзакцию
+	err = tx.Commit(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	u.logger.Info("User registered with transaction, awaiting email verification",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email))
+
+	return user, nil
+}
+
 func (u *UserUsecase) Login(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
 	if req.Username == "" || req.Password == "" {
 		return nil, fmt.Errorf("username and password are required")

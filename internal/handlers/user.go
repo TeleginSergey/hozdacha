@@ -166,8 +166,8 @@ func (h *UserHandler) Register(c *gin.Context) {
 		}
 	}
 
-	// Регистрируем нового пользователя
-	user, err := h.userUC.Register(c.Request.Context(), req)
+	// Регистрируем нового пользователя с транзакцией (защита от race conditions)
+	user, err := h.userUC.RegisterWithTransaction(c.Request.Context(), req)
 	if err != nil {
 		h.logger.Warn("Registration failed",
 			zap.String("email", req.Email),
