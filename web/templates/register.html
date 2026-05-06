@@ -307,9 +307,12 @@
                 errorDiv.textContent = 'Ошибка сети. Попробуйте еще раз.';
                 errorDiv.style.display = 'block';
             } finally {
+                // Всегда разблокируем кнопку
+                btn.disabled = false;
                 if (registrationStep === 1) {
-                    btn.disabled = false;
                     btn.textContent = 'Зарегистрироваться';
+                } else {
+                    btn.textContent = 'Подтвердить регистрацию';
                 }
             }
         }
