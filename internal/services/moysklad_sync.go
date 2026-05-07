@@ -74,16 +74,28 @@ func (s *MoyskladSyncService) SyncProductsDelta(ctx context.Context) (*SyncResul
 }
 
 func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, since *time.Time) (*SyncResult, error) {
+	// Защищаемся от паник
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("syncProducts panicked",
+				zap.Any("panic", r),
+				zap.Bool("delta", delta))
+		}
+	}()
+
 	if s.moyskladClient == nil {
 		return nil, fmt.Errorf("moysklad client not initialized")
 	}
 
 	// Берем остатки отдельным отчетом: entity/product не содержит stock.
+	s.logger.Info("Getting stock report from Moysklad")
 	stockMap, err := s.moyskladClient.GetStockReport(ctx)
 	if err != nil {
-		// Не делаем синк “в ноль” при проблемах с остатками — лучше упасть явно.
+		// Не делаем синк "в ноль" при проблемах с остатками — лучше упасть явно.
+		s.logger.Error("Failed to get stock report from Moysklad", zap.Error(err))
 		return nil, fmt.Errorf("failed to get stock report from Moysklad: %w", err)
 	}
+	s.logger.Info("Stock report retrieved", zap.Int("stock_count", len(stockMap)))
 
 	var moyskladProducts []moysklad.MoyskladProduct
 	if delta && since != nil {
@@ -97,117 +109,152 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 	}
 
 	if err != nil {
+		s.logger.Error("Failed to get products from Moysklad", zap.Error(err))
 		return nil, fmt.Errorf("failed to get products from Moysklad: %w", err)
 	}
 
+	s.logger.Info("Products retrieved from Moysklad", zap.Int("total", len(moyskladProducts)))
 	result := &SyncResult{}
 
-	// Синхронизируем каждый товар
-	for _, msProduct := range moyskladProducts {
-		// Проверяем, существует ли товар с таким moysklad_id
-		existing, err := s.productQuery.GetByMoyskladID(ctx, msProduct.ID)
-		if err != nil {
-			s.logger.Warn("Failed to check existing product",
-				zap.String("moysklad_id", msProduct.ID),
-				zap.Error(err))
-			result.Errors++
-			continue
+	// Синхронизируем каждый товар с прогрессом
+	batchSize := 100
+	for i := 0; i < len(moyskladProducts); i += batchSize {
+		end := i + batchSize
+		if end > len(moyskladProducts) {
+			end = len(moyskladProducts)
 		}
 
-		// Преобразуем товар из МойСклад в наш формат
-		now := time.Now()
-		product := &db.Product{
-			Name:        msProduct.Name,
-			Description: msProduct.Description,
-			MoyskladID:  &msProduct.ID,
-			Active:      true, // Active = true для не удалённых товаров
-			CreatedAt:   now,
-			UpdatedAt:   now,
+		batch := moyskladProducts[i:end]
+		s.logger.Info("Processing batch",
+			zap.Int("batch_start", i),
+			zap.Int("batch_end", end),
+			zap.Int("batch_size", len(batch)),
+			zap.Int("total_products", len(moyskladProducts)))
+
+		for _, msProduct := range batch {
+			// Защищаемся от паник для каждого товара
+			func() {
+				defer func() {
+					if r := recover(); r != nil {
+						s.logger.Error("Product sync panicked",
+							zap.Any("panic", r),
+							zap.String("moysklad_id", msProduct.ID),
+							zap.String("product_name", msProduct.Name))
+						result.Errors++
+					}
+				}()
+
+				// Проверяем, существует ли товар с таким moysklad_id
+				existing, err := s.productQuery.GetByMoyskladID(ctx, msProduct.ID)
+				if err != nil {
+					s.logger.Warn("Failed to check existing product",
+						zap.String("moysklad_id", msProduct.ID),
+						zap.Error(err))
+					result.Errors++
+					return
+				}
+
+				// Преобразуем товар из МойСклад в наш формат
+				now := time.Now()
+				product := &db.Product{
+					Name:        msProduct.Name,
+					Description: msProduct.Description,
+					MoyskladID:  &msProduct.ID,
+					Active:      true, // Active = true для не удалённых товаров
+					CreatedAt:   now,
+					UpdatedAt:   now,
+				}
+
+				// Парсим цену (в МойСклад это массив salePrices, цена в копейках)
+				if len(msProduct.SalePrices) > 0 && msProduct.SalePrices[0].Value > 0 {
+					// Цена в МойСклад хранится в копейках, делим на 100 для получения рублей
+					product.Price = msProduct.SalePrices[0].Value / 100.0
+				} else {
+					// Если цены нет, устанавливаем 0
+					product.Price = 0
+				}
+
+				// Устанавливаем остаток (из вложенного объекта stock)
+				stock := stockMap[msProduct.ID]
+
+				if stock > 0 {
+					product.Stock = int(stock)
+				} else {
+					// Если остаток не пришел, оставляем 0 (можно будет обновить через SyncStockOnly)
+					product.Stock = 0
+				}
+
+				// Статус товара в зависимости от остатка
+				if product.Stock > 0 {
+					product.Status = "active"
+				} else {
+					// Оставляем карточку, но помечаем как out_of_stock
+					product.Status = "out_of_stock"
+				}
+
+				// Обновляем время последнего updated из МойСклад, если доступно
+				if msProduct.Updated != "" {
+					if t, err := time.Parse(time.RFC3339Nano, msProduct.Updated); err == nil {
+						product.LastSyncUpdated = &t
+					}
+				}
+
+				// Устанавливаем изображение (берем первое изображение если есть)
+				if msProduct.Images != nil && len(msProduct.Images.Rows) > 0 {
+					imageURL := msProduct.Images.Rows[0].Meta.Href
+					product.ImageURL = &imageURL
+				}
+
+				if existing == nil {
+					// Создаем новый товар
+					created, err := s.productQuery.Insert(ctx, product)
+					if err != nil {
+						s.logger.Warn("Failed to create product",
+							zap.String("moysklad_id", msProduct.ID),
+							zap.Error(err))
+						result.Errors++
+						return
+					}
+					result.Created++
+
+					// Кэшируем остаток
+					if s.stockCache != nil && created != nil {
+						s.stockCache.SetStock(ctx, created.ID, msProduct.ID, created.Stock)
+					}
+
+					s.logger.Info("Product created from Moysklad",
+						zap.String("moysklad_id", msProduct.ID),
+						zap.String("name", msProduct.Name))
+				} else {
+					// Обновляем существующий товар
+					product.ID = existing.ID
+					// Устанавливаем UpdatedAt для обновления
+					product.UpdatedAt = time.Now()
+					updated, err := s.productQuery.Update(ctx, product, existing.ID)
+					if err != nil {
+						s.logger.Warn("Failed to update product",
+							zap.String("moysklad_id", msProduct.ID),
+							zap.Error(err))
+						result.Errors++
+						return
+					}
+					result.Updated++
+
+					// Обновляем кэш остатка
+					if s.stockCache != nil && updated != nil {
+						s.stockCache.SetStock(ctx, updated.ID, msProduct.ID, updated.Stock)
+					}
+
+					s.logger.Info("Product updated from Moysklad",
+						zap.String("moysklad_id", msProduct.ID),
+						zap.String("name", msProduct.Name))
+				}
+			}()
 		}
 
-		// Парсим цену (в МойСклад это массив salePrices, цена в копейках)
-		if len(msProduct.SalePrices) > 0 && msProduct.SalePrices[0].Value > 0 {
-			// Цена в МойСклад хранится в копейках, делим на 100 для получения рублей
-			product.Price = msProduct.SalePrices[0].Value / 100.0
-		} else {
-			// Если цены нет, устанавливаем 0
-			product.Price = 0
-		}
-
-		// Устанавливаем остаток (из вложенного объекта stock)
-		stock := stockMap[msProduct.ID]
-
-		if stock > 0 {
-			product.Stock = int(stock)
-		} else {
-			// Если остаток не пришел, оставляем 0 (можно будет обновить через SyncStockOnly)
-			product.Stock = 0
-		}
-
-		// Статус товара в зависимости от остатка
-		if product.Stock > 0 {
-			product.Status = "active"
-		} else {
-			// Оставляем карточку, но помечаем как out_of_stock
-			product.Status = "out_of_stock"
-		}
-
-		// Обновляем время последнего updated из МойСклад, если доступно
-		if msProduct.Updated != "" {
-			if t, err := time.Parse(time.RFC3339Nano, msProduct.Updated); err == nil {
-				product.LastSyncUpdated = &t
-			}
-		}
-
-		// Устанавливаем изображение (берем первое изображение если есть)
-		if msProduct.Images != nil && len(msProduct.Images.Rows) > 0 {
-			imageURL := msProduct.Images.Rows[0].Meta.Href
-			product.ImageURL = &imageURL
-		}
-
-		if existing == nil {
-			// Создаем новый товар
-			created, err := s.productQuery.Insert(ctx, product)
-			if err != nil {
-				s.logger.Warn("Failed to create product",
-					zap.String("moysklad_id", msProduct.ID),
-					zap.Error(err))
-				result.Errors++
-				continue
-			}
-			result.Created++
-
-			// Кэшируем остаток
-			if s.stockCache != nil && created != nil {
-				s.stockCache.SetStock(ctx, created.ID, msProduct.ID, created.Stock)
-			}
-
-			s.logger.Info("Product created from Moysklad",
-				zap.String("moysklad_id", msProduct.ID),
-				zap.String("name", msProduct.Name))
-		} else {
-			// Обновляем существующий товар
-			product.ID = existing.ID
-			// Устанавливаем UpdatedAt для обновления
-			product.UpdatedAt = time.Now()
-			updated, err := s.productQuery.Update(ctx, product, existing.ID)
-			if err != nil {
-				s.logger.Warn("Failed to update product",
-					zap.String("moysklad_id", msProduct.ID),
-					zap.Error(err))
-				result.Errors++
-				continue
-			}
-			result.Updated++
-
-			// Обновляем кэш остатка
-			if s.stockCache != nil && updated != nil {
-				s.stockCache.SetStock(ctx, updated.ID, msProduct.ID, updated.Stock)
-			}
-
-			s.logger.Info("Product updated from Moysklad",
-				zap.String("moysklad_id", msProduct.ID),
-				zap.String("name", msProduct.Name))
+		// Небольшая пауза между батчами для снижения нагрузки
+		if i+batchSize < len(moyskladProducts) {
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 

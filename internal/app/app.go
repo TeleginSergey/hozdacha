@@ -183,14 +183,15 @@ func (a *App) Run() {
 				}
 			}()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 			defer cancel()
 
+			a.Logger.Info("Starting initial full sync with 15 minute timeout")
 			err := a.Scheduler.FullSync(ctx)
 			if err != nil {
 				a.Logger.Error("Initial full sync failed",
 					zap.Error(err),
-					zap.String("note", "Application will continue without initial sync"))
+					zap.String("note", "Application will continue without initial sync, periodic sync will handle updates"))
 			} else {
 				a.Logger.Info("Initial full sync completed successfully")
 			}
