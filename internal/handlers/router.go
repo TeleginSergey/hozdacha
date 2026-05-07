@@ -91,15 +91,22 @@ func SetupRouter(
 		})
 	})
 
-	// Health check endpoint для Traefik/Docker
+	// Ultra lightweight health check для Dokploy/Traefik (работает под нагрузкой)
 	healthHandler := func(c *gin.Context) {
+		// Минимальный ответ - просто статус без JSON парсинга
+		c.String(http.StatusOK, "ok")
+	}
+	router.GET("/health", healthHandler)
+	router.HEAD("/health", healthHandler)
+
+	// Более детальный health check для мониторинга
+	healthDetailHandler := func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "ok",
 			"timestamp": time.Now().Unix(),
 		})
 	}
-	router.GET("/health", healthHandler)
-	router.HEAD("/health", healthHandler)
+	router.GET("/health/detail", healthDetailHandler)
 
 	// Публичные API
 	api := router.Group("/api")
