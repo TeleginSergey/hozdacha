@@ -116,8 +116,21 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 	s.logger.Info("Products retrieved from Moysklad", zap.Int("total", len(moyskladProducts)))
 	result := &SyncResult{}
 
-	// Синхронизируем каждый товар с прогрессом
-	batchSize := 100
+	// Синхронизируем каждый товар с прогрессом - адаптивный размер батча
+	batchSize := 50
+	totalProducts := len(moyskladProducts)
+
+	// Уменьшаем размер батча для больших объемов
+	if totalProducts > 10000 {
+		batchSize = 25
+	}
+	if totalProducts > 20000 {
+		batchSize = 10
+	}
+
+	s.logger.Info("Starting batch processing",
+		zap.Int("batch_size", batchSize),
+		zap.Int("total_products", totalProducts))
 	for i := 0; i < len(moyskladProducts); i += batchSize {
 		end := i + batchSize
 		if end > len(moyskladProducts) {
@@ -252,9 +265,23 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 			}()
 		}
 
-		// Небольшая пауза между батчами для снижения нагрузки
+		// Адаптивная пауза между батчами для снижения нагрузки
 		if i+batchSize < len(moyskladProducts) {
-			time.Sleep(100 * time.Millisecond)
+			// Увеличиваем паузу для больших объемов данных
+			pauseDuration := 200 * time.Millisecond
+			if len(moyskladProducts) > 10000 {
+				pauseDuration = 500 * time.Millisecond
+			}
+			if len(moyskladProducts) > 20000 {
+				pauseDuration = 1000 * time.Millisecond
+			}
+
+			s.logger.Debug("Pausing between batches",
+				zap.Duration("pause", pauseDuration),
+				zap.Int("processed", i+batchSize),
+				zap.Int("total", len(moyskladProducts)))
+
+			time.Sleep(pauseDuration)
 		}
 	}
 

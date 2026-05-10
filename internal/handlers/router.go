@@ -93,13 +93,23 @@ func SetupRouter(
 
 	// Ultra lightweight health check для Dokploy/Traefik (работает под нагрузкой)
 	healthHandler := func(c *gin.Context) {
-		// Минимальный ответ - просто статус без JSON парсинга
+		// Максимально легкий ответ - без JSON, без логирования, без задержек
+		c.Header("Cache-Control", "no-cache")
+		c.Header("Connection", "keep-alive")
 		c.String(http.StatusOK, "ok")
 	}
 	router.GET("/health", healthHandler)
 	router.HEAD("/health", healthHandler)
 
-	// Более детальный health check для мониторинга
+	// Самый легкий healthcheck - только статус код
+	healthPingHandler := func(c *gin.Context) {
+		// Только статус 200, без тела ответа
+		c.Status(http.StatusOK)
+	}
+	router.GET("/ping", healthPingHandler)
+	router.HEAD("/ping", healthPingHandler)
+
+	// Более детальный health check для мониторинга (не используется в Docker healthcheck)
 	healthDetailHandler := func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "ok",
