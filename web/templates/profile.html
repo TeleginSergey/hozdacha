@@ -205,6 +205,10 @@
                         <label for="phone">Телефон *</label>
                         <input type="tel" id="phone" name="phone" required placeholder="+7 XXX XXX-XX-XX">
                     </div>
+                    <div class="form-group">
+                        <label for="address">Адрес доставки</label>
+                        <input type="text" id="address" name="address" placeholder="Улица, дом, квартира">
+                    </div>
                     <button type="submit" class="btn">Сохранить изменения</button>
                 </form>
             </div>
@@ -278,7 +282,8 @@
                         },
                         body: JSON.stringify({
                             full_name: fullName,
-                            phone: phone
+                            phone: phone,
+                            address: document.getElementById('address').value
                         })
                     });
 
@@ -286,8 +291,9 @@
                     if (response.ok) {
                         // Обновляем данные в localStorage
                         const userData = JSON.parse(localStorage.getItem('user'));
-                        userData.FullName = fullName;
-                        userData.Phone = phone;
+                        userData.full_name = fullName;
+                        userData.phone = phone;
+                        userData.address = document.getElementById('address').value;
                         localStorage.setItem('user', JSON.stringify(userData));
                         
                         // Обновляем отображение
@@ -336,17 +342,18 @@
             const user = await checkAuth();
             if (!user) return;
 
-            document.getElementById('user-name').textContent = user.FullName || user.Username || 'Имя не указано';
-            document.getElementById('user-email').textContent = user.Email || 'Email не указан';
-            document.getElementById('user-phone').textContent = user.Phone || 'Телефон не указан';
+            document.getElementById('user-name').textContent = user.full_name || user.name || user.username || 'Имя не указано';
+            document.getElementById('user-email').textContent = user.email || 'Email не указан';
+            document.getElementById('user-phone').textContent = user.phone || 'Телефон не указан';
             
-            // First letter of name for avatar (prefer FullName, then Username, then Email)
-            const initial = (user.FullName || user.Username || user.Email || 'U').charAt(0).toUpperCase();
+            // First letter of name for avatar (prefer full_name, then name, then username, then email)
+            const initial = (user.full_name || user.name || user.username || user.email || 'U').charAt(0).toUpperCase();
             document.getElementById('user-initial').textContent = initial;
             
             // Заполняем форму
-            document.getElementById('full_name').value = user.FullName || '';
-            document.getElementById('phone').value = user.Phone || '';
+            document.getElementById('full_name').value = user.full_name || user.name || '';
+            document.getElementById('phone').value = user.phone || '';
+            document.getElementById('address').value = user.address || '';
             
             // Загружаем заказы
             loadOrders();

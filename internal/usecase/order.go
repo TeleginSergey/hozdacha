@@ -16,6 +16,7 @@ import (
 type OrderRepository interface {
 	InsertWithItems(ctx context.Context, order *db.Order, items []db.OrderItem) (*db.Order, error)
 	Update(ctx context.Context, order *db.Order, id int64) (*db.Order, error)
+	GetByUserID(ctx context.Context, userID int64) ([]*db.Order, error)
 }
 
 // ProductReadRepository — контракт чтения товаров; совместим с db.ProductQuery.
@@ -159,4 +160,12 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 	}
 
 	return order, nil
+}
+
+func (u *OrderUsecase) GetUserOrders(ctx context.Context, userID int64) ([]*db.Order, error) {
+	orders, err := u.orders.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get user orders: %w", err)
+	}
+	return orders, nil
 }

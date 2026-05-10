@@ -106,3 +106,21 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, order)
 }
+
+func (h *OrderHandler) GetUserOrders(c *gin.Context) {
+	// Проверяем авторизацию
+	userID, exists := c.Get("user_id")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		return
+	}
+
+	orders, err := h.orderUC.GetUserOrders(c.Request.Context(), userID.(int64))
+	if err != nil {
+		h.logger.Error("Failed to get user orders", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get orders"})
+		return
+	}
+
+	c.JSON(http.StatusOK, orders)
+}

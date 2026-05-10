@@ -170,6 +170,7 @@ func SetupRouter(
 		orders.Use(middleware.RequireAuth())
 		{
 			orders.POST("", orderHandler.CreateOrder)
+			orders.GET("", orderHandler.GetUserOrders)
 		}
 
 		// Webhook для МойСклад (публичный endpoint, но защищен подписью)

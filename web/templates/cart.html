@@ -92,6 +92,86 @@
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        
+        .modal-content {
+            background-color: white;
+            margin: 10% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 500px;
+            position: relative;
+        }
+        
+        .close {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #999;
+        }
+        
+        .checkout-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+        
+        .checkout-info p {
+            margin: 5px 0;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .form-group textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: vertical;
+        }
+        
+        .form-group input[type="checkbox"] {
+            margin-right: 8px;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+    </style>
     <script>
         let authToken = localStorage.getItem('auth_token');
         let user = JSON.parse(localStorage.getItem('user') || '{}');
@@ -310,20 +390,88 @@
                 // Получаем данные пользователя из localStorage
                 const user = JSON.parse(localStorage.getItem('user') || '{}');
                 
+                // Показываем модальное окно для подтверждения заказа
+                showCheckoutModal(user);
+            } catch (error) {
+                console.error('Error creating order:', error);
+                alert('Ошибка оформления заказа');
+            }
+        }
+
+        function showCheckoutModal(user) {
+            // Создаем модальное окно для оформления заказа
+            const modalHtml = `
+                <div id="checkoutModal" class="modal" style="display: block;">
+                    <div class="modal-content" style="max-width: 500px;">
+                        <span class="close" onclick="closeCheckoutModal()">&times;</span>
+                        <h2>Оформление заказа</h2>
+                        <div class="checkout-info">
+                            <p><strong>Имя:</strong> ${user.full_name || user.name || user.username || 'Не указано'}</p>
+                            <p><strong>Телефон:</strong> ${user.phone || 'Не указан'}</p>
+                            <p><strong>Адрес:</strong> ${user.address || 'Не указан'}</p>
+                        </div>
+                        <div class="form-group">
+                            <label for="orderComment">Комментарий к заказу (необязательно)</label>
+                            <textarea id="orderComment" placeholder="Укажите дополнительные детали заказа..." rows="3"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="confirmOrder" required>
+                                Я подтверждаю заказ и согласен с условиями
+                            </label>
+                        </div>
+                        <div class="modal-actions">
+                            <button class="btn btn-secondary" onclick="closeCheckoutModal()">Отмена</button>
+                            <button class="btn btn-primary" onclick="submitOrder()">Оформить заказ</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Добавляем модальное окно на страницу
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+        }
+
+        function closeCheckoutModal() {
+            const modal = document.getElementById('checkoutModal');
+            if (modal) {
+                modal.remove();
+            }
+        }
+
+        async function submitOrder() {
+            const confirmCheckbox = document.getElementById('confirmOrder');
+            if (!confirmCheckbox.checked) {
+                alert('Пожалуйста, подтвердите заказ');
+                return;
+            }
+
+            try {
+                // Получаем данные пользователя из localStorage
+                const user = JSON.parse(localStorage.getItem('user') || '{}');
+                
                 // Формируем заказ с данными из профиля
                 const orderData = {
-                    customer_name: user.name || user.username || user.email || 'Не указано',
+                    customer_name: user.full_name || user.name || user.username || user.email || 'Не указано',
                     phone: user.phone || '',
                     address: user.address || '',
-                    comment: '' // Можно добавить поле для комментария
+                    comment: document.getElementById('orderComment').value || '',
+                    items: [] // Будет заполнено из корзины
                 };
                 
                 // Проверяем обязательные поля
                 if (!orderData.phone) {
                     alert('Пожалуйста, укажите номер телефона в профиле перед оформлением заказа.');
+                    closeCheckoutModal();
                     window.location.href = '/profile';
                     return;
                 }
+
+                // Показываем индикатор загрузки
+                const submitBtn = document.querySelector('#checkoutModal .btn-primary');
+                const originalText = submitBtn.textContent;
+                submitBtn.textContent = 'Оформление...';
+                submitBtn.disabled = true;
                 
                 const response = await fetch('/api/orders', {
                     method: 'POST',
@@ -335,15 +483,21 @@
                 });
 
                 if (response.ok) {
-                    alert('Заказ успешно оформлен!');
+                    alert('Заказ успешно оформлен! Товары забронированы.');
+                    closeCheckoutModal();
                     window.location.href = '/profile';
                 } else {
                     const error = await response.json();
                     alert(error.error || 'Ошибка оформления заказа');
+                    submitBtn.textContent = originalText;
+                    submitBtn.disabled = false;
                 }
             } catch (error) {
                 console.error('Error creating order:', error);
                 alert('Ошибка оформления заказа');
+                const submitBtn = document.querySelector('#checkoutModal .btn-primary');
+                submitBtn.textContent = 'Оформить заказ';
+                submitBtn.disabled = false;
             }
         }
 
