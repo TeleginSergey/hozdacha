@@ -113,8 +113,8 @@ func NewApp() (*App, error) {
 
 	// Health check service
 	var healthCheckService *services.HealthCheckService
-	if db != nil {
-		healthCheckService = services.NewHealthCheckService(db, stockCache.GetRedisClient(), logger)
+	if database != nil {
+		healthCheckService = services.NewHealthCheckService(database.Pool, stockCache.GetRedisClient(), logger)
 	}
 
 	// Создаем cartUC перед использованием в других handlers
