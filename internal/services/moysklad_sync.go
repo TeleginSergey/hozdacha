@@ -313,6 +313,92 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 	return result, nil
 }
 
+// GetProductsForSync получает товары для синхронизации (полная или дельта)
+func (s *MoyskladSyncService) GetProductsForSync(ctx context.Context, delta bool, since *time.Time) ([]moysklad.MoyskladProduct, error) {
+	var moyskladProducts []moysklad.MoyskladProduct
+	var err error
+
+	if delta && since != nil {
+		// Дельта-синхронизация
+		s.logger.Info("Getting delta products from Moysklad", zap.Time("since", *since))
+		moyskladProducts, err = s.moyskladClient.GetProductsDelta(ctx, *since)
+	} else {
+		// Полная синхронизация
+		s.logger.Info("Getting all products from Moysklad")
+		moyskladProducts, err = s.moyskladClient.GetProducts(ctx)
+	}
+
+	if err != nil {
+		s.logger.Error("Failed to get products from Moysklad", zap.Error(err))
+		return nil, fmt.Errorf("failed to get products from Moysklad: %w", err)
+	}
+
+	return moyskladProducts, nil
+}
+
+// SyncSingleProduct синхронизирует один продукт с timeout
+func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product MoyskladProduct) error {
+	// Проверяем существует ли товар
+	existingProduct, err := s.productQuery.GetByMoyskladID(ctx, product.ID)
+	if err != nil {
+		return fmt.Errorf("failed to check existing product: %w", err)
+	}
+
+	if existingProduct != nil {
+		// Обновляем существующий товар
+		updated := &db.Product{
+			ID:          existingProduct.ID,
+			MoyskladID:  product.ID,
+			Name:        product.Name,
+			Description: product.Description,
+			Price:       product.Price,
+			Stock:       product.Stock,
+			Active:      true,
+			UpdatedAt:   time.Now(),
+		}
+
+		if err := s.productQuery.Update(ctx, updated); err != nil {
+			return fmt.Errorf("failed to update product: %w", err)
+		}
+
+		// Обновляем кэш остатков
+		if s.stockCache != nil {
+			s.stockCache.SetStock(ctx, updated.ID, product.ID, updated.Stock)
+		}
+
+		s.logger.Debug("Product updated from Moysklad",
+			zap.String("moysklad_id", product.ID),
+			zap.String("name", product.Name))
+	} else {
+		// Создаем новый товар
+		newProduct := &db.Product{
+			MoyskladID:  product.ID,
+			Name:        product.Name,
+			Description: product.Description,
+			Price:       product.Price,
+			Stock:       product.Stock,
+			Active:      true,
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+
+		if err := s.productQuery.Create(ctx, newProduct); err != nil {
+			return fmt.Errorf("failed to create product: %w", err)
+		}
+
+		// Устанавливаем кэш остатков
+		if s.stockCache != nil {
+			s.stockCache.SetStock(ctx, newProduct.ID, product.ID, newProduct.Stock)
+		}
+
+		s.logger.Debug("Product created from Moysklad",
+			zap.String("moysklad_id", product.ID),
+			zap.String("name", product.Name))
+	}
+
+	return nil
+}
+
 // SyncStockOnly синхронизирует только остатки (быстрее чем полная синхронизация)
 func (s *MoyskladSyncService) SyncStockOnly(ctx context.Context) error {
 	if s.moyskladClient == nil {

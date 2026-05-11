@@ -111,6 +111,12 @@ func NewApp() (*App, error) {
 		logger.Info("Token blacklist service initialized")
 	}
 
+	// Health check service
+	var healthCheckService *services.HealthCheckService
+	if db != nil {
+		healthCheckService = services.NewHealthCheckService(db, stockCache.GetRedisClient(), logger)
+	}
+
 	// Создаем cartUC перед использованием в других handlers
 	cartUC := usecase.NewCartUsecase(cartRepo, productRepo, stockCache, logger)
 
@@ -146,6 +152,7 @@ func NewApp() (*App, error) {
 		cartHandler,
 		productRepo,
 		cfg.JWT.Secret,
+		healthCheckService,
 		logger,
 	)
 

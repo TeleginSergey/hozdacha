@@ -9,6 +9,7 @@ import (
 
 	"github.com/TeleginSergey/hozdacha/internal/db"
 	"github.com/TeleginSergey/hozdacha/internal/middleware"
+	"github.com/TeleginSergey/hozdacha/internal/services"
 )
 
 // SetupRouter — общий конструктор роутера, переиспользуемый из app.NewApp().
@@ -23,9 +24,16 @@ func SetupRouter(
 	cartHandler *CartHandler,
 	productQuery db.ProductQuery,
 	jwtSecret string,
+	healthCheckService *services.HealthCheckService,
 	logger *zap.Logger,
 ) *gin.Engine {
 	router := gin.Default()
+
+	// Добавляем health check service в контекст для middleware
+	router.Use(func(c *gin.Context) {
+		c.Set("health_service", healthCheckService)
+		c.Next()
+	})
 
 	// Глобальные middleware безопасности
 	router.Use(middleware.SecurityHeaders())
@@ -109,11 +117,22 @@ func SetupRouter(
 	router.GET("/ping", healthPingHandler)
 	router.HEAD("/ping", healthPingHandler)
 
-	// Более детальный health check для мониторинга (не используется в Docker healthcheck)
+	// Детальный health check с использованием HealthCheckService
 	healthDetailHandler := func(c *gin.Context) {
+		// Используем HealthCheckService если доступен
+		if healthService, exists := c.Get("health_service"); exists {
+			if hs, ok := healthService.(*services.HealthCheckService); ok {
+				status := hs.GetStatus(c.Request.Context())
+				c.JSON(http.StatusOK, status)
+				return
+			}
+		}
+
+		// Fallback если HealthCheckService не инициализирован
 		c.JSON(http.StatusOK, gin.H{
 			"status":    "ok",
 			"timestamp": time.Now().Unix(),
+			"note":      "fallback mode - health check service not available",
 		})
 	}
 	router.GET("/health/detail", healthDetailHandler)

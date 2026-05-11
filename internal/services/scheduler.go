@@ -10,14 +10,18 @@ import (
 
 type Scheduler struct {
 	syncService *MoyskladSyncService
+	workerPool  *SyncWorkerPool
 	interval    time.Duration
 	logger      *zap.Logger
 	stopChan    chan struct{}
 }
 
 func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, logger *zap.Logger) *Scheduler {
+	workerPool := NewSyncWorkerPool(syncService, 3, logger) // 3 параллельных worker'а
+
 	return &Scheduler{
 		syncService: syncService,
+		workerPool:  workerPool,
 		interval:    interval,
 		logger:      logger,
 		stopChan:    make(chan struct{}),
@@ -30,10 +34,15 @@ func (s *Scheduler) Start(ctx context.Context) {
 		return
 	}
 
+	// Запускаем worker pool в отдельной goroutine
+	go s.workerPool.Start(ctx)
+
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
-	s.logger.Info("Scheduler started", zap.Duration("interval", s.interval))
+	s.logger.Info("Scheduler started with worker pool",
+		zap.Duration("interval", s.interval),
+		zap.Int("workers", 3))
 
 	// Выполняем первую синхронизацию сразу при старте
 	go s.syncOnce(ctx)
@@ -84,7 +93,7 @@ func (s *Scheduler) syncOnce(ctx context.Context) {
 	}
 }
 
-// FullSync выполняет полную синхронизацию всех продуктов с МойСклад
+// FullSync выполняет полную синхронизацию всех продуктов с МойСклад через worker pool
 func (s *Scheduler) FullSync(ctx context.Context) error {
 	// Защищаемся от паник
 	defer func() {
@@ -99,24 +108,64 @@ func (s *Scheduler) FullSync(ctx context.Context) error {
 		return fmt.Errorf("sync service not initialized")
 	}
 
-	s.logger.Info("Starting full product sync on startup")
+	s.logger.Info("Starting full product sync with worker pool")
 
-	// Выполняем полную синхронизацию
-	result, err := s.syncService.SyncProducts(ctx)
+	// Получаем все товары из МойСклад
+	moyskladProducts, err := s.syncService.GetProductsForSync(ctx, false, nil)
 	if err != nil {
-		s.logger.Error("Full sync failed", zap.Error(err))
-		return err
+		s.logger.Error("Failed to get products from Moysklad", zap.Error(err))
+		return fmt.Errorf("failed to get products from Moysklad: %w", err)
 	}
 
-	s.logger.Info("Full sync completed successfully",
-		zap.Int("processed", result.Created+result.Updated),
-		zap.Int("created", result.Created),
-		zap.Int("updated", result.Updated),
-		zap.Int("errors", result.Errors))
+	s.logger.Info("Products retrieved from Moysklad", zap.Int("total", len(moyskladProducts)))
+
+	// Разбиваем на маленькие батчи и отправляем в worker pool
+	batchSize := 3 // Очень маленький батч
+	totalProducts := len(moyskladProducts)
+
+	if totalProducts > 1000 {
+		batchSize = 2
+	}
+	if totalProducts > 5000 {
+		batchSize = 1
+	}
+
+	totalBatches := (totalProducts + batchSize - 1) / batchSize
+	s.logger.Info("Splitting products into batches for worker pool",
+		zap.Int("batch_size", batchSize),
+		zap.Int("total_products", totalProducts),
+		zap.Int("total_batches", totalBatches))
+
+	// Отправляем все батчи в очередь worker pool
+	for i := 0; i < totalProducts; i += batchSize {
+		end := i + batchSize
+		if end > totalProducts {
+			end = totalProducts
+		}
+
+		batch := moyskladProducts[i:end]
+		task := SyncTask{
+			ID:           fmt.Sprintf("full-sync-%d", i/batchSize),
+			Type:         "batch",
+			Products:     batch,
+			BatchIndex:   i / batchSize,
+			TotalBatches: totalBatches,
+		}
+
+		s.workerPool.PushTask(task)
+	}
+
+	s.logger.Info("All batches queued for worker pool",
+		zap.Int("total_batches", totalBatches),
+		zap.String("note", "workers will process batches in parallel"))
 
 	return nil
 }
 
 func (s *Scheduler) Stop() {
+	s.logger.Info("Stopping scheduler and worker pool")
 	close(s.stopChan)
+	if s.workerPool != nil {
+		s.workerPool.Stop()
+	}
 }
