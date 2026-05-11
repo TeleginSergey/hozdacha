@@ -183,10 +183,10 @@ func (a *App) Run() {
 				}
 			}()
 
-			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+			a.Logger.Info("Starting initial full sync with 60 minute timeout for large datasets")
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
 			defer cancel()
 
-			a.Logger.Info("Starting initial full sync with 15 minute timeout")
 			err := a.Scheduler.FullSync(ctx)
 			if err != nil {
 				a.Logger.Error("Initial full sync failed",
