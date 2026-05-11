@@ -2,23 +2,23 @@ package services
 
 import (
 	"context"
-	"database/sql"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
 
 type HealthCheckService struct {
-	db    *sql.DB
-	redis *redis.Client
+	db     *pgxpool.Pool
+	redis  *redis.Client
 	logger *zap.Logger
 }
 
-func NewHealthCheckService(db *sql.DB, redis *redis.Client, logger *zap.Logger) *HealthCheckService {
+func NewHealthCheckService(db *pgxpool.Pool, redis *redis.Client, logger *zap.Logger) *HealthCheckService {
 	return &HealthCheckService{
-		db:    db,
-		redis: redis,
+		db:     db,
+		redis:  redis,
 		logger: logger,
 	}
 }
@@ -52,7 +52,7 @@ func (h *HealthCheckService) checkDatabase(ctx context.Context) error {
 	}
 
 	// Простой ping с timeout
-	if err := h.db.PingContext(ctx); err != nil {
+	if err := h.db.Ping(ctx); err != nil {
 		return err
 	}
 
@@ -79,7 +79,7 @@ func (h *HealthCheckService) IsReady(ctx context.Context) bool {
 		h.logger.Warn("System not ready", zap.Error(err))
 		return false
 	}
-	
+
 	h.logger.Debug("System is ready")
 	return true
 }
@@ -87,7 +87,7 @@ func (h *HealthCheckService) IsReady(ctx context.Context) bool {
 // GetStatus возвращает детальный статус системы
 func (h *HealthCheckService) GetStatus(ctx context.Context) map[string]interface{} {
 	status := make(map[string]interface{})
-	
+
 	// Проверяем БД
 	if h.db != nil {
 		if err := h.checkDatabase(ctx); err != nil {
@@ -105,7 +105,7 @@ func (h *HealthCheckService) GetStatus(ctx context.Context) map[string]interface
 			"status": "disabled",
 		}
 	}
-	
+
 	// Проверяем Redis
 	if h.redis != nil {
 		if err := h.checkRedis(ctx); err != nil {
@@ -123,7 +123,7 @@ func (h *HealthCheckService) GetStatus(ctx context.Context) map[string]interface
 			"status": "disabled",
 		}
 	}
-	
+
 	// Общий статус
 	allHealthy := true
 	if dbStatus, ok := status["database"].(map[string]string); ok && dbStatus["status"] == "unhealthy" {
@@ -132,11 +132,17 @@ func (h *HealthCheckService) GetStatus(ctx context.Context) map[string]interface
 	if redisStatus, ok := status["redis"].(map[string]string); ok && redisStatus["status"] == "unhealthy" {
 		allHealthy = false
 	}
-	
+
 	status["overall"] = map[string]interface{}{
-		"status":    func() string { if allHealthy { return "healthy" } else { return "unhealthy" } }(),
+		"status": func() string {
+			if allHealthy {
+				return "healthy"
+			} else {
+				return "unhealthy"
+			}
+		}(),
 		"timestamp": time.Now().Unix(),
 	}
-	
+
 	return status
 }
