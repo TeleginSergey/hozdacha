@@ -111,6 +111,9 @@ func NewApp() (*App, error) {
 		logger.Info("Token blacklist service initialized")
 	}
 
+	// Создаем cartUC перед использованием в других handlers
+	cartUC := usecase.NewCartUsecase(cartRepo, productRepo, stockCache, logger)
+
 	// Handlers поверх usecase // Handlers
 	authHandler := handlers.NewAuthHandler(authService, logger)
 	userHandler := handlers.NewUserHandler(userUC, emailService, blacklistService, logger)
@@ -118,9 +121,6 @@ func NewApp() (*App, error) {
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo, logger)
 	orderHandler := handlers.NewOrderHandlerWithUsecase(orderUC, cartUC, logger)
 	moyskladSyncHandler := handlers.NewMoyskladSyncHandler(moyskladSyncService, logger)
-
-	// Создаем cartHandler
-	cartUC := usecase.NewCartUsecase(cartRepo, productRepo, stockCache, logger)
 	cartHandler := handlers.NewCartHandler(cartUC, logger)
 
 	var webhookHandler *handlers.WebhookHandler
