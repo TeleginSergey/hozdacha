@@ -336,6 +336,23 @@ func (s *MoyskladSyncService) GetProductsForSync(ctx context.Context, delta bool
 	return moyskladProducts, nil
 }
 
+// getPrice извлекает цену из MoyskladProduct
+func getPrice(product moysklad.MoyskladProduct) float64 {
+	if len(product.SalePrices) > 0 {
+		// Берем первую цену (обычно базовая цена)
+		return product.SalePrices[0].Value / 100.0 // Конвертируем из копеек в рубли
+	}
+	return 0.0
+}
+
+// getStock извлекает остаток из MoyskladProduct
+func getStock(product moysklad.MoyskladProduct) int {
+	if product.Stock != nil {
+		return int(product.Stock.Stock)
+	}
+	return 0
+}
+
 // SyncSingleProduct синхронизирует один продукт с timeout
 func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moysklad.MoyskladProduct) error {
 	// Проверяем существует ли товар
@@ -348,11 +365,11 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 		// Обновляем существующий товар
 		updated := &db.Product{
 			ID:          existingProduct.ID,
-			MoyskladID:  product.ID,
+			MoyskladID:  &product.ID,
 			Name:        product.Name,
 			Description: product.Description,
-			Price:       product.Price,
-			Stock:       product.Stock,
+			Price:       getPrice(product),
+			Stock:       getStock(product),
 			Active:      true,
 			UpdatedAt:   time.Now(),
 		}
@@ -372,11 +389,11 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 	} else {
 		// Создаем новый товар
 		newProduct := &db.Product{
-			MoyskladID:  product.ID,
+			MoyskladID:  &product.ID,
 			Name:        product.Name,
 			Description: product.Description,
-			Price:       product.Price,
-			Stock:       product.Stock,
+			Price:       getPrice(product),
+			Stock:       getStock(product),
 			Active:      true,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
