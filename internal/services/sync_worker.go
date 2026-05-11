@@ -7,13 +7,14 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/TeleginSergey/hozdacha/internal/moysklad"
 	"go.uber.org/zap"
 )
 
 type SyncTask struct {
 	ID           string
 	Type         string // "full", "delta", "batch", "preload"
-	Products     []MoyskladProduct
+	Products     []moysklad.MoyskladProduct
 	BatchIndex   int
 	TotalBatches int
 	Priority     int // 1=высокий, 2=средний, 3=низкий

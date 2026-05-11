@@ -337,7 +337,7 @@ func (s *MoyskladSyncService) GetProductsForSync(ctx context.Context, delta bool
 }
 
 // SyncSingleProduct синхронизирует один продукт с timeout
-func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product MoyskladProduct) error {
+func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moysklad.MoyskladProduct) error {
 	// Проверяем существует ли товар
 	existingProduct, err := s.productQuery.GetByMoyskladID(ctx, product.ID)
 	if err != nil {
@@ -357,7 +357,7 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product Moy
 			UpdatedAt:   time.Now(),
 		}
 
-		if err := s.productQuery.Update(ctx, updated); err != nil {
+		if _, err := s.productQuery.Update(ctx, updated, existingProduct.ID); err != nil {
 			return fmt.Errorf("failed to update product: %w", err)
 		}
 
@@ -382,7 +382,7 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product Moy
 			UpdatedAt:   time.Now(),
 		}
 
-		if err := s.productQuery.Create(ctx, newProduct); err != nil {
+		if _, err := s.productQuery.Insert(ctx, newProduct); err != nil {
 			return fmt.Errorf("failed to create product: %w", err)
 		}
 
