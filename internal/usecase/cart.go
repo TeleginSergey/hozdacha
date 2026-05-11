@@ -14,6 +14,8 @@ type CartUsecase struct {
 	productQuery db.ProductQuery
 	stockCache   interface {
 		GetAvailableStock(ctx context.Context, productID int64, productQuery db.ProductQuery) (int, error)
+		ReserveStock(ctx context.Context, productID int64, quantity int) error
+		ReleaseStock(ctx context.Context, productID int64, quantity int) error
 		InvalidateStockCache(ctx context.Context, productID int64) error
 	}
 	logger *zap.Logger
@@ -21,6 +23,8 @@ type CartUsecase struct {
 
 func NewCartUsecase(cartQuery db.CartItemQuery, productQuery db.ProductQuery, stockCache interface {
 	GetAvailableStock(ctx context.Context, productID int64, productQuery db.ProductQuery) (int, error)
+	ReserveStock(ctx context.Context, productID int64, quantity int) error
+	ReleaseStock(ctx context.Context, productID int64, quantity int) error
 	InvalidateStockCache(ctx context.Context, productID int64) error
 }, logger *zap.Logger) *CartUsecase {
 	return &CartUsecase{
@@ -86,7 +90,7 @@ func (c *CartUsecase) AddToCart(ctx context.Context, req *AddToCartRequest) erro
 		return c.cartQuery.UpdateQuantity(ctx, req.UserID, req.ProductID, newQuantity)
 	}
 
-	// Добавляем товар в корзину
+	// Добавляем товар в корзину с резервированием
 	cartItem := &db.CartItem{
 		UserID:    req.UserID,
 		ProductID: req.ProductID,
@@ -95,10 +99,23 @@ func (c *CartUsecase) AddToCart(ctx context.Context, req *AddToCartRequest) erro
 		UpdatedAt: time.Now(),
 	}
 
+	// Резервируем товар в кэше остатков
+	if err := c.stockCache.ReserveStock(ctx, req.ProductID, req.Quantity); err != nil {
+		return fmt.Errorf("failed to reserve stock for product %d: %w", req.ProductID, err)
+	}
+
 	err = c.cartQuery.Create(ctx, cartItem)
 	if err != nil {
-		return fmt.Errorf("failed to add item to cart: %w", err)
+		// При ошибке освобождаем резервирование
+		c.stockCache.ReleaseStock(ctx, req.ProductID, req.Quantity)
+		return fmt.Errorf("failed to create cart item: %w", err)
 	}
+
+	c.logger.Info("Product added to cart with reservation",
+		zap.Int64("user_id", req.UserID),
+		zap.Int64("product_id", req.ProductID),
+		zap.Int("quantity", req.Quantity),
+		zap.Int("available_stock", availableStock))
 
 	return nil
 }
@@ -161,30 +178,109 @@ func (c *CartUsecase) UpdateCart(ctx context.Context, req *UpdateCartRequest) er
 		return fmt.Errorf("item not found in cart")
 	}
 
-	// Обновляем товар в корзине
+	// Обновляем товар в корзине с резервированием
 	newQuantity := req.Quantity
 	if newQuantity > availableStock {
 		return fmt.Errorf("insufficient stock for product %s (available: %d, requested: %d)", product.Name, availableStock, newQuantity)
 	}
 
-	return c.cartQuery.UpdateQuantity(ctx, existingItem.UserID, existingItem.ProductID, newQuantity)
+	// Вычисляем разницу для резервирования/освобождения
+	quantityDiff := newQuantity - existingItem.Quantity
+
+	if quantityDiff > 0 {
+		// Нужно зарезервировать дополнительно
+		if err := c.stockCache.ReserveStock(ctx, req.ProductID, quantityDiff); err != nil {
+			return fmt.Errorf("failed to reserve additional stock: %w", err)
+		}
+	} else if quantityDiff < 0 {
+		// Нужно освободить часть резерва
+		if err := c.stockCache.ReleaseStock(ctx, req.ProductID, -quantityDiff); err != nil {
+			return fmt.Errorf("failed to release stock: %w", err)
+		}
+	}
+
+	err := c.cartQuery.UpdateQuantity(ctx, existingItem.UserID, existingItem.ProductID, newQuantity)
+	if err != nil {
+		// При ошибке откатываем резервирование
+		if quantityDiff > 0 {
+			c.stockCache.ReleaseStock(ctx, req.ProductID, quantityDiff)
+		} else if quantityDiff < 0 {
+			c.stockCache.ReserveStock(ctx, req.ProductID, -quantityDiff)
+		}
+		return fmt.Errorf("failed to update cart item: %w", err)
+	}
+
+	c.logger.Info("Cart item updated with stock adjustment",
+		zap.Int64("user_id", req.UserID),
+		zap.Int64("product_id", req.ProductID),
+		zap.Int("old_quantity", existingItem.Quantity),
+		zap.Int("new_quantity", newQuantity),
+		zap.Int("stock_diff", quantityDiff))
+
+	return nil
 }
 
 func (c *CartUsecase) RemoveFromCart(ctx context.Context, userID, productID int64) error {
-	err := c.cartQuery.Delete(ctx, userID, productID)
+	// Получаем информацию о товаре в корзине для освобождения резерва
+	cartItem, err := c.cartQuery.GetByUserIDAndProductID(ctx, userID, productID)
+	if err != nil {
+		return fmt.Errorf("failed to get cart item: %w", err)
+	}
+	if cartItem == nil {
+		return fmt.Errorf("item not found in cart")
+	}
+
+	err = c.cartQuery.Delete(ctx, userID, productID)
 	if err != nil {
 		c.logger.Error("Failed to remove from cart", zap.Error(err))
 		return fmt.Errorf("failed to remove from cart: %w", err)
 	}
+
+	// Освобождаем зарезервированный товар
+	if err := c.stockCache.ReleaseStock(ctx, productID, cartItem.Quantity); err != nil {
+		c.logger.Error("Failed to release stock on cart removal",
+			zap.Error(err),
+			zap.Int64("product_id", productID),
+			zap.Int("quantity", cartItem.Quantity))
+		// Не возвращаем ошибку, так как товар уже удален из корзины
+	}
+
+	c.logger.Info("Cart item removed with stock release",
+		zap.Int64("user_id", userID),
+		zap.Int64("product_id", productID),
+		zap.Int("released_quantity", cartItem.Quantity))
+
 	return nil
 }
 
 func (c *CartUsecase) ClearCart(ctx context.Context, userID int64) error {
-	err := c.cartQuery.Clear(ctx, userID)
+	// Получаем все товары в корзине для освобождения резервов
+	cartItems, err := c.cartQuery.GetByUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get cart items: %w", err)
+	}
+
+	err = c.cartQuery.Clear(ctx, userID)
 	if err != nil {
 		c.logger.Error("Failed to clear cart", zap.Error(err))
 		return fmt.Errorf("failed to clear cart: %w", err)
 	}
+
+	// Освобождаем все зарезервированные товары
+	for _, item := range cartItems {
+		if releaseErr := c.stockCache.ReleaseStock(ctx, item.ProductID, item.Quantity); releaseErr != nil {
+			c.logger.Error("Failed to release stock on cart clear",
+				zap.Error(releaseErr),
+				zap.Int64("product_id", item.ProductID),
+				zap.Int("quantity", item.Quantity))
+			// Продолжаем освобождать остальные товары
+		}
+	}
+
+	c.logger.Info("Cart cleared with stock releases",
+		zap.Int64("user_id", userID),
+		zap.Int("items_cleared", len(cartItems)))
+
 	return nil
 }
 

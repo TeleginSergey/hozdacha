@@ -24,7 +24,7 @@ func NewEmailService(cfg config.SMTPConfig, logger *zap.Logger) *EmailService {
 
 // SendVerificationCode отправляет код верификации на email
 func (s *EmailService) SendVerificationCode(to, name, code string) error {
-	subject := "Код подтверждения регистрации - Хозяйкин Дом"
+	subject := "Код подтверждения регистрации - ХозДача"
 	body := fmt.Sprintf(`Здравствуйте, %s!
 
 Код подтверждения: %s
@@ -32,7 +32,7 @@ func (s *EmailService) SendVerificationCode(to, name, code string) error {
 Введите этот код в поле подтверждения на сайте для завершения регистрации.
 Код действителен в течение 30 минут.
 
-Если вы не регистрировались на сайте Хозяйкин Дом, проигнорируйте это письмо.
+Если вы не регистрировались на сайте hozdacha.ru, проигнорируйте это письмо.
 
 С уважением,
 Команда Хозяйкин Дом
@@ -43,7 +43,7 @@ func (s *EmailService) SendVerificationCode(to, name, code string) error {
 
 // SendPasswordResetCode отправляет код для сброса пароля
 func (s *EmailService) SendPasswordResetCode(to, name, code string) error {
-	subject := "Сброс пароля - Хозяйкин Дом"
+	subject := "Сброс пароля - hozdacha.ru"
 	body := fmt.Sprintf(`Здравствуйте, %s!
 
 Код для сброса пароля: %s
@@ -54,7 +54,7 @@ func (s *EmailService) SendPasswordResetCode(to, name, code string) error {
 Если вы не запрашивали сброс пароля, проигнорируйте это письмо.
 
 С уважением,
-Команда Хозяйкин Дом
+Команда hozdacha.ru
 `, name, code)
 
 	return s.sendEmail(to, subject, body)

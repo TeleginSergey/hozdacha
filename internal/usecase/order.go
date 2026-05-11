@@ -82,7 +82,7 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 	var totalPrice float64
 	items := make([]db.OrderItem, 0, len(req.Items))
 
-	// Резервируем товары и проверяем доступность
+	// Проверяем товары и рассчитываем цену (резервирование уже сделано в корзине)
 	for _, item := range req.Items {
 		product, err := u.products.GetByID(ctx, item.ProductID)
 		if err != nil {
@@ -95,7 +95,7 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 			return nil, fmt.Errorf("product %d is not active", item.ProductID)
 		}
 
-		// Проверяем доступный остаток
+		// Проверяем доступный остаток (товары уже зарезервированы в корзине)
 		availableStock, err := u.stockCache.GetAvailableStock(ctx, item.ProductID, u.products)
 		if err != nil {
 			return nil, fmt.Errorf("failed to check available stock for product %d: %w", item.ProductID, err)
@@ -103,11 +103,6 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 
 		if availableStock < item.Quantity {
 			return nil, fmt.Errorf("insufficient stock for product %d. Available: %d, Requested: %d", item.ProductID, availableStock, item.Quantity)
-		}
-
-		// Резервируем товар
-		if err := u.stockCache.ReserveStock(ctx, item.ProductID, item.Quantity); err != nil {
-			return nil, fmt.Errorf("failed to reserve stock for product %d: %w", item.ProductID, err)
 		}
 
 		itemPrice := product.Price * float64(item.Quantity)
@@ -132,10 +127,6 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 
 	order, err := u.orders.InsertWithItems(ctx, order, items)
 	if err != nil {
-		// При ошибке освобождаем все резервирования
-		for _, item := range req.Items {
-			u.stockCache.ReleaseStock(ctx, item.ProductID, item.Quantity)
-		}
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 

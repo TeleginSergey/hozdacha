@@ -12,6 +12,7 @@ import (
 
 type OrderHandler struct {
 	orderUC *usecase.OrderUsecase
+	cartUC  *usecase.CartUsecase
 	logger  *zap.Logger
 }
 
@@ -25,8 +26,15 @@ func NewOrderHandler(orderService *services.OrderService, logger *zap.Logger) *O
 		orderService.TelegramBot(),
 		logger,
 	)
+	cartUC := usecase.NewCartUsecase(
+		orderService.CartQuery(),
+		orderService.ProductQuery(),
+		orderService.StockCache(),
+		logger,
+	)
 	return &OrderHandler{
 		orderUC: uc,
+		cartUC:  cartUC,
 		logger:  logger,
 	}
 }
@@ -102,6 +110,19 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		// Не раскрываем детали ошибки клиенту
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
 		return
+	}
+
+	// Очищаем корзину пользователя после успешного создания заказа
+	if err := h.cartUC.ClearCart(c.Request.Context(), userID.(int64)); err != nil {
+		h.logger.Warn("Failed to clear cart after order creation",
+			zap.Error(err),
+			zap.Int64("user_id", userID.(int64)),
+			zap.Int64("order_id", order.ID))
+		// Не возвращаем ошибку, так как заказ уже создан
+	} else {
+		h.logger.Info("Cart cleared successfully after order creation",
+			zap.Int64("user_id", userID.(int64)),
+			zap.Int64("order_id", order.ID))
 	}
 
 	c.JSON(http.StatusCreated, order)
