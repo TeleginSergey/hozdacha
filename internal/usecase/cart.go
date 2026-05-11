@@ -199,7 +199,7 @@ func (c *CartUsecase) UpdateCart(ctx context.Context, req *UpdateCartRequest) er
 		}
 	}
 
-	err := c.cartQuery.UpdateQuantity(ctx, existingItem.UserID, existingItem.ProductID, newQuantity)
+	err = c.cartQuery.UpdateQuantity(ctx, existingItem.UserID, existingItem.ProductID, newQuantity)
 	if err != nil {
 		// При ошибке откатываем резервирование
 		if quantityDiff > 0 {
