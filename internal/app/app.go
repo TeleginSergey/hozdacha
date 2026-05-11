@@ -116,7 +116,7 @@ func NewApp() (*App, error) {
 	userHandler := handlers.NewUserHandler(userUC, emailService, blacklistService, logger)
 	productHandler := handlers.NewProductHandlerWithUsecase(productUC, logger)
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo, logger)
-	orderHandler := handlers.NewOrderHandlerWithUsecase(orderUC, logger)
+	orderHandler := handlers.NewOrderHandlerWithUsecase(orderUC, cartUC, logger)
 	moyskladSyncHandler := handlers.NewMoyskladSyncHandler(moyskladSyncService, logger)
 
 	// Создаем cartHandler

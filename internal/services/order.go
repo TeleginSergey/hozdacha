@@ -14,6 +14,7 @@ import (
 type OrderService struct {
 	orderQuery     db.OrderQuery
 	productQuery   db.ProductQuery
+	cartQuery      db.CartItemQuery
 	stockCache     *cache.StockCache
 	moyskladClient *moysklad.Client
 	telegramBot    *telegram.Bot
@@ -23,6 +24,7 @@ type OrderService struct {
 func NewOrderService(
 	orderQuery db.OrderQuery,
 	productQuery db.ProductQuery,
+	cartQuery db.CartItemQuery,
 	stockCache *cache.StockCache,
 	moyskladClient *moysklad.Client,
 	telegramBot *telegram.Bot,
@@ -31,6 +33,7 @@ func NewOrderService(
 	return &OrderService{
 		orderQuery:     orderQuery,
 		productQuery:   productQuery,
+		cartQuery:      cartQuery,
 		stockCache:     stockCache,
 		moyskladClient: moyskladClient,
 		telegramBot:    telegramBot,
@@ -145,4 +148,8 @@ func (s *OrderService) MoyskladClient() *moysklad.Client {
 
 func (s *OrderService) TelegramBot() *telegram.Bot {
 	return s.telegramBot
+}
+
+func (s *OrderService) CartQuery() db.CartItemQuery {
+	return s.cartQuery
 }

@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
-	"github.com/TeleginSergey/hozdacha/internal/services"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
 )
 
@@ -16,33 +15,11 @@ type OrderHandler struct {
 	logger  *zap.Logger
 }
 
-// Временный конструктор для старого сервиса (backward compatibility).
-func NewOrderHandler(orderService *services.OrderService, logger *zap.Logger) *OrderHandler {
-	uc := usecase.NewOrderUsecase(
-		orderService.OrderQuery(),
-		orderService.ProductQuery(),
-		orderService.StockCache(),
-		orderService.MoyskladClient(),
-		orderService.TelegramBot(),
-		logger,
-	)
-	cartUC := usecase.NewCartUsecase(
-		orderService.CartQuery(),
-		orderService.ProductQuery(),
-		orderService.StockCache(),
-		logger,
-	)
-	return &OrderHandler{
-		orderUC: uc,
-		cartUC:  cartUC,
-		logger:  logger,
-	}
-}
-
 // Новый конструктор поверх usecase.
-func NewOrderHandlerWithUsecase(orderUC *usecase.OrderUsecase, logger *zap.Logger) *OrderHandler {
+func NewOrderHandlerWithUsecase(orderUC *usecase.OrderUsecase, cartUC *usecase.CartUsecase, logger *zap.Logger) *OrderHandler {
 	return &OrderHandler{
 		orderUC: orderUC,
+		cartUC:  cartUC,
 		logger:  logger,
 	}
 }
