@@ -205,18 +205,12 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 					product.Stock = 0
 				}
 
-				// Статус товара в зависимости от остатка и состояния из МойСклад
+				// Статус товара в зависимости от остатка
 				if product.Stock > 0 {
 					product.Status = "active"
 				} else {
 					// Оставляем карточку, но помечаем как out_of_stock
 					product.Status = "out_of_stock"
-				}
-
-				// Проверяем archived статус из МойСклад (если есть)
-				if msProduct.Archived {
-					product.Status = "archived"
-					product.Active = false
 				}
 
 				// Обновляем время последнего updated из МойСклад, если доступно
@@ -371,18 +365,11 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 		// Обновляем существующий товар
 		stock := getStock(product)
 		var status string
-		var active bool = true
 
 		if stock > 0 {
 			status = "active"
 		} else {
 			status = "out_of_stock"
-		}
-
-		// Проверяем archived статус из МойСклад
-		if product.Archived {
-			status = "archived"
-			active = false
 		}
 
 		updated := &db.Product{
@@ -393,7 +380,7 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 			Price:       getPrice(product),
 			Stock:       stock,
 			Status:      status, // Добавляем статус
-			Active:      active,
+			Active:      true,
 			UpdatedAt:   time.Now(),
 		}
 
@@ -414,18 +401,11 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 		// Создаем новый товар
 		stock := getStock(product)
 		var status string
-		var active bool = true
 
 		if stock > 0 {
 			status = "active"
 		} else {
 			status = "out_of_stock"
-		}
-
-		// Проверяем archived статус из МойСклад
-		if product.Archived {
-			status = "archived"
-			active = false
 		}
 
 		newProduct := &db.Product{
@@ -435,7 +415,7 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 			Price:       getPrice(product),
 			Stock:       stock,
 			Status:      status, // Добавляем статус
-			Active:      active,
+			Active:      true,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		}
