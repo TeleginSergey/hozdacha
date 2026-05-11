@@ -205,12 +205,18 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 					product.Stock = 0
 				}
 
-				// Статус товара в зависимости от остатка
+				// Статус товара в зависимости от остатка и состояния из МойСклад
 				if product.Stock > 0 {
 					product.Status = "active"
 				} else {
 					// Оставляем карточку, но помечаем как out_of_stock
 					product.Status = "out_of_stock"
+				}
+
+				// Проверяем archived статус из МойСклад (если есть)
+				if msProduct.Archived {
+					product.Status = "archived"
+					product.Active = false
 				}
 
 				// Обновляем время последнего updated из МойСклад, если доступно
@@ -363,14 +369,31 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 
 	if existingProduct != nil {
 		// Обновляем существующий товар
+		stock := getStock(product)
+		var status string
+		var active bool = true
+
+		if stock > 0 {
+			status = "active"
+		} else {
+			status = "out_of_stock"
+		}
+
+		// Проверяем archived статус из МойСклад
+		if product.Archived {
+			status = "archived"
+			active = false
+		}
+
 		updated := &db.Product{
 			ID:          existingProduct.ID,
 			MoyskladID:  &product.ID,
 			Name:        product.Name,
 			Description: product.Description,
 			Price:       getPrice(product),
-			Stock:       getStock(product),
-			Active:      true,
+			Stock:       stock,
+			Status:      status, // Добавляем статус
+			Active:      active,
 			UpdatedAt:   time.Now(),
 		}
 
@@ -385,16 +408,34 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 
 		s.logger.Debug("Product updated from Moysklad",
 			zap.String("moysklad_id", product.ID),
-			zap.String("name", product.Name))
+			zap.String("name", product.Name),
+			zap.String("status", status))
 	} else {
 		// Создаем новый товар
+		stock := getStock(product)
+		var status string
+		var active bool = true
+
+		if stock > 0 {
+			status = "active"
+		} else {
+			status = "out_of_stock"
+		}
+
+		// Проверяем archived статус из МойСклад
+		if product.Archived {
+			status = "archived"
+			active = false
+		}
+
 		newProduct := &db.Product{
 			MoyskladID:  &product.ID,
 			Name:        product.Name,
 			Description: product.Description,
 			Price:       getPrice(product),
-			Stock:       getStock(product),
-			Active:      true,
+			Stock:       stock,
+			Status:      status, // Добавляем статус
+			Active:      active,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
 		}
@@ -410,7 +451,8 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 
 		s.logger.Debug("Product created from Moysklad",
 			zap.String("moysklad_id", product.ID),
-			zap.String("name", product.Name))
+			zap.String("name", product.Name),
+			zap.String("status", status))
 	}
 
 	return nil
