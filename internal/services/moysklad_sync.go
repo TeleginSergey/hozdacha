@@ -136,10 +136,9 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 		zap.Int("total_products", totalProducts),
 		zap.Int("estimated_batches", (totalProducts+batchSize-1)/batchSize))
 	for i := 0; i < len(moyskladProducts); i += batchSize {
-		if end := i + batchSize; end > len(moyskladProducts) {
+		end := i + batchSize
+		if end > len(moyskladProducts) {
 			end = len(moyskladProducts)
-		} else {
-			end = i + batchSize
 		}
 
 		batch := moyskladProducts[i:end]
