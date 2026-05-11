@@ -175,34 +175,17 @@ func NewApp() (*App, error) {
 
 // Run запускает HTTP-сервер и планировщик, и делает graceful shutdown.
 func (a *App) Run() {
-	// Выполняем полную синхронизацию с МойСклад при запуске
+	// СНАЧАЛА запускаем HTTP сервер
+	go func() {
+		a.Logger.Info("Server starting", zap.String("address", a.Server.Addr))
+		if err := a.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			a.Logger.Fatal("Failed to start server", zap.Error(err))
+		}
+	}()
+
+	// ПОТОМ запускаем синхронизацию с МойСклад в фоне
 	if a.Scheduler != nil {
-		a.Logger.Info("Starting initial full sync with Moysklad on startup")
-
-		// Защищаемся от паник при синхронизации
-		func() {
-			defer func() {
-				if r := recover(); r != nil {
-					a.Logger.Error("Initial full sync panicked",
-						zap.Any("panic", r),
-						zap.String("stack", fmt.Sprintf("%+v", r)))
-					a.Logger.Warn("Application will continue despite sync panic")
-				}
-			}()
-
-			a.Logger.Info("Starting initial full sync with 60 minute timeout for large datasets")
-			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Minute)
-			defer cancel()
-
-			err := a.Scheduler.FullSync(ctx)
-			if err != nil {
-				a.Logger.Error("Initial full sync failed",
-					zap.Error(err),
-					zap.String("note", "Application will continue without initial sync, periodic sync will handle updates"))
-			} else {
-				a.Logger.Info("Initial full sync completed successfully")
-			}
-		}()
+		a.Logger.Info("Starting Moysklad sync services in background")
 
 		// Запускаем планировщик для периодической синхронизации
 		go func() {
@@ -217,17 +200,38 @@ func (a *App) Run() {
 			a.Scheduler.Start(context.Background())
 		}()
 
+		// Выполняем полную синхронизацию с МойСклад в фоне
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					a.Logger.Error("Initial full sync panicked",
+						zap.Any("panic", r),
+						zap.String("stack", fmt.Sprintf("%+v", r)))
+					a.Logger.Warn("Application will continue despite sync panic")
+				}
+			}()
+
+			// Даем серверу время на запуск
+			time.Sleep(5 * time.Second)
+
+			a.Logger.Info("Starting initial full sync with 30 minute timeout")
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+			defer cancel()
+
+			err := a.Scheduler.FullSync(ctx)
+			if err != nil {
+				a.Logger.Error("Initial full sync failed",
+					zap.Error(err),
+					zap.String("note", "Application will continue without initial sync, periodic sync will handle updates"))
+			} else {
+				a.Logger.Info("Initial full sync completed successfully")
+			}
+		}()
+
 		a.Logger.Info("Auto-sync scheduler started",
 			zap.Duration("interval", a.Config.Moysklad.SyncInterval),
 			zap.Float64("stock_buffer", a.Config.Moysklad.StockBuffer))
 	}
-
-	go func() {
-		a.Logger.Info("Server starting", zap.String("address", a.Server.Addr))
-		if err := a.Server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			a.Logger.Fatal("Failed to start server", zap.Error(err))
-		}
-	}()
 
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)

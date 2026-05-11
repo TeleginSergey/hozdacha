@@ -17,7 +17,7 @@ type Scheduler struct {
 }
 
 func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, logger *zap.Logger) *Scheduler {
-	workerPool := NewSyncWorkerPool(syncService, 3, logger) // 3 параллельных worker'а
+	workerPool := NewSyncWorkerPool(syncService, 2, logger) // 2 параллельных worker'а для снижения нагрузки
 
 	return &Scheduler{
 		syncService: syncService,
@@ -42,7 +42,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 
 	s.logger.Info("Scheduler started with worker pool",
 		zap.Duration("interval", s.interval),
-		zap.Int("workers", 3))
+		zap.Int("workers", 2))
 
 	// Выполняем первую синхронизацию сразу при старте
 	go s.syncOnce(ctx)

@@ -54,7 +54,7 @@ func NewSyncWorkerPool(syncService *MoyskladSyncService, workers int, logger *za
 	return &SyncWorkerPool{
 		syncService: syncService,
 		logger:      logger,
-		taskQueue:   make(chan SyncTask, 200), // Увеличенный буфер
+		taskQueue:   make(chan SyncTask, 50), // Уменьшенный буфер для снижения нагрузки
 		workers:     0,
 		maxWorkers:  maxWorkers,
 		semaphore:   make(chan struct{}, maxWorkers),
