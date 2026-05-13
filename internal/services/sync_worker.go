@@ -54,7 +54,8 @@ func NewSyncWorkerPool(syncService *MoyskladSyncService, workers int, logger *za
 	return &SyncWorkerPool{
 		syncService: syncService,
 		logger:      logger,
-		taskQueue:   make(chan SyncTask, 50), // Уменьшенный буфер для снижения нагрузки
+		// Буфер под полную синхронизацию (десятки тысяч батчей); иначе PushTask сбрасывает задачи в default.
+		taskQueue: make(chan SyncTask, 4096),
 		workers:     0,
 		maxWorkers:  maxWorkers,
 		semaphore:   make(chan struct{}, maxWorkers),
@@ -70,6 +71,9 @@ func (p *SyncWorkerPool) Start(ctx context.Context) {
 	p.logger.Info("Starting dynamic sync worker pool",
 		zap.Int32("max_workers", p.maxWorkers),
 		zap.Int("cpu_cores", runtime.NumCPU()))
+
+	// Сразу один воркер — иначе первые секунды очередь переполняется, пока ticker не вызовет adjustWorkerCount.
+	p.startWorker()
 
 	// Запускаем воркеров динамически по мере необходимости
 	go p.workerManager(ctx)
@@ -203,19 +207,14 @@ func (p *SyncWorkerPool) PushTask(task SyncTask) {
 	atomic.AddInt64(&p.stats.TotalTasks, 1)
 	atomic.AddInt32(&p.stats.QueuedTasks, 1)
 
-	select {
-	case p.taskQueue <- task:
-		p.logger.Debug("Task queued",
-			zap.String("task_id", task.ID),
-			zap.String("type", task.Type),
-			zap.Int("batch_index", task.BatchIndex),
-			zap.Int("priority", task.Priority))
-	default:
-		atomic.AddInt32(&p.stats.QueuedTasks, -1)
-		atomic.AddInt64(&p.stats.FailedTasks, 1)
-		p.logger.Warn("Task queue full, dropping task",
-			zap.String("task_id", task.ID))
-	}
+	// Блокирующая отправка: не теряем батчи при пиковой нагрузке (полная синхронизация).
+	p.taskQueue <- task
+
+	p.logger.Debug("Task queued",
+		zap.String("task_id", task.ID),
+		zap.String("type", task.Type),
+		zap.Int("batch_index", task.BatchIndex),
+		zap.Int("priority", task.Priority))
 }
 
 // GetStats возвращает текущую статистику воркеров

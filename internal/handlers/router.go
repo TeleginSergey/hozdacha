@@ -63,8 +63,8 @@ func SetupRouter(
 		productHandler.RenderProductPage(c)
 	})
 
-	// Корзина (требует авторизации)
-	router.GET("/cart", middleware.RequireAuth(), func(c *gin.Context) {
+	// Корзина: как /profile — отдаём HTML без RequireAuth; проверка JWT в JS (checkAuth + Bearer в API).
+	router.GET("/cart", middleware.AuthMiddleware(jwtSecret), func(c *gin.Context) {
 		c.HTML(http.StatusOK, "cart.html", gin.H{
 			"title": "Корзина - Телегинс Шоп",
 		})
@@ -182,8 +182,9 @@ func SetupRouter(
 		// Акции
 		api.GET("/promotions", promotionHandler.GetActivePromotions)
 
-		// Корзина (с защитой)
+		// Корзина (с защитой): сначала парсим JWT, иначе RequireAuth не видит user_id.
 		cart := api.Group("/cart")
+		cart.Use(middleware.AuthMiddleware(jwtSecret))
 		cart.Use(middleware.RequireAuth())
 		{
 			cart.POST("", cartHandler.AddToCart)
@@ -196,6 +197,7 @@ func SetupRouter(
 
 		// Заказы (требует авторизации)
 		orders := api.Group("/orders")
+		orders.Use(middleware.AuthMiddleware(jwtSecret))
 		orders.Use(middleware.RequireAuth())
 		{
 			orders.POST("", orderHandler.CreateOrder)

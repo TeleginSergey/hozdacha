@@ -461,12 +461,20 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
             quantity: parseInt(item.quantity)
         }))
     };
-    
+
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+        alert('Чтобы оформить заказ, войдите в аккаунт.');
+        window.location.href = '/login?redirect=' + encodeURIComponent('/catalog');
+        return;
+    }
+
     try {
         const response = await fetch('/api/orders', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer ' + token
             },
             body: JSON.stringify(order)
         });
