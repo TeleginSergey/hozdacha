@@ -18,8 +18,10 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/handlers"
 	"github.com/TeleginSergey/hozdacha/internal/middleware"
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
+	"github.com/TeleginSergey/hozdacha/internal/resilience"
 	"github.com/TeleginSergey/hozdacha/internal/services"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
+	"github.com/redis/go-redis/v9"
 )
 
 // App инкапсулирует все зависимости и HTTP-сервер.
@@ -71,11 +73,26 @@ func NewApp() (*App, error) {
 	orderRepo := db.NewOrderQuery(database.Pool, database.SQ, logger)
 	cartRepo := db.NewCartItemQuery(database.Pool, logger)
 
-	// Moysklad client
+	// Moysklad client (circuit breaker + лимит параллельных запросов)
 	var moyskladClient *moysklad.Client
 	if cfg.Moysklad.Token != "" {
-		moyskladClient = moysklad.NewClient(cfg.Moysklad.BaseURL, cfg.Moysklad.Token, logger, cfg.Moysklad.RequestsPerSecond, cfg.Moysklad.MaxRetries)
-		logger.Info("Moysklad client initialized")
+		maxConc := cfg.Moysklad.MaxConcurrentRequests
+		if maxConc < 1 {
+			maxConc = 8
+		}
+		cb := resilience.NewCircuitBreaker(cfg.Moysklad.CircuitFailThreshold, cfg.Moysklad.CircuitOpenTimeout)
+		moyskladClient = moysklad.NewClient(
+			cfg.Moysklad.BaseURL,
+			cfg.Moysklad.Token,
+			logger,
+			cfg.Moysklad.RequestsPerSecond,
+			cfg.Moysklad.MaxRetries,
+			moysklad.WithOutboundConcurrency(maxConc),
+			moysklad.WithCircuitBreaker(cb),
+		)
+		logger.Info("Moysklad client initialized",
+			zap.Int("max_concurrent_requests", maxConc),
+			zap.Int("circuit_fail_threshold", cfg.Moysklad.CircuitFailThreshold))
 	} else {
 		logger.Warn("Moysklad token not provided, integration disabled")
 	}
@@ -103,7 +120,7 @@ func NewApp() (*App, error) {
 		if syncWorkers > 32 {
 			syncWorkers = 32
 		}
-		scheduler = services.NewScheduler(moyskladSyncService, cfg.Moysklad.SyncInterval, syncWorkers, logger)
+		scheduler = services.NewScheduler(moyskladSyncService, cfg.Moysklad.SyncInterval, syncWorkers, cfg.Moysklad.ReseedFullInterval, logger)
 	}
 
 	// Email Service
@@ -121,7 +138,11 @@ func NewApp() (*App, error) {
 	// Health check service
 	var healthCheckService *services.HealthCheckService
 	if database != nil {
-		healthCheckService = services.NewHealthCheckService(database.Pool, stockCache.GetRedisClient(), logger)
+		var redisClient *redis.Client
+		if stockCache != nil {
+			redisClient = stockCache.GetRedisClient()
+		}
+		healthCheckService = services.NewHealthCheckService(database.Pool, redisClient, logger)
 	}
 
 	// Создаем cartUC перед использованием в других handlers
@@ -137,14 +158,33 @@ func NewApp() (*App, error) {
 	cartHandler := handlers.NewCartHandler(cartUC, logger)
 
 	var webhookHandler *handlers.WebhookHandler
+	webhookInbox := db.NewWebhookInboxRepo(database.Pool, logger)
+	webhookProcessor := services.NewWebhookProcessor(productRepo, moyskladClient, stockCache, logger)
 	if moyskladClient != nil {
+		maxWhAttempts := cfg.Moysklad.WebhookMaxAttempts
+		if maxWhAttempts < 1 {
+			maxWhAttempts = 15
+		}
 		webhookHandler = handlers.NewWebhookHandler(
-			productRepo,
-			moyskladClient,
-			stockCache,
 			cfg.Moysklad.WebhookSecret,
+			webhookInbox,
+			maxWhAttempts,
 			logger,
 		)
+		whBatch := cfg.Moysklad.WebhookInboxBatch
+		if whBatch < 1 {
+			whBatch = 10
+		}
+		whWorker := services.NewWebhookInboxWorker(webhookInbox, webhookProcessor, cfg.Moysklad.WebhookWorkerInterval, whBatch, logger)
+		go func() {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.Error("webhook inbox worker panicked", zap.Any("panic", r))
+				}
+			}()
+			whWorker.Run(context.Background())
+		}()
+		logger.Info("Webhook inbox worker started")
 	}
 
 	// Router

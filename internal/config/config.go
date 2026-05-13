@@ -48,6 +48,16 @@ type MoyskladConfig struct {
 	MaxRetries        int           // Максимальное количество попыток при ошибках
 	// SyncWorkers — параллельные воркеры пула синхронизации (сеть/IO к МойСклад; не обязано совпадать с числом CPU).
 	SyncWorkers int
+	// ReseedFullInterval — редкая полная пересинхронизация (0 = отключено).
+	ReseedFullInterval time.Duration
+	// Webhook inbox / worker
+	WebhookWorkerInterval time.Duration
+	WebhookInboxBatch     int
+	WebhookMaxAttempts    int
+	// Circuit breaker исходящих запросов к API МойСклад
+	CircuitFailThreshold  int
+	CircuitOpenTimeout    time.Duration
+	MaxConcurrentRequests int
 }
 
 type RedisConfig struct {
@@ -100,7 +110,14 @@ func Load() (*Config, error) {
 			StockBuffer:       parseFloat(getEnv("MOYSKLAD_STOCK_BUFFER", "3.0")),         // Уменьшили буфер до 3%
 			RequestsPerSecond: parseFloat(getEnv("MOYSKLAD_REQUESTS_PER_SECOND", "10.0")), // 10/сек = 600/минуту (75% от 800 лимита)
 			MaxRetries:        parseInt(getEnv("MOYSKLAD_MAX_RETRIES", "5")),              // в т.ч. повторы при 503
-			SyncWorkers:       parseInt(getEnv("MOYSKLAD_SYNC_WORKERS", "3")),
+			SyncWorkers:           parseInt(getEnv("MOYSKLAD_SYNC_WORKERS", "3")),
+			ReseedFullInterval:    parseDurationOrZero(getEnv("MOYSKLAD_RESEED_FULL_INTERVAL", "24h")),
+			WebhookWorkerInterval: parseDuration(getEnv("WEBHOOK_INBOX_POLL_INTERVAL", "2s")),
+			WebhookInboxBatch:     parseInt(getEnv("WEBHOOK_INBOX_BATCH", "10")),
+			WebhookMaxAttempts:    parseInt(getEnv("WEBHOOK_MAX_ATTEMPTS", "15")),
+			CircuitFailThreshold:  parseInt(getEnv("MOYSKLAD_CIRCUIT_FAIL_THRESHOLD", "5")),
+			CircuitOpenTimeout:    parseDuration(getEnv("MOYSKLAD_CIRCUIT_OPEN_TIMEOUT", "60s")),
+			MaxConcurrentRequests: parseInt(getEnv("MOYSKLAD_MAX_CONCURRENT_REQUESTS", "8")),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "redis"),
@@ -138,6 +155,14 @@ func parseDuration(s string) time.Duration {
 		return 10 * time.Minute
 	}
 	return d
+}
+
+// parseDurationOrZero — как parseDuration, но "0"/"off" отключают фичу.
+func parseDurationOrZero(s string) time.Duration {
+	if s == "" || s == "0" || s == "off" || s == "false" {
+		return 0
+	}
+	return parseDuration(s)
 }
 
 func parseFloat(s string) float64 {

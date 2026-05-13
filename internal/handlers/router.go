@@ -229,6 +229,11 @@ func SetupRouter(
 		// Синхронизация с МойСклад
 		admin.POST("/products/sync", moyskladSyncHandler.SyncProducts)
 		admin.POST("/products/sync/full", moyskladSyncHandler.SyncProductsFull)
+
+		if webhookHandler != nil {
+			admin.GET("/webhooks/dead-letter", webhookHandler.ListDeadLetter)
+			admin.POST("/webhooks/replay/:id", webhookHandler.ReplayDeadLetter)
+		}
 	}
 
 	return router

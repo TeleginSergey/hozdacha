@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -106,6 +107,13 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 		// Полная синхронизация
 		s.logger.Info("Starting full sync")
 		moyskladProducts, err = s.moyskladClient.GetProducts(ctx)
+	}
+
+	if err != nil {
+		if delta && since != nil && errors.Is(err, moysklad.ErrResyncRequired) {
+			s.logger.Warn("Delta sync rejected by Moysklad, falling back to full product list", zap.Error(err))
+			moyskladProducts, err = s.moyskladClient.GetProducts(ctx)
+		}
 	}
 
 	if err != nil {
