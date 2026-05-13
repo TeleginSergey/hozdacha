@@ -188,6 +188,26 @@ func (c *Client) doRequestWithRetry(ctx context.Context, req *http.Request) (*ht
 			continue
 		}
 
+		// Временные сбои на стороне МойСклад / балансировщика
+		if resp.StatusCode == http.StatusServiceUnavailable ||
+			resp.StatusCode == http.StatusBadGateway ||
+			resp.StatusCode == http.StatusGatewayTimeout {
+			resp.Body.Close()
+			if attempt == maxRetries {
+				return nil, fmt.Errorf("server error %d after %d attempts", resp.StatusCode, maxRetries)
+			}
+			delay := baseDelay * time.Duration(1<<uint(attempt))
+			if delay > 30*time.Second {
+				delay = 30 * time.Second
+			}
+			c.logger.Warn("Moysklad temporary error, retrying",
+				zap.Int("status", resp.StatusCode),
+				zap.Int("attempt", attempt+1),
+				zap.Duration("delay", delay))
+			time.Sleep(delay)
+			continue
+		}
+
 		return resp, nil
 	}
 

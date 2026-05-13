@@ -47,6 +47,28 @@ services:
     restart: unless-stopped
     networks:
       - hozdacha_network
+    # На хосте 4 CPU: можно ограничить приложение (Swarm / часть оркестраторов):
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: "3.0"
+    # Параллельные воркеры синхронизации МойСклад (не равно числу CPU; см. MOYSKLAD_SYNC_WORKERS в .env).
+
+  # Разовые миграции: docker compose run --rm migrate
+  # (не подменяйте команду основного сервиса на migrate-up — контейнер завершится).
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    depends_on:
+      hozdacha_db:
+        condition: service_healthy
+    command: ["migrate-up"]
+    networks:
+      - hozdacha_network
+    restart: "no"
 
 volumes:
   postgres_data:

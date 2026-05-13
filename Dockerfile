@@ -24,6 +24,10 @@ COPY --from=builder /app/main .
 COPY --from=builder /app/web ./web
 COPY --from=builder /app/migrations ./migrations
 
+# Копируем entrypoint (миграции отдельно: migrate-up или AUTO_MIGRATE)
+COPY docker-entrypoint.sh /root/docker-entrypoint.sh
+RUN chmod +x /root/docker-entrypoint.sh
+
 # Создаем директорию для логов
 RUN mkdir -p /var/log/telegins_shop
 
@@ -33,4 +37,5 @@ HEALTHCHECK --interval=90s --timeout=15s --start-period=60s --retries=3 \
 
 EXPOSE 8080
 
+ENTRYPOINT ["/root/docker-entrypoint.sh"]
 CMD ["./main"]
