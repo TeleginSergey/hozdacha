@@ -9,27 +9,29 @@ import (
 )
 
 type Scheduler struct {
-	syncService *MoyskladSyncService
-	workerPool  *SyncWorkerPool
-	maxWorkers  int
-	interval    time.Duration
-	logger      *zap.Logger
-	stopChan    chan struct{}
+	syncService        *MoyskladSyncService
+	workerPool         *SyncWorkerPool
+	maxWorkers         int
+	interval           time.Duration
+	reseedFullInterval time.Duration
+	logger             *zap.Logger
+	stopChan           chan struct{}
 }
 
-func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxWorkers int, logger *zap.Logger) *Scheduler {
+func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxWorkers int, reseedFullInterval time.Duration, logger *zap.Logger) *Scheduler {
 	if maxWorkers < 1 {
 		maxWorkers = 1
 	}
 	workerPool := NewSyncWorkerPool(syncService, maxWorkers, logger)
 
 	return &Scheduler{
-		syncService: syncService,
-		workerPool:  workerPool,
-		maxWorkers:  maxWorkers,
-		interval:    interval,
-		logger:      logger,
-		stopChan:    make(chan struct{}),
+		syncService:        syncService,
+		workerPool:         workerPool,
+		maxWorkers:         maxWorkers,
+		interval:           interval,
+		reseedFullInterval: reseedFullInterval,
+		logger:             logger,
+		stopChan:           make(chan struct{}),
 	}
 }
 
@@ -42,12 +44,17 @@ func (s *Scheduler) Start(ctx context.Context) {
 	// Запускаем worker pool в отдельной goroutine
 	go s.workerPool.Start(ctx)
 
+	if s.reseedFullInterval > 0 {
+		go s.runReseedFullLoop(ctx)
+	}
+
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
 	s.logger.Info("Scheduler started with worker pool",
 		zap.Duration("interval", s.interval),
-		zap.Int("max_workers", s.maxWorkers))
+		zap.Int("max_workers", s.maxWorkers),
+		zap.Duration("reseed_full_interval", s.reseedFullInterval))
 
 	// Выполняем первую синхронизацию сразу при старте
 	go s.syncOnce(ctx)
@@ -63,6 +70,26 @@ func (s *Scheduler) Start(ctx context.Context) {
 		case <-ctx.Done():
 			s.logger.Info("Scheduler stopped due to context cancellation")
 			return
+		}
+	}
+}
+
+func (s *Scheduler) runReseedFullLoop(ctx context.Context) {
+	t := time.NewTicker(s.reseedFullInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			rctx, cancel := context.WithTimeout(context.Background(), 2*time.Hour)
+			s.logger.Info("Scheduled reseed: full Moysklad sync")
+			if err := s.FullSync(rctx); err != nil {
+				s.logger.Error("Reseed full sync failed", zap.Error(err))
+			} else {
+				s.logger.Info("Reseed full sync finished")
+			}
+			cancel()
 		}
 	}
 }

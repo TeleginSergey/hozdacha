@@ -8,20 +8,44 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/TeleginSergey/hozdacha/internal/resilience"
 	"go.uber.org/zap"
 )
 
 type Client struct {
-	baseURL     string
-	token       string
-	client      *http.Client
-	logger      *zap.Logger
-	rateLimiter *rateLimiter
-	maxRetries  int
+	baseURL       string
+	token         string
+	client        *http.Client
+	logger        *zap.Logger
+	rateLimiter   *rateLimiter
+	maxRetries    int
+	breaker       *resilience.CircuitBreaker
+	outboundSem   chan struct{}
+}
+
+// ClientOption настраивает клиент МойСклад.
+type ClientOption func(*Client)
+
+// WithOutboundConcurrency ограничивает одновременные исходящие HTTP-запросы.
+func WithOutboundConcurrency(n int) ClientOption {
+	return func(c *Client) {
+		if n < 1 {
+			n = 8
+		}
+		c.outboundSem = make(chan struct{}, n)
+	}
+}
+
+// WithCircuitBreaker включает circuit breaker на уровне логического запроса (после исчерпания ретраев).
+func WithCircuitBreaker(b *resilience.CircuitBreaker) ClientOption {
+	return func(c *Client) {
+		c.breaker = b
+	}
 }
 
 // rateLimiter контролирует частоту запросов к API МойСклад
@@ -51,8 +75,8 @@ func (rl *rateLimiter) wait() {
 	rl.lastRequest = time.Now()
 }
 
-func NewClient(baseURL, token string, logger *zap.Logger, requestsPerSecond float64, maxRetries int) *Client {
-	return &Client{
+func NewClient(baseURL, token string, logger *zap.Logger, requestsPerSecond float64, maxRetries int, opts ...ClientOption) *Client {
+	c := &Client{
 		baseURL: baseURL,
 		token:   token,
 		client: &http.Client{
@@ -62,6 +86,21 @@ func NewClient(baseURL, token string, logger *zap.Logger, requestsPerSecond floa
 		rateLimiter: newRateLimiter(requestsPerSecond),
 		maxRetries:  maxRetries,
 	}
+	for _, o := range opts {
+		o(c)
+	}
+	if c.outboundSem == nil {
+		c.outboundSem = make(chan struct{}, 8)
+	}
+	return c
+}
+
+func (c *Client) acquireOutbound() {
+	c.outboundSem <- struct{}{}
+}
+
+func (c *Client) releaseOutbound() {
+	<-c.outboundSem
 }
 
 type MoyskladProduct struct {
@@ -154,64 +193,109 @@ type MoyskladOrderResponse struct {
 	ID string `json:"id"`
 }
 
+func parseRetryAfterSeconds(h string, attempt int) time.Duration {
+	if h == "" {
+		return 0
+	}
+	if sec, err := strconv.Atoi(strings.TrimSpace(h)); err == nil && sec > 0 {
+		return time.Duration(sec) * time.Second
+	}
+	if t, err := http.ParseTime(h); err == nil {
+		d := time.Until(t)
+		if d > 0 {
+			return d
+		}
+	}
+	return resilience.MoyskladHTTPRetrySleepDuration(attempt)
+}
+
 func (c *Client) doRequestWithRetry(ctx context.Context, req *http.Request) (*http.Response, error) {
 	maxRetries := c.maxRetries
-	baseDelay := 1 * time.Second
-
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		// Rate limiting - ждем перед каждым запросом
-		c.rateLimiter.wait()
-
-		resp, err := c.client.Do(req)
-		if err != nil {
-			if attempt == maxRetries {
-				return nil, fmt.Errorf("failed to execute request after %d attempts: %w", maxRetries, err)
-			}
-			c.logger.Warn("Request failed, retrying", zap.Int("attempt", attempt+1), zap.Error(err))
-			time.Sleep(baseDelay * time.Duration(attempt+1))
-			continue
-		}
-
-		// Проверяем статус код
-		if resp.StatusCode == http.StatusTooManyRequests {
-			resp.Body.Close()
-			if attempt == maxRetries {
-				return nil, fmt.Errorf("rate limit exceeded after %d attempts", maxRetries)
-			}
-
-			// Экспоненциальный бэкоф для 429
-			delay := baseDelay * time.Duration(1<<uint(attempt))
-			c.logger.Warn("Rate limit hit, retrying with exponential backoff",
-				zap.Int("attempt", attempt+1),
-				zap.Duration("delay", delay))
-			time.Sleep(delay)
-			continue
-		}
-
-		// Временные сбои на стороне МойСклад / балансировщика
-		if resp.StatusCode == http.StatusServiceUnavailable ||
-			resp.StatusCode == http.StatusBadGateway ||
-			resp.StatusCode == http.StatusGatewayTimeout {
-			resp.Body.Close()
-			if attempt == maxRetries {
-				return nil, fmt.Errorf("server error %d after %d attempts", resp.StatusCode, maxRetries)
-			}
-			delay := baseDelay * time.Duration(1<<uint(attempt))
-			if delay > 30*time.Second {
-				delay = 30 * time.Second
-			}
-			c.logger.Warn("Moysklad temporary error, retrying",
-				zap.Int("status", resp.StatusCode),
-				zap.Int("attempt", attempt+1),
-				zap.Duration("delay", delay))
-			time.Sleep(delay)
-			continue
-		}
-
-		return resp, nil
+	if maxRetries < 0 {
+		maxRetries = 0
 	}
 
-	return nil, fmt.Errorf("unexpected error in retry logic")
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		if c.breaker != nil && !c.breaker.Allow() {
+			return nil, resilience.ErrCircuitOpen
+		}
+
+		c.rateLimiter.wait()
+		c.acquireOutbound()
+
+		r := req.Clone(ctx)
+		if r == nil {
+			r = req
+		}
+
+		resp, err := c.client.Do(r)
+		if err != nil {
+			c.releaseOutbound()
+			lastErr = err
+			c.logger.Warn("Moysklad request failed", zap.Int("attempt", attempt+1), zap.Error(err))
+			if attempt == maxRetries {
+				if c.breaker != nil {
+					c.breaker.OnFailure()
+				}
+				return nil, fmt.Errorf("failed after %d attempts: %w", maxRetries+1, err)
+			}
+			_ = resilience.MoyskladHTTPRetrySleep(ctx, attempt)
+			continue
+		}
+
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests:
+			ra := parseRetryAfterSeconds(resp.Header.Get("Retry-After"), attempt)
+			resp.Body.Close()
+			c.releaseOutbound()
+			c.logger.Warn("Moysklad 429", zap.Int("attempt", attempt+1), zap.Duration("delay", ra))
+			if attempt == maxRetries {
+				if c.breaker != nil {
+					c.breaker.OnFailure()
+				}
+				return nil, fmt.Errorf("rate limit exceeded after %d attempts", maxRetries+1)
+			}
+			if ra > 0 {
+				_ = resilience.SleepCtx(ctx, ra)
+			} else {
+				_ = resilience.MoyskladHTTPRetrySleep(ctx, attempt)
+			}
+			continue
+
+		case http.StatusServiceUnavailable, http.StatusBadGateway, http.StatusGatewayTimeout:
+			resp.Body.Close()
+			c.releaseOutbound()
+			c.logger.Warn("Moysklad temporary HTTP error", zap.Int("status", resp.StatusCode), zap.Int("attempt", attempt+1))
+			if attempt == maxRetries {
+				if c.breaker != nil {
+					c.breaker.OnFailure()
+				}
+				return nil, fmt.Errorf("moysklad server error %d after %d attempts", resp.StatusCode, maxRetries+1)
+			}
+			_ = resilience.MoyskladHTTPRetrySleep(ctx, attempt)
+			continue
+
+		default:
+			c.releaseOutbound()
+			if c.breaker != nil {
+				switch {
+				case resp.StatusCode >= 200 && resp.StatusCode < 300:
+					c.breaker.OnSuccess()
+				case resp.StatusCode >= 500:
+					c.breaker.OnFailure()
+				default:
+					c.breaker.OnSuccess()
+				}
+			}
+			return resp, nil
+		}
+	}
+
+	if lastErr != nil {
+		return nil, fmt.Errorf("unexpected retry loop exit: %w", lastErr)
+	}
+	return nil, fmt.Errorf("unexpected retry loop exit")
 }
 
 func (c *Client) GetProducts(ctx context.Context) ([]MoyskladProduct, error) {
@@ -346,6 +430,9 @@ func (c *Client) GetProductsDelta(ctx context.Context, since time.Time) ([]Moysk
 
 		if resp.StatusCode != http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
+			if resp.StatusCode == http.StatusGone {
+				return nil, fmt.Errorf("%w: %s", ErrResyncRequired, string(body))
+			}
 			return nil, fmt.Errorf("moysklad API error: %s, body: %s", resp.Status, string(body))
 		}
 
@@ -389,14 +476,15 @@ func (c *Client) GetStockReportFromURL(ctx context.Context, reportURL string) (m
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept-Encoding", "gzip")
 
-	resp, err := c.client.Do(req)
+	resp, err := c.doRequestWithRetry(ctx, req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	var stockReport struct {
