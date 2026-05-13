@@ -46,6 +46,8 @@ type MoyskladConfig struct {
 	StockBuffer       float64       // Буфер остатков в процентах (5-10%)
 	RequestsPerSecond float64       // Лимит запросов в секунду к API МойСклад
 	MaxRetries        int           // Максимальное количество попыток при ошибках
+	// SyncWorkers — параллельные воркеры пула синхронизации (сеть/IO к МойСклад; не обязано совпадать с числом CPU).
+	SyncWorkers int
 }
 
 type RedisConfig struct {
@@ -97,7 +99,8 @@ func Load() (*Config, error) {
 			WebhookSecret:     getEnv("MOYSKLAD_WEBHOOK_SECRET", "a15b3006e171f232b232acbb230c397a6e5368c40317f4a3e528b81768936e4c"),
 			StockBuffer:       parseFloat(getEnv("MOYSKLAD_STOCK_BUFFER", "3.0")),         // Уменьшили буфер до 3%
 			RequestsPerSecond: parseFloat(getEnv("MOYSKLAD_REQUESTS_PER_SECOND", "10.0")), // 10/сек = 600/минуту (75% от 800 лимита)
-			MaxRetries:        parseInt(getEnv("MOYSKLAD_MAX_RETRIES", "3")),              // 3 попытки
+			MaxRetries:        parseInt(getEnv("MOYSKLAD_MAX_RETRIES", "5")),              // в т.ч. повторы при 503
+			SyncWorkers:       parseInt(getEnv("MOYSKLAD_SYNC_WORKERS", "3")),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "redis"),

@@ -45,10 +45,9 @@ type SyncWorkerPool struct {
 func NewSyncWorkerPool(syncService *MoyskladSyncService, workers int, logger *zap.Logger) *SyncWorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// Определяем максимальное количество воркеров на основе CPU
 	maxWorkers := int32(workers)
-	if maxWorkers > int32(runtime.NumCPU()) {
-		maxWorkers = int32(runtime.NumCPU())
+	if maxWorkers < 1 {
+		maxWorkers = 1
 	}
 
 	return &SyncWorkerPool{
@@ -70,7 +69,7 @@ func NewSyncWorkerPool(syncService *MoyskladSyncService, workers int, logger *za
 func (p *SyncWorkerPool) Start(ctx context.Context) {
 	p.logger.Info("Starting dynamic sync worker pool",
 		zap.Int32("max_workers", p.maxWorkers),
-		zap.Int("cpu_cores", runtime.NumCPU()))
+		zap.Int("runtime_num_cpu", runtime.NumCPU()))
 
 	// Сразу один воркер — иначе первые секунды очередь переполняется, пока ticker не вызовет adjustWorkerCount.
 	p.startWorker()

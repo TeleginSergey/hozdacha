@@ -74,7 +74,7 @@ func NewApp() (*App, error) {
 	// Moysklad client
 	var moyskladClient *moysklad.Client
 	if cfg.Moysklad.Token != "" {
-		moyskladClient = moysklad.NewClient(cfg.Moysklad.BaseURL, cfg.Moysklad.Token, logger, 2.0, 3)
+		moyskladClient = moysklad.NewClient(cfg.Moysklad.BaseURL, cfg.Moysklad.Token, logger, cfg.Moysklad.RequestsPerSecond, cfg.Moysklad.MaxRetries)
 		logger.Info("Moysklad client initialized")
 	} else {
 		logger.Warn("Moysklad token not provided, integration disabled")
@@ -96,7 +96,14 @@ func NewApp() (*App, error) {
 	// Scheduler
 	var scheduler *services.Scheduler
 	if cfg.Moysklad.AutoSync && moyskladClient != nil {
-		scheduler = services.NewScheduler(moyskladSyncService, cfg.Moysklad.SyncInterval, logger)
+		syncWorkers := cfg.Moysklad.SyncWorkers
+		if syncWorkers < 1 {
+			syncWorkers = 3
+		}
+		if syncWorkers > 32 {
+			syncWorkers = 32
+		}
+		scheduler = services.NewScheduler(moyskladSyncService, cfg.Moysklad.SyncInterval, syncWorkers, logger)
 	}
 
 	// Email Service

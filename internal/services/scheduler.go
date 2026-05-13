@@ -11,17 +11,22 @@ import (
 type Scheduler struct {
 	syncService *MoyskladSyncService
 	workerPool  *SyncWorkerPool
+	maxWorkers  int
 	interval    time.Duration
 	logger      *zap.Logger
 	stopChan    chan struct{}
 }
 
-func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, logger *zap.Logger) *Scheduler {
-	workerPool := NewSyncWorkerPool(syncService, 2, logger) // 2 параллельных worker'а для снижения нагрузки
+func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxWorkers int, logger *zap.Logger) *Scheduler {
+	if maxWorkers < 1 {
+		maxWorkers = 1
+	}
+	workerPool := NewSyncWorkerPool(syncService, maxWorkers, logger)
 
 	return &Scheduler{
 		syncService: syncService,
 		workerPool:  workerPool,
+		maxWorkers:  maxWorkers,
 		interval:    interval,
 		logger:      logger,
 		stopChan:    make(chan struct{}),
@@ -42,7 +47,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 
 	s.logger.Info("Scheduler started with worker pool",
 		zap.Duration("interval", s.interval),
-		zap.Int("workers", 2))
+		zap.Int("max_workers", s.maxWorkers))
 
 	// Выполняем первую синхронизацию сразу при старте
 	go s.syncOnce(ctx)
