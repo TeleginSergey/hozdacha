@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -11,6 +12,11 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
 	"github.com/TeleginSergey/hozdacha/internal/telegram"
 )
+
+// DefaultReservationTTL — на сколько товар бронируется для пользователя
+// после создания заказа. Если клиент не выкупил в магазине за это время,
+// бронь автоматически снимается, сток возвращается, и CustomerOrder в МойСклад удаляется.
+const DefaultReservationTTL = 48 * time.Hour
 
 // OrderRepository — контракт работы с заказами.
 type OrderRepository interface {
@@ -110,14 +116,16 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		})
 	}
 
+	reservedUntil := time.Now().Add(DefaultReservationTTL)
 	order := &db.Order{
-		UserID:       &req.UserID,
-		Status:       "pending",
-		TotalPrice:   totalPrice,
-		CustomerName: req.CustomerName,
-		Phone:        req.Phone,
-		Address:      req.Address,
-		Comment:      req.Comment,
+		UserID:        &req.UserID,
+		Status:        "pending",
+		TotalPrice:    totalPrice,
+		CustomerName:  req.CustomerName,
+		Phone:         req.Phone,
+		Address:       req.Address,
+		Comment:       req.Comment,
+		ReservedUntil: &reservedUntil,
 	}
 
 	order, updatedProducts, err := u.orders.CreateOrderAtomic(ctx, order, items, req.UserID)

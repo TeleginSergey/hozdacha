@@ -65,5 +65,3 @@ func CSRFProtection() gin.HandlerFunc {
 		c.Next()
 	}
 }
-
-

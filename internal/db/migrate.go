@@ -146,7 +146,7 @@ func (m *MigrateRunner) runMigration(filename string, content string) error {
 	}
 
 	// Записываем миграцию в историю
-	_, err = tx.Exec(ctx, 
+	_, err = tx.Exec(ctx,
 		`INSERT INTO schema_migrations (filename, applied_at) VALUES ($1, $2)`,
 		filename, time.Now())
 	if err != nil {

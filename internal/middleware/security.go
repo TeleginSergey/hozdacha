@@ -16,29 +16,29 @@ func SecurityHeaders() gin.HandlerFunc {
 		c.Header("X-Content-Type-Options", "nosniff")
 		c.Header("X-Frame-Options", "DENY") // Защита от clickjacking
 		c.Header("X-XSS-Protection", "1; mode=block")
-		
+
 		// Content Security Policy
-		c.Header("Content-Security-Policy", 
+		c.Header("Content-Security-Policy",
 			"default-src 'self'; "+
-			"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
-			"style-src 'self' 'unsafe-inline'; "+
-			"img-src 'self' data: https:; "+
-			"font-src 'self' data:; "+
-			"connect-src 'self'; "+
-			"frame-ancestors 'none';")
-		
+				"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "+
+				"style-src 'self' 'unsafe-inline'; "+
+				"img-src 'self' data: https:; "+
+				"font-src 'self' data:; "+
+				"connect-src 'self'; "+
+				"frame-ancestors 'none';")
+
 		// Strict Transport Security (для HTTPS)
 		if c.Request.TLS != nil {
 			c.Header("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
 		}
-		
+
 		// Referrer Policy
 		c.Header("Referrer-Policy", "strict-origin-when-cross-origin")
-		
+
 		// Permissions Policy
-		c.Header("Permissions-Policy", 
+		c.Header("Permissions-Policy",
 			"geolocation=(), microphone=(), camera=()")
-		
+
 		c.Next()
 	}
 }
@@ -47,7 +47,7 @@ func SecurityHeaders() gin.HandlerFunc {
 func SanitizeInput(input string) string {
 	// Экранируем HTML теги
 	sanitized := html.EscapeString(input)
-	
+
 	// Удаляем опасные паттерны
 	dangerous := []string{
 		"<script",
@@ -58,14 +58,14 @@ func SanitizeInput(input string) string {
 		"onclick=",
 		"onmouseover=",
 	}
-	
+
 	lower := strings.ToLower(sanitized)
 	for _, pattern := range dangerous {
 		if strings.Contains(lower, pattern) {
 			sanitized = strings.ReplaceAll(sanitized, pattern, "")
 		}
 	}
-	
+
 	return sanitized
 }
 
@@ -94,7 +94,7 @@ func ValidateEmail(email string) bool {
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
-		
+
 		// Разрешаем только определенные источники (можно настроить)
 		allowedOrigins := []string{
 			"http://localhost:8081",
@@ -102,7 +102,7 @@ func CORS() gin.HandlerFunc {
 			"http://127.0.0.1:8081",
 			"http://127.0.0.1:8080",
 		}
-		
+
 		allowed := false
 		for _, allowedOrigin := range allowedOrigins {
 			if origin == allowedOrigin {
@@ -110,23 +110,21 @@ func CORS() gin.HandlerFunc {
 				break
 			}
 		}
-		
+
 		if allowed || origin == "" {
 			c.Header("Access-Control-Allow-Origin", origin)
 		}
-		
+
 		c.Header("Access-Control-Allow-Credentials", "true")
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With")
 		c.Header("Access-Control-Max-Age", "3600")
-		
+
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)
 			return
 		}
-		
+
 		c.Next()
 	}
 }
-
-

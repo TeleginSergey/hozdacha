@@ -231,6 +231,3 @@ func (p *promotionQuery) Delete(ctx context.Context, id int64) error {
 	p.logger.Info("Promotion deleted successfully", zap.Int64("promotion_id", id))
 	return nil
 }
-
-
-

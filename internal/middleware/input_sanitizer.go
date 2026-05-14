@@ -26,7 +26,7 @@ func SanitizeHTML(input string) string {
 	for _, pattern := range dangerousPatterns {
 		sanitized = pattern.ReplaceAllString(sanitized, "")
 	}
-	
+
 	// Экранируем оставшиеся HTML символы
 	return html.EscapeString(sanitized)
 }
@@ -80,4 +80,3 @@ func SanitizeNumeric(value interface{}) (int64, bool) {
 	}
 	return 0, false
 }
-

@@ -22,18 +22,18 @@ const (
 )
 
 type WebhookInboxJob struct {
-	ID              int64
-	IdempotencyKey  string
-	WebhookKind     string
-	Payload         []byte
-	Status          string
-	Attempts        int
-	MaxAttempts     int
-	NextAttemptAt   time.Time
-	LastError       *string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	ProcessedAt     *time.Time
+	ID             int64
+	IdempotencyKey string
+	WebhookKind    string
+	Payload        []byte
+	Status         string
+	Attempts       int
+	MaxAttempts    int
+	NextAttemptAt  time.Time
+	LastError      *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	ProcessedAt    *time.Time
 }
 
 type WebhookInboxRepo struct {
