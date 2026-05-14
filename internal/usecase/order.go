@@ -15,6 +15,7 @@ import (
 // OrderRepository — контракт работы с заказами.
 type OrderRepository interface {
 	InsertWithItems(ctx context.Context, order *db.Order, items []db.OrderItem) (*db.Order, error)
+	CreateOrderAtomic(ctx context.Context, order *db.Order, items []db.OrderItem, clearCartForUserID int64) (*db.Order, []*db.Product, error)
 	Update(ctx context.Context, order *db.Order, id int64) (*db.Order, error)
 	GetByUserID(ctx context.Context, userID int64) ([]*db.Order, error)
 }
@@ -82,8 +83,12 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 	var totalPrice float64
 	items := make([]db.OrderItem, 0, len(req.Items))
 
-	// Проверяем товары и рассчитываем цену (резервирование уже сделано в корзине)
+	// Предварительно подгружаем товары только чтобы зафиксировать цену.
+	// Финальная проверка стока и его атомарное списание происходят в БД.
 	for _, item := range req.Items {
+		if item.Quantity <= 0 {
+			return nil, fmt.Errorf("invalid quantity for product %d", item.ProductID)
+		}
 		product, err := u.products.GetByID(ctx, item.ProductID)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get product %d: %w", item.ProductID, err)
@@ -93,10 +98,6 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		}
 		if !product.Active {
 			return nil, fmt.Errorf("product %d is not active", item.ProductID)
-		}
-
-		if product.Stock < item.Quantity {
-			return nil, fmt.Errorf("insufficient stock for product %d. Available: %d, Requested: %d", item.ProductID, product.Stock, item.Quantity)
 		}
 
 		itemPrice := product.Price * float64(item.Quantity)
@@ -119,9 +120,26 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		Comment:      req.Comment,
 	}
 
-	order, err := u.orders.InsertWithItems(ctx, order, items)
+	order, updatedProducts, err := u.orders.CreateOrderAtomic(ctx, order, items, req.UserID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create order: %w", err)
+	}
+
+	// После коммита обновляем Redis-кэш остатков и сбрасываем резервы
+	// best-effort: если Redis не отвечает — заказ всё равно создан корректно.
+	if u.stockCache != nil {
+		for i, p := range updatedProducts {
+			moyskladID := ""
+			if p.MoyskladID != nil {
+				moyskladID = *p.MoyskladID
+			}
+			if err := u.stockCache.SetStock(ctx, p.ID, moyskladID, p.Stock); err != nil {
+				u.logger.Warn("Failed to refresh stock cache after order", zap.Int64("product_id", p.ID), zap.Error(err))
+			}
+			if err := u.stockCache.ReleaseStock(ctx, p.ID, items[i].Quantity); err != nil {
+				u.logger.Warn("Failed to release reservation after order", zap.Int64("product_id", p.ID), zap.Error(err))
+			}
+		}
 	}
 
 	// Telegram-уведомление
