@@ -95,14 +95,8 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 			return nil, fmt.Errorf("product %d is not active", item.ProductID)
 		}
 
-		// Проверяем доступный остаток (товары уже зарезервированы в корзине)
-		availableStock, err := u.stockCache.GetAvailableStock(ctx, item.ProductID, u.products)
-		if err != nil {
-			return nil, fmt.Errorf("failed to check available stock for product %d: %w", item.ProductID, err)
-		}
-
-		if availableStock < item.Quantity {
-			return nil, fmt.Errorf("insufficient stock for product %d. Available: %d, Requested: %d", item.ProductID, availableStock, item.Quantity)
+		if product.Stock < item.Quantity {
+			return nil, fmt.Errorf("insufficient stock for product %d. Available: %d, Requested: %d", item.ProductID, product.Stock, item.Quantity)
 		}
 
 		itemPrice := product.Price * float64(item.Quantity)

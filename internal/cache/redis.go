@@ -180,17 +180,31 @@ func (c *StockCache) GetLastSyncTime(ctx context.Context) (*time.Time, error) {
 // ReserveStock резервирует товар для корзины (временно уменьшает доступный остаток)
 func (c *StockCache) ReserveStock(ctx context.Context, productID int64, quantity int) error {
 	key := fmt.Sprintf("reserved:%d", productID)
+	if quantity <= 0 {
+		return nil
+	}
 
-	// Увеличиваем зарезервированное количество
 	return c.client.IncrBy(ctx, key, int64(quantity)).Err()
 }
 
 // ReleaseStock освобождает зарезервированный товар
 func (c *StockCache) ReleaseStock(ctx context.Context, productID int64, quantity int) error {
 	key := fmt.Sprintf("reserved:%d", productID)
+	if quantity <= 0 {
+		return nil
+	}
 
-	// Уменьшаем зарезервированное количество
-	return c.client.IncrBy(ctx, key, -int64(quantity)).Err()
+	script := redis.NewScript(`
+local current = tonumber(redis.call("GET", KEYS[1]) or "0")
+local next = current - tonumber(ARGV[1])
+if next <= 0 then
+	redis.call("DEL", KEYS[1])
+	return 0
+end
+redis.call("SET", KEYS[1], next)
+return next
+`)
+	return script.Run(ctx, c.client, []string{key}, quantity).Err()
 }
 
 // GetReservedStock получает количество зарезервированного товара
@@ -215,8 +229,17 @@ func (c *StockCache) GetAvailableStock(ctx context.Context, productID int64, pro
 		return 0, err
 	}
 	if info == nil {
-		// Cache miss - возвращаем специальное значение чтобы использовать остаток из БД
-		return -2, nil // -2 означает "использовать остаток из БД"
+		product, err := productQuery.GetByID(ctx, productID)
+		if err != nil {
+			return 0, fmt.Errorf("failed to get product stock from db: %w", err)
+		}
+		if product == nil {
+			return 0, fmt.Errorf("product %d not found", productID)
+		}
+		if err := c.SetStock(ctx, product.ID, "", product.Stock); err != nil {
+			c.logger.Warn("Failed to warm stock cache from db", zap.Int64("product_id", productID), zap.Error(err))
+		}
+		info = &StockInfo{Stock: product.Stock}
 	}
 
 	reserved, err := c.GetReservedStock(ctx, productID)
@@ -230,6 +253,10 @@ func (c *StockCache) GetAvailableStock(ctx context.Context, productID int64, pro
 	}
 
 	return available, nil
+}
+
+func (c *StockCache) ConsumeReservedStock(ctx context.Context, productID int64, quantity int) error {
+	return c.ReleaseStock(ctx, productID, quantity)
 }
 
 // SetStockToCache устанавливает остаток в кэш (для совместимости с интерфейсом)

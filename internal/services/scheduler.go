@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -16,6 +17,7 @@ type Scheduler struct {
 	reseedFullInterval time.Duration
 	logger             *zap.Logger
 	stopChan           chan struct{}
+	syncRunning        int32
 }
 
 func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxWorkers int, reseedFullInterval time.Duration, logger *zap.Logger) *Scheduler {
@@ -105,6 +107,11 @@ func (s *Scheduler) syncOnce(ctx context.Context) {
 	}()
 
 	s.logger.Info("Starting backup product sync (webhooks handle real-time updates)")
+	if !atomic.CompareAndSwapInt32(&s.syncRunning, 0, 1) {
+		s.logger.Warn("Skipping backup sync because another sync is already running")
+		return
+	}
+	defer atomic.StoreInt32(&s.syncRunning, 0)
 
 	// Используем дельта-синхронизацию как резервный механизм
 	result, err := s.syncService.SyncProductsDelta(ctx)
@@ -139,8 +146,18 @@ func (s *Scheduler) FullSync(ctx context.Context) error {
 	if s.syncService == nil {
 		return fmt.Errorf("sync service not initialized")
 	}
+	if !atomic.CompareAndSwapInt32(&s.syncRunning, 0, 1) {
+		return fmt.Errorf("another sync is already running")
+	}
+	defer atomic.StoreInt32(&s.syncRunning, 0)
 
 	s.logger.Info("Starting full product sync with worker pool")
+
+	stockMap, err := s.syncService.GetStockMapForSync(ctx)
+	if err != nil {
+		s.logger.Error("Failed to get stock report from Moysklad", zap.Error(err))
+		return fmt.Errorf("failed to get stock report from Moysklad: %w", err)
+	}
 
 	// Получаем все товары из МойСклад
 	moyskladProducts, err := s.syncService.GetProductsForSync(ctx, false, nil)
@@ -180,6 +197,7 @@ func (s *Scheduler) FullSync(ctx context.Context) error {
 			ID:           fmt.Sprintf("full-sync-%d", i/batchSize),
 			Type:         "batch",
 			Products:     batch,
+			StockByID:    stockMap,
 			BatchIndex:   i / batchSize,
 			TotalBatches: totalBatches,
 		}

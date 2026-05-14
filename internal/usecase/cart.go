@@ -16,6 +16,8 @@ type CartUsecase struct {
 		GetAvailableStock(ctx context.Context, productID int64, productQuery db.ProductQuery) (int, error)
 		ReserveStock(ctx context.Context, productID int64, quantity int) error
 		ReleaseStock(ctx context.Context, productID int64, quantity int) error
+		ConsumeReservedStock(ctx context.Context, productID int64, quantity int) error
+		SetStock(ctx context.Context, productID int64, moyskladID string, stock int) error
 		InvalidateStockCache(ctx context.Context, productID int64) error
 	}
 	logger *zap.Logger
@@ -25,6 +27,8 @@ func NewCartUsecase(cartQuery db.CartItemQuery, productQuery db.ProductQuery, st
 	GetAvailableStock(ctx context.Context, productID int64, productQuery db.ProductQuery) (int, error)
 	ReserveStock(ctx context.Context, productID int64, quantity int) error
 	ReleaseStock(ctx context.Context, productID int64, quantity int) error
+	ConsumeReservedStock(ctx context.Context, productID int64, quantity int) error
+	SetStock(ctx context.Context, productID int64, moyskladID string, stock int) error
 	InvalidateStockCache(ctx context.Context, productID int64) error
 }, logger *zap.Logger) *CartUsecase {
 	return &CartUsecase{
@@ -82,12 +86,18 @@ func (c *CartUsecase) AddToCart(ctx context.Context, req *AddToCartRequest) erro
 		return fmt.Errorf("failed to check existing cart item: %w", err)
 	}
 	if existingItem != nil {
-		// Если товар уже в корзине, обновляем количество
 		newQuantity := existingItem.Quantity + req.Quantity
-		if newQuantity > availableStock {
-			return fmt.Errorf("insufficient stock for product %s (available: %d, requested: %d)", product.Name, availableStock, newQuantity)
+		if availableStock < req.Quantity {
+			return fmt.Errorf("insufficient stock for product %s (available: %d, requested: %d)", product.Name, availableStock, req.Quantity)
 		}
-		return c.cartQuery.UpdateQuantity(ctx, req.UserID, req.ProductID, newQuantity)
+		if err := c.stockCache.ReserveStock(ctx, req.ProductID, req.Quantity); err != nil {
+			return fmt.Errorf("failed to reserve additional stock: %w", err)
+		}
+		if err := c.cartQuery.UpdateQuantity(ctx, req.UserID, req.ProductID, newQuantity); err != nil {
+			c.stockCache.ReleaseStock(ctx, req.ProductID, req.Quantity)
+			return fmt.Errorf("failed to update cart item: %w", err)
+		}
+		return nil
 	}
 
 	// Добавляем товар в корзину с резервированием
@@ -180,8 +190,9 @@ func (c *CartUsecase) UpdateCart(ctx context.Context, req *UpdateCartRequest) er
 
 	// Обновляем товар в корзине с резервированием
 	newQuantity := req.Quantity
-	if newQuantity > availableStock {
-		return fmt.Errorf("insufficient stock for product %s (available: %d, requested: %d)", product.Name, availableStock, newQuantity)
+	maxAllowed := availableStock + existingItem.Quantity
+	if newQuantity > maxAllowed {
+		return fmt.Errorf("insufficient stock for product %s (available: %d, requested: %d)", product.Name, maxAllowed, newQuantity)
 	}
 
 	// Вычисляем разницу для резервирования/освобождения
@@ -280,6 +291,57 @@ func (c *CartUsecase) ClearCart(ctx context.Context, userID int64) error {
 	c.logger.Info("Cart cleared with stock releases",
 		zap.Int64("user_id", userID),
 		zap.Int("items_cleared", len(cartItems)))
+
+	return nil
+}
+
+func (c *CartUsecase) CommitCartReservation(ctx context.Context, userID int64) error {
+	cartItems, err := c.cartQuery.GetByUserID(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("failed to get cart items: %w", err)
+	}
+
+	for _, item := range cartItems {
+		product, err := c.productQuery.GetByID(ctx, item.ProductID)
+		if err != nil {
+			return fmt.Errorf("failed to get product %d: %w", item.ProductID, err)
+		}
+		if product == nil {
+			return fmt.Errorf("product %d not found", item.ProductID)
+		}
+		product.Stock -= item.Quantity
+		if product.Stock < 0 {
+			product.Stock = 0
+		}
+		if product.Stock > 0 {
+			product.Status = "active"
+		} else {
+			product.Status = "out_of_stock"
+		}
+		updated, err := c.productQuery.Update(ctx, product, item.ProductID)
+		if err != nil {
+			return fmt.Errorf("failed to decrease product stock %d: %w", item.ProductID, err)
+		}
+		if err := c.stockCache.ConsumeReservedStock(ctx, item.ProductID, item.Quantity); err != nil {
+			return fmt.Errorf("failed to consume reserved stock for product %d: %w", item.ProductID, err)
+		}
+		moyskladID := ""
+		if updated.MoyskladID != nil {
+			moyskladID = *updated.MoyskladID
+		}
+		if err := c.stockCache.SetStock(ctx, updated.ID, moyskladID, updated.Stock); err != nil {
+			c.logger.Warn("Failed to update stock cache after order", zap.Int64("product_id", updated.ID), zap.Error(err))
+		}
+	}
+
+	return nil
+}
+
+func (c *CartUsecase) ClearCartAfterOrder(ctx context.Context, userID int64) error {
+	if err := c.cartQuery.Clear(ctx, userID); err != nil {
+		c.logger.Error("Failed to clear cart after order", zap.Error(err))
+		return fmt.Errorf("failed to clear cart after order: %w", err)
+	}
 
 	return nil
 }
