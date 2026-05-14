@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"github.com/TeleginSergey/hozdacha/internal/db"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
 )
 
@@ -83,30 +85,20 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		Items:        req.Items,
 	})
 	if err != nil {
+		// Недостаточно стока — сообщаем клиенту по делу.
+		if errors.Is(err, db.ErrInsufficientStock) {
+			h.logger.Info("Order rejected: insufficient stock",
+				zap.Int64("user_id", userID.(int64)),
+				zap.Error(err))
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "insufficient_stock",
+				"message": "Один из товаров в корзине уже недоступен в нужном количестве. Обновите корзину.",
+			})
+			return
+		}
 		h.logger.Error("Failed to create order", zap.Error(err))
-		// Не раскрываем детали ошибки клиенту
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
 		return
-	}
-
-	if err := h.cartUC.CommitCartReservation(c.Request.Context(), userID.(int64)); err != nil {
-		h.logger.Warn("Failed to commit cart reservation after order creation",
-			zap.Error(err),
-			zap.Int64("user_id", userID.(int64)),
-			zap.Int64("order_id", order.ID))
-	}
-
-	// Очищаем корзину пользователя после успешного создания заказа
-	if err := h.cartUC.ClearCartAfterOrder(c.Request.Context(), userID.(int64)); err != nil {
-		h.logger.Warn("Failed to clear cart after order creation",
-			zap.Error(err),
-			zap.Int64("user_id", userID.(int64)),
-			zap.Int64("order_id", order.ID))
-		// Не возвращаем ошибку, так как заказ уже создан
-	} else {
-		h.logger.Info("Cart cleared successfully after order creation",
-			zap.Int64("user_id", userID.(int64)),
-			zap.Int64("order_id", order.ID))
 	}
 
 	c.JSON(http.StatusCreated, order)

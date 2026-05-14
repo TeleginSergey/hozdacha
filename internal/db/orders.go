@@ -17,6 +17,11 @@ import (
 const OrdersTable = "orders"
 const OrderItemsTable = "order_items"
 
+// ErrInsufficientStock возвращается, если на момент создания заказа в БД
+// фактически меньше товара, чем требуется. Это финальная атомарная проверка
+// и она имеет приоритет над любыми кэшами.
+var ErrInsufficientStock = errors.New("insufficient stock")
+
 const (
 	OrdersID           = "orders_id_pk"
 	OrdersUserID       = "orders_user_id_fk"
@@ -80,6 +85,14 @@ type OrderQuery interface {
 	Insert(ctx context.Context, order *Order) (*Order, error)
 	Update(ctx context.Context, order *Order, id int64) (*Order, error)
 	InsertWithItems(ctx context.Context, order *Order, items []OrderItem) (*Order, error)
+	// CreateOrderAtomic выполняет в одной транзакции:
+	//  1. UPDATE products SET stock = stock - qty WHERE id = ? AND stock >= qty (для каждого item)
+	//  2. INSERT INTO orders
+	//  3. INSERT INTO order_items
+	//  4. DELETE FROM cart_items WHERE user_id = ?
+	// Если у любого товара недостаточно стока — возвращает ErrInsufficientStock и транзакция откатывается.
+	// updatedProducts содержит новые остатки товаров после списания (для обновления кэша после коммита).
+	CreateOrderAtomic(ctx context.Context, order *Order, items []OrderItem, clearCartForUserID int64) (createdOrder *Order, updatedProducts []*Product, err error)
 }
 
 type orderQuery struct {
@@ -271,6 +284,109 @@ func (o *orderQuery) InsertWithItems(ctx context.Context, order *Order, items []
 	o.logger.Info("Order with items inserted successfully", zap.Int64("order_id", order.ID))
 	order.Items = items
 	return order, nil
+}
+
+func (o *orderQuery) CreateOrderAtomic(ctx context.Context, order *Order, items []OrderItem, clearCartForUserID int64) (*Order, []*Product, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+
+	tx, err := o.runner.Begin(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// 1. Атомарно списываем сток у каждого товара. Если у кого-то stock < quantity —
+	// UPDATE вернёт 0 строк и мы откатываем транзакцию с ErrInsufficientStock.
+	updatedProducts := make([]*Product, 0, len(items))
+	for _, item := range items {
+		updateSQL := `
+			UPDATE ` + ProductsTable + `
+			SET ` + ProductsStock + ` = ` + ProductsStock + ` - $1,
+			    ` + ProductsStatus + ` = CASE WHEN ` + ProductsStock + ` - $1 > 0 THEN 'active' ELSE 'out_of_stock' END,
+			    ` + ProductsUpdatedAt + ` = NOW()
+			WHERE ` + ProductsID + ` = $2
+			  AND ` + ProductsStock + ` >= $1
+			  AND ` + ProductsActive + ` = TRUE
+			RETURNING *
+		`
+		var updatedProduct Product
+		err := pgxscan.Get(ctx, tx, &updatedProduct, updateSQL, item.Quantity, item.ProductID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				// Либо товара нет, либо стока недостаточно, либо товар неактивен.
+				o.logger.Warn("Order atomic decrement failed",
+					zap.Int64("product_id", item.ProductID),
+					zap.Int("quantity", item.Quantity))
+				return nil, nil, fmt.Errorf("%w: product %d", ErrInsufficientStock, item.ProductID)
+			}
+			return nil, nil, fmt.Errorf("failed to decrement product stock %d: %w", item.ProductID, err)
+		}
+		updatedProducts = append(updatedProducts, &updatedProduct)
+	}
+
+	// 2. Вставляем заказ
+	insertMap, err := stomOrderInsert.ToMap(order)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to map order: %w", err)
+	}
+	qb, args, err := o.sq.Insert(OrdersTable).
+		SetMap(insertMap).
+		Suffix("RETURNING *").
+		ToSql()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to build order insert query: %w", err)
+	}
+	if err := pgxscan.Get(ctx, tx, order, qb, args...); err != nil {
+		return nil, nil, fmt.Errorf("failed to insert order: %w", err)
+	}
+
+	// 3. Вставляем order_items
+	for i := range items {
+		items[i].OrderID = order.ID
+		itemMap, err := stomOrderItemInsert.ToMap(&items[i])
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to map order item: %w", err)
+		}
+		itemQb, itemArgs, err := o.sq.Insert(OrderItemsTable).
+			SetMap(itemMap).
+			ToSql()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to build order item query: %w", err)
+		}
+		if _, err := tx.Exec(ctx, itemQb, itemArgs...); err != nil {
+			return nil, nil, fmt.Errorf("failed to insert order item: %w", err)
+		}
+	}
+
+	// 4. Чистим корзину пользователя (только указанные товары, чтобы не удалить
+	// что-то, что пользователь добавил параллельно после старта оформления).
+	if clearCartForUserID != 0 && len(items) > 0 {
+		productIDs := make([]int64, 0, len(items))
+		for _, it := range items {
+			productIDs = append(productIDs, it.ProductID)
+		}
+		clearQb, clearArgs, err := o.sq.Delete(CartItemsTable).
+			Where(squirrel.Eq{CartItemsUserID: clearCartForUserID}).
+			Where(squirrel.Eq{CartItemsProductID: productIDs}).
+			ToSql()
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to build cart cleanup query: %w", err)
+		}
+		if _, err := tx.Exec(ctx, clearQb, clearArgs...); err != nil {
+			return nil, nil, fmt.Errorf("failed to clear cart items: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, nil, fmt.Errorf("failed to commit transaction: %w", err)
+	}
+
+	order.Items = items
+	o.logger.Info("Order created atomically",
+		zap.Int64("order_id", order.ID),
+		zap.Int("items_count", len(items)))
+	return order, updatedProducts, nil
 }
 
 func (o *orderQuery) Update(ctx context.Context, order *Order, id int64) (*Order, error) {
