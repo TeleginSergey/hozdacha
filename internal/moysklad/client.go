@@ -18,14 +18,14 @@ import (
 )
 
 type Client struct {
-	baseURL       string
-	token         string
-	client        *http.Client
-	logger        *zap.Logger
-	rateLimiter   *rateLimiter
-	maxRetries    int
-	breaker       *resilience.CircuitBreaker
-	outboundSem   chan struct{}
+	baseURL     string
+	token       string
+	client      *http.Client
+	logger      *zap.Logger
+	rateLimiter *rateLimiter
+	maxRetries  int
+	breaker     *resilience.CircuitBreaker
+	outboundSem chan struct{}
 }
 
 // ClientOption настраивает клиент МойСклад.
@@ -713,6 +713,39 @@ func (c *Client) CreateCustomerOrder(ctx context.Context, order *MoyskladOrder) 
 
 	c.logger.Info("Order created in Moysklad", zap.String("moysklad_id", response.ID))
 	return &response, nil
+}
+
+// DeleteCustomerOrder удаляет CustomerOrder из МойСклад.
+// Используется когда у клиента истёк TTL брони (он не пришёл в магазин).
+// Согласно https://dev.moysklad.ru/doc/api/remap/1.2/#mojsklad-json-api-obschie-swedeniq-udalenie-ob-ekta
+// удалённый ресурс возвращает 200 OK c пустым телом.
+func (c *Client) DeleteCustomerOrder(ctx context.Context, moyskladID string) error {
+	if moyskladID == "" {
+		return fmt.Errorf("empty moysklad id")
+	}
+	url := fmt.Sprintf("%s/entity/customerorder/%s", c.baseURL, moyskladID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json;charset=utf-8")
+
+	resp, err := c.doRequestWithRetry(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to execute request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// 200 — удалён, 404 — уже нет (идемпотентно), всё остальное — ошибка.
+	if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
+		c.logger.Info("Moysklad customer order deleted",
+			zap.String("moysklad_id", moyskladID),
+			zap.Int("status", resp.StatusCode))
+		return nil
+	}
+	body, _ := io.ReadAll(resp.Body)
+	return fmt.Errorf("moysklad delete order failed: %s, body: %s", resp.Status, string(body))
 }
 
 func (c *Client) GetBaseURL() string {

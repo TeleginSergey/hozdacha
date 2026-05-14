@@ -146,7 +146,7 @@ func NewApp() (*App, error) {
 	}
 
 	// Создаем cartUC перед использованием в других handlers
-	cartUC := usecase.NewCartUsecase(cartRepo, productRepo, stockCache, logger)
+	cartUC := usecase.NewCartUsecase(cartRepo, productRepo, logger)
 
 	// Handlers поверх usecase // Handlers
 	authHandler := handlers.NewAuthHandler(authService, logger)
@@ -186,6 +186,24 @@ func NewApp() (*App, error) {
 		}()
 		logger.Info("Webhook inbox worker started")
 	}
+
+	// Reservation expiry: проверяем истёкшие брони (orders.reserved_until < now) каждые 5 минут.
+	expirySvc := services.NewReservationExpiryService(
+		orderRepo,
+		moyskladClient,
+		stockCache,
+		5*time.Minute,
+		100,
+		logger,
+	)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.Error("reservation expiry service panicked", zap.Any("panic", r))
+			}
+		}()
+		expirySvc.Run(context.Background())
+	}()
 
 	// Router
 	router := handlers.SetupRouter(

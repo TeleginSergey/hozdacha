@@ -23,17 +23,18 @@ const OrderItemsTable = "order_items"
 var ErrInsufficientStock = errors.New("insufficient stock")
 
 const (
-	OrdersID           = "orders_id_pk"
-	OrdersUserID       = "orders_user_id_fk"
-	OrdersStatus       = "orders_status"
-	OrdersTotalPrice   = "orders_total_price"
-	OrdersCustomerName = "orders_customer_name"
-	OrdersPhone        = "orders_phone"
-	OrdersAddress      = "orders_address"
-	OrdersComment      = "orders_comment"
-	OrdersMoyskladID   = "orders_moysklad_id"
-	OrdersCreatedAt    = "orders_created_at"
-	OrdersUpdatedAt    = "orders_updated_at"
+	OrdersID            = "orders_id_pk"
+	OrdersUserID        = "orders_user_id_fk"
+	OrdersStatus        = "orders_status"
+	OrdersTotalPrice    = "orders_total_price"
+	OrdersCustomerName  = "orders_customer_name"
+	OrdersPhone         = "orders_phone"
+	OrdersAddress       = "orders_address"
+	OrdersComment       = "orders_comment"
+	OrdersMoyskladID    = "orders_moysklad_id"
+	OrdersCreatedAt     = "orders_created_at"
+	OrdersUpdatedAt     = "orders_updated_at"
+	OrdersReservedUntil = "orders_reserved_until"
 )
 
 const (
@@ -45,18 +46,19 @@ const (
 )
 
 type Order struct {
-	ID           int64       `db:"orders_id_pk"`
-	UserID       *int64      `db:"orders_user_id_fk" insert:"orders_user_id_fk" update:"orders_user_id_fk"`
-	Status       string      `db:"orders_status" insert:"orders_status" update:"orders_status"`
-	TotalPrice   float64     `db:"orders_total_price" insert:"orders_total_price" update:"orders_total_price"`
-	CustomerName string      `db:"orders_customer_name" insert:"orders_customer_name" update:"orders_customer_name"`
-	Phone        string      `db:"orders_phone" insert:"orders_phone" update:"orders_phone"`
-	Address      *string     `db:"orders_address" insert:"orders_address" update:"orders_address"`
-	Comment      *string     `db:"orders_comment" insert:"orders_comment" update:"orders_comment"`
-	MoyskladID   *string     `db:"orders_moysklad_id" insert:"orders_moysklad_id" update:"orders_moysklad_id"`
-	CreatedAt    time.Time   `db:"orders_created_at"`
-	UpdatedAt    time.Time   `db:"orders_updated_at" update:"orders_updated_at"`
-	Items        []OrderItem `db:"-"`
+	ID            int64       `db:"orders_id_pk"`
+	UserID        *int64      `db:"orders_user_id_fk" insert:"orders_user_id_fk" update:"orders_user_id_fk"`
+	Status        string      `db:"orders_status" insert:"orders_status" update:"orders_status"`
+	TotalPrice    float64     `db:"orders_total_price" insert:"orders_total_price" update:"orders_total_price"`
+	CustomerName  string      `db:"orders_customer_name" insert:"orders_customer_name" update:"orders_customer_name"`
+	Phone         string      `db:"orders_phone" insert:"orders_phone" update:"orders_phone"`
+	Address       *string     `db:"orders_address" insert:"orders_address" update:"orders_address"`
+	Comment       *string     `db:"orders_comment" insert:"orders_comment" update:"orders_comment"`
+	MoyskladID    *string     `db:"orders_moysklad_id" insert:"orders_moysklad_id" update:"orders_moysklad_id"`
+	CreatedAt     time.Time   `db:"orders_created_at"`
+	UpdatedAt     time.Time   `db:"orders_updated_at" update:"orders_updated_at"`
+	ReservedUntil *time.Time  `db:"orders_reserved_until" insert:"orders_reserved_until" update:"orders_reserved_until"`
+	Items         []OrderItem `db:"-"`
 }
 
 type OrderItem struct {
@@ -85,6 +87,13 @@ type OrderQuery interface {
 	Insert(ctx context.Context, order *Order) (*Order, error)
 	Update(ctx context.Context, order *Order, id int64) (*Order, error)
 	InsertWithItems(ctx context.Context, order *Order, items []OrderItem) (*Order, error)
+	// ListExpiredPendingIDs возвращает id pending-заказов, у которых reserved_until < now (TTL истёк).
+	// Используется cron-задачей для автоматической отмены брони.
+	ListExpiredPendingIDs(ctx context.Context, now time.Time, limit int) ([]int64, error)
+	// ExpireOrderAtomic переводит заказ в expired и атомарно возвращает товары на склад.
+	// Возвращает moysklad_id (если был), чтобы можно было удалить CustomerOrder в МойСклад.
+	// alreadyHandled = true, если заказ уже не pending (другой воркер обработал).
+	ExpireOrderAtomic(ctx context.Context, orderID int64) (moyskladID *string, alreadyHandled bool, restored []*Product, err error)
 	// CreateOrderAtomic выполняет в одной транзакции:
 	//  1. UPDATE products SET stock = stock - qty WHERE id = ? AND stock >= qty (для каждого item)
 	//  2. INSERT INTO orders
@@ -387,6 +396,110 @@ func (o *orderQuery) CreateOrderAtomic(ctx context.Context, order *Order, items 
 		zap.Int64("order_id", order.ID),
 		zap.Int("items_count", len(items)))
 	return order, updatedProducts, nil
+}
+
+func (o *orderQuery) ListExpiredPendingIDs(ctx context.Context, now time.Time, limit int) ([]int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	if limit <= 0 {
+		limit = 100
+	}
+
+	sqlText := `
+		SELECT ` + OrdersID + `
+		FROM ` + OrdersTable + `
+		WHERE ` + OrdersStatus + ` = 'pending'
+		  AND ` + OrdersReservedUntil + ` IS NOT NULL
+		  AND ` + OrdersReservedUntil + ` < $1
+		ORDER BY ` + OrdersReservedUntil + ` ASC
+		LIMIT $2
+	`
+	rows, err := o.runner.Query(ctx, sqlText, now, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to list expired orders: %w", err)
+	}
+	defer rows.Close()
+
+	ids := make([]int64, 0)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan expired order id: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (o *orderQuery) ExpireOrderAtomic(ctx context.Context, orderID int64) (*string, bool, []*Product, error) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	tx, err := o.runner.Begin(ctx)
+	if err != nil {
+		return nil, false, nil, fmt.Errorf("failed to begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx)
+
+	// Захватываем заказ с FOR UPDATE SKIP LOCKED, чтобы параллельные воркеры не брали одно и то же.
+	var order Order
+	lockSQL := `
+		SELECT ` + OrdersID + `, ` + OrdersStatus + `, ` + OrdersMoyskladID + `
+		FROM ` + OrdersTable + `
+		WHERE ` + OrdersID + ` = $1
+		FOR UPDATE SKIP LOCKED
+	`
+	row := tx.QueryRow(ctx, lockSQL, orderID)
+	if err := row.Scan(&order.ID, &order.Status, &order.MoyskladID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			// Кто-то уже забрал блокировку — пропустим этот заказ.
+			return nil, true, nil, nil
+		}
+		return nil, false, nil, fmt.Errorf("failed to lock order: %w", err)
+	}
+	if order.Status != "pending" {
+		return nil, true, nil, nil
+	}
+
+	// Возвращаем сток по каждой позиции и собираем итоговые остатки для обновления кэша.
+	restoreSQL := `
+		UPDATE ` + ProductsTable + ` p
+		SET ` + ProductsStock + ` = p.` + ProductsStock + ` + oi.` + OrderItemsQuantity + `,
+		    ` + ProductsStatus + ` = CASE WHEN p.` + ProductsStock + ` + oi.` + OrderItemsQuantity + ` > 0 THEN 'active' ELSE 'out_of_stock' END,
+		    ` + ProductsUpdatedAt + ` = NOW()
+		FROM ` + OrderItemsTable + ` oi
+		WHERE oi.` + OrderItemsOrderID + ` = $1
+		  AND p.` + ProductsID + ` = oi.` + OrderItemsProductID + `
+		RETURNING p.*
+	`
+	rows, err := tx.Query(ctx, restoreSQL, orderID)
+	if err != nil {
+		return nil, false, nil, fmt.Errorf("failed to restore stock: %w", err)
+	}
+	restored := make([]*Product, 0)
+	if err := pgxscan.ScanAll(&restored, rows); err != nil {
+		return nil, false, nil, fmt.Errorf("failed to scan restored products: %w", err)
+	}
+
+	// Помечаем заказ как expired.
+	expireSQL := `
+		UPDATE ` + OrdersTable + `
+		SET ` + OrdersStatus + ` = 'expired', ` + OrdersUpdatedAt + ` = NOW()
+		WHERE ` + OrdersID + ` = $1
+	`
+	if _, err := tx.Exec(ctx, expireSQL, orderID); err != nil {
+		return nil, false, nil, fmt.Errorf("failed to mark order expired: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, false, nil, fmt.Errorf("failed to commit expire tx: %w", err)
+	}
+
+	o.logger.Info("Order expired and stock restored",
+		zap.Int64("order_id", orderID),
+		zap.Int("products_restored", len(restored)))
+	return order.MoyskladID, false, restored, nil
 }
 
 func (o *orderQuery) Update(ctx context.Context, order *Order, id int64) (*Order, error) {

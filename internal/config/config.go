@@ -102,14 +102,14 @@ func Load() (*Config, error) {
 			Expiration: expiration,
 		},
 		Moysklad: MoyskladConfig{
-			Token:             getEnv("MOYSKLAD_TOKEN", "47ce83c983ae81c9da6caaf2d7a28a5bf4124775"),
-			BaseURL:           getEnv("MOYSKLAD_BASE_URL", "https://api.moysklad.ru/api/remap/1.2"),
-			AutoSync:          getEnv("MOYSKLAD_AUTO_SYNC", "true") == "true",
-			SyncInterval:      parseDuration(getEnv("MOYSKLAD_SYNC_INTERVAL", "1h")), // Резервная синхронизация каждые 1 час
-			WebhookSecret:     getEnv("MOYSKLAD_WEBHOOK_SECRET", "a15b3006e171f232b232acbb230c397a6e5368c40317f4a3e528b81768936e4c"),
-			StockBuffer:       parseFloat(getEnv("MOYSKLAD_STOCK_BUFFER", "3.0")),         // Уменьшили буфер до 3%
-			RequestsPerSecond: parseFloat(getEnv("MOYSKLAD_REQUESTS_PER_SECOND", "10.0")), // 10/сек = 600/минуту (75% от 800 лимита)
-			MaxRetries:        parseInt(getEnv("MOYSKLAD_MAX_RETRIES", "5")),              // в т.ч. повторы при 503
+			Token:                 getEnv("MOYSKLAD_TOKEN", "47ce83c983ae81c9da6caaf2d7a28a5bf4124775"),
+			BaseURL:               getEnv("MOYSKLAD_BASE_URL", "https://api.moysklad.ru/api/remap/1.2"),
+			AutoSync:              getEnv("MOYSKLAD_AUTO_SYNC", "true") == "true",
+			SyncInterval:          parseDuration(getEnv("MOYSKLAD_SYNC_INTERVAL", "1h")), // Резервная синхронизация каждые 1 час
+			WebhookSecret:         getEnv("MOYSKLAD_WEBHOOK_SECRET", "a15b3006e171f232b232acbb230c397a6e5368c40317f4a3e528b81768936e4c"),
+			StockBuffer:           parseFloat(getEnv("MOYSKLAD_STOCK_BUFFER", "3.0")),         // Уменьшили буфер до 3%
+			RequestsPerSecond:     parseFloat(getEnv("MOYSKLAD_REQUESTS_PER_SECOND", "10.0")), // 10/сек = 600/минуту (75% от 800 лимита)
+			MaxRetries:            parseInt(getEnv("MOYSKLAD_MAX_RETRIES", "5")),              // в т.ч. повторы при 503
 			SyncWorkers:           parseInt(getEnv("MOYSKLAD_SYNC_WORKERS", "3")),
 			ReseedFullInterval:    parseDurationOrZero(getEnv("MOYSKLAD_RESEED_FULL_INTERVAL", "24h")),
 			WebhookWorkerInterval: parseDuration(getEnv("WEBHOOK_INBOX_POLL_INTERVAL", "2s")),

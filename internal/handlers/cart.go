@@ -4,20 +4,20 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/gin-gonic/gin"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
+	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 )
 
 type CartHandler struct {
 	cartUsecase *usecase.CartUsecase
-	logger       *zap.Logger
+	logger      *zap.Logger
 }
 
 func NewCartHandler(cartUsecase *usecase.CartUsecase, logger *zap.Logger) *CartHandler {
 	return &CartHandler{
 		cartUsecase: cartUsecase,
-		logger:       logger,
+		logger:      logger,
 	}
 }
 

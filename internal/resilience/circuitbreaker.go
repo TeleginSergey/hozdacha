@@ -9,14 +9,14 @@ import (
 
 // CircuitBreaker упрощённый трёхсостоянияный breaker для внешнего HTTP API.
 type CircuitBreaker struct {
-	mu           sync.Mutex
-	failures     int
-	successes    int // в half-open
-	state        int // 0 closed, 1 open, 2 half-open
-	openedAt     time.Time
-	failThreshold int
+	mu              sync.Mutex
+	failures        int
+	successes       int // в half-open
+	state           int // 0 closed, 1 open, 2 half-open
+	openedAt        time.Time
+	failThreshold   int
 	successHalfOpen int
-	openTimeout   time.Duration
+	openTimeout     time.Duration
 }
 
 const (
