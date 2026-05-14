@@ -56,12 +56,10 @@ func (s *Scheduler) Start(ctx context.Context) {
 	s.logger.Info("Scheduler started with worker pool",
 		zap.Duration("interval", s.interval),
 		zap.Int("max_workers", s.maxWorkers),
-		zap.Duration("reseed_full_interval", s.reseedFullInterval))
+		zap.Duration("reseed_full_interval", s.reseedFullInterval),
+		zap.String("note", "initial sync is triggered by App; scheduler only handles periodic delta sync"))
 
-	// Выполняем первую синхронизацию сразу при старте
-	go s.syncOnce(ctx)
-
-	// Затем синхронизируем по расписанию
+	// Синхронизируем по расписанию (initial full sync делается из app.Run)
 	for {
 		select {
 		case <-ticker.C:
@@ -146,8 +144,18 @@ func (s *Scheduler) FullSync(ctx context.Context) error {
 	if s.syncService == nil {
 		return fmt.Errorf("sync service not initialized")
 	}
-	if !atomic.CompareAndSwapInt32(&s.syncRunning, 0, 1) {
-		return fmt.Errorf("another sync is already running")
+
+	// Ждём освобождения блокировки до 2 минут (на случай, если ticker delta-sync захватил её первым).
+	waitDeadline := time.Now().Add(2 * time.Minute)
+	for !atomic.CompareAndSwapInt32(&s.syncRunning, 0, 1) {
+		if time.Now().After(waitDeadline) {
+			return fmt.Errorf("another sync is already running (waited 2m)")
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(500 * time.Millisecond):
+		}
 	}
 	defer atomic.StoreInt32(&s.syncRunning, 0)
 
