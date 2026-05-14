@@ -15,6 +15,7 @@ type SyncTask struct {
 	ID           string
 	Type         string // "full", "delta", "batch", "preload"
 	Products     []moysklad.MoyskladProduct
+	StockByID    map[string]float64
 	BatchIndex   int
 	TotalBatches int
 	Priority     int // 1=высокий, 2=средний, 3=низкий
@@ -54,15 +55,15 @@ func NewSyncWorkerPool(syncService *MoyskladSyncService, workers int, logger *za
 		syncService: syncService,
 		logger:      logger,
 		// Буфер под полную синхронизацию (десятки тысяч батчей); иначе PushTask сбрасывает задачи в default.
-		taskQueue: make(chan SyncTask, 4096),
-		workers:     0,
-		maxWorkers:  maxWorkers,
-		semaphore:   make(chan struct{}, maxWorkers),
-		stopChan:    make(chan struct{}),
-		wg:          sync.WaitGroup{},
-		stats:       &WorkerStats{},
-		ctx:         ctx,
-		cancel:      cancel,
+		taskQueue:  make(chan SyncTask, 4096),
+		workers:    0,
+		maxWorkers: maxWorkers,
+		semaphore:  make(chan struct{}, maxWorkers),
+		stopChan:   make(chan struct{}),
+		wg:         sync.WaitGroup{},
+		stats:      &WorkerStats{},
+		ctx:        ctx,
+		cancel:     cancel,
 	}
 }
 
@@ -308,6 +309,14 @@ func (p *SyncWorkerPool) processTask(ctx context.Context, task SyncTask, workerI
 		default:
 			// Timeout для каждого API запроса
 			apiCtx, apiCancel := context.WithTimeout(ctx, 30*time.Second)
+
+			if task.StockByID != nil {
+				if stock, ok := task.StockByID[product.ID]; ok {
+					product.Stock = &moysklad.MoyskladStock{Stock: stock, Available: stock}
+				} else {
+					product.Stock = &moysklad.MoyskladStock{Stock: 0, Available: 0}
+				}
+			}
 
 			err := p.syncService.SyncSingleProduct(apiCtx, product)
 			apiCancel()

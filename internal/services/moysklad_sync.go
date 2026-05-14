@@ -344,6 +344,19 @@ func (s *MoyskladSyncService) GetProductsForSync(ctx context.Context, delta bool
 	return moyskladProducts, nil
 }
 
+func (s *MoyskladSyncService) GetStockMapForSync(ctx context.Context) (map[string]float64, error) {
+	if s.moyskladClient == nil {
+		return nil, fmt.Errorf("moysklad client not initialized")
+	}
+
+	stockMap, err := s.moyskladClient.GetStockReport(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get stock report from Moysklad: %w", err)
+	}
+
+	return stockMap, nil
+}
+
 // getPrice извлекает цену из MoyskladProduct
 func getPrice(product moysklad.MoyskladProduct) float64 {
 	if len(product.SalePrices) > 0 {

@@ -89,8 +89,15 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
+	if err := h.cartUC.CommitCartReservation(c.Request.Context(), userID.(int64)); err != nil {
+		h.logger.Warn("Failed to commit cart reservation after order creation",
+			zap.Error(err),
+			zap.Int64("user_id", userID.(int64)),
+			zap.Int64("order_id", order.ID))
+	}
+
 	// Очищаем корзину пользователя после успешного создания заказа
-	if err := h.cartUC.ClearCart(c.Request.Context(), userID.(int64)); err != nil {
+	if err := h.cartUC.ClearCartAfterOrder(c.Request.Context(), userID.(int64)); err != nil {
 		h.logger.Warn("Failed to clear cart after order creation",
 			zap.Error(err),
 			zap.Int64("user_id", userID.(int64)),
