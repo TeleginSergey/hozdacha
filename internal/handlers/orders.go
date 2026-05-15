@@ -149,7 +149,7 @@ func (h *OrderHandler) ShipOrder(c *gin.Context) {
 		return
 	}
 
-	if err := h.orderUC.CompleteOrder(c.Request.Context(), orderID); err != nil {
+	if err := h.orderUC.CompleteOrder(c.Request.Context(), orderID, actorUserID(c)); err != nil {
 		h.logger.Error("Failed to ship order",
 			zap.Int64("order_id", orderID),
 			zap.Error(err))
@@ -168,7 +168,7 @@ func (h *OrderHandler) ExpireOrder(c *gin.Context) {
 		return
 	}
 
-	if err := h.orderUC.ExpireOrderByAdmin(c.Request.Context(), orderID); err != nil {
+	if err := h.orderUC.ExpireOrderByAdmin(c.Request.Context(), orderID, actorUserID(c)); err != nil {
 		h.logger.Error("Failed to expire order",
 			zap.Int64("order_id", orderID),
 			zap.Error(err))
@@ -176,6 +176,19 @@ func (h *OrderHandler) ExpireOrder(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "expired"})
+}
+
+// actorUserID — достаёт id залогиненного админа/пользователя из контекста (для audit log).
+// Возвращает nil если не залогинен.
+func actorUserID(c *gin.Context) *int64 {
+	raw, exists := c.Get("user_id")
+	if !exists {
+		return nil
+	}
+	if id, ok := raw.(int64); ok {
+		return &id
+	}
+	return nil
 }
 
 func (h *OrderHandler) GetUserOrders(c *gin.Context) {

@@ -22,6 +22,7 @@ func SetupRouter(
 	moyskladSyncHandler *MoyskladSyncHandler,
 	webhookHandler *WebhookHandler,
 	cartHandler *CartHandler,
+	adminOrdersHandler *AdminOrdersHandler,
 	productQuery db.ProductQuery,
 	jwtSecret string,
 	healthCheckService *services.HealthCheckService,
@@ -237,8 +238,24 @@ func SetupRouter(
 		// /expire — ручное истечение брони → возврат стока + удаление в МойСклад
 		adminOrders := admin.Group("/orders", middleware.RequireAdmin())
 		{
+			// Списки и аналитика. Lookup объявляется до /:id, чтобы gin не путал
+			// "lookup" / "today" / "stats" с параметром :id.
+			adminOrders.GET("", adminOrdersHandler.ListOrders)
+			adminOrders.GET("/today", adminOrdersHandler.ListToday)
+			adminOrders.GET("/stats", adminOrdersHandler.Stats)
+			adminOrders.GET("/lookup", adminOrdersHandler.Lookup)
+			adminOrders.GET("/:id", adminOrdersHandler.GetOrderDetails)
+
+			// Изменение статусов.
 			adminOrders.POST("/:id/ship", orderHandler.ShipOrder)
 			adminOrders.POST("/:id/expire", orderHandler.ExpireOrder)
+		}
+
+		// Клиенты — поиск и статистика.
+		adminUsers := admin.Group("/users", middleware.RequireAdmin())
+		{
+			adminUsers.GET("", adminOrdersHandler.SearchUsers)
+			adminUsers.GET("/:id/stats", adminOrdersHandler.UserStats)
 		}
 
 		if webhookHandler != nil {

@@ -71,6 +71,7 @@ func NewApp() (*App, error) {
 	productRepo := db.NewProductQuery(database.Pool, database.SQ, logger)
 	promotionRepo := db.NewPromotionQuery(database.Pool, database.SQ, logger)
 	orderRepo := db.NewOrderQuery(database.Pool, database.SQ, logger)
+	orderEventRepo := db.NewOrderEventQuery(database.Pool, logger)
 	cartRepo := db.NewCartItemQuery(database.Pool, logger)
 
 	// Moysklad client (circuit breaker + лимит параллельных запросов)
@@ -106,7 +107,7 @@ func NewApp() (*App, error) {
 	authService := services.NewAuthService(userRepo, cfg.JWT.Secret, logger)
 	userUC := usecase.NewUserUsecase(userRepo, logger, cfg.JWT.Secret)
 	productUC := usecase.NewProductUsecase(productRepo, stockCache, cfg.Moysklad.StockBuffer, logger)
-	orderUC := usecase.NewOrderUsecase(orderRepo, productRepo, stockCache, moyskladClient, nil, logger)
+	orderUC := usecase.NewOrderUsecase(orderRepo, productRepo, stockCache, moyskladClient, nil, orderEventRepo, logger)
 	moyskladSyncService := services.NewMoyskladSyncService(
 		moyskladClient,
 		productRepo, // реализует ProductRepository
@@ -161,6 +162,7 @@ func NewApp() (*App, error) {
 	orderHandler := handlers.NewOrderHandlerWithUsecase(orderUC, cartUC, logger)
 	moyskladSyncHandler := handlers.NewMoyskladSyncHandler(moyskladSyncService, logger)
 	cartHandler := handlers.NewCartHandler(cartUC, logger)
+	adminOrdersHandler := handlers.NewAdminOrdersHandler(orderRepo, userRepo, orderEventRepo, logger)
 
 	var webhookHandler *handlers.WebhookHandler
 	webhookInbox := db.NewWebhookInboxRepo(database.Pool, logger)
@@ -195,6 +197,7 @@ func NewApp() (*App, error) {
 	// Reservation expiry: проверяем истёкшие брони (orders.reserved_until < now) каждые 5 минут.
 	expirySvc := services.NewReservationExpiryService(
 		orderRepo,
+		orderEventRepo,
 		moyskladClient,
 		stockCache,
 		5*time.Minute,
@@ -220,6 +223,7 @@ func NewApp() (*App, error) {
 		moyskladSyncHandler,
 		webhookHandler,
 		cartHandler,
+		adminOrdersHandler,
 		productRepo,
 		cfg.JWT.Secret,
 		healthCheckService,
