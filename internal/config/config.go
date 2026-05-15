@@ -58,6 +58,11 @@ type MoyskladConfig struct {
 	CircuitFailThreshold  int
 	CircuitOpenTimeout    time.Duration
 	MaxConcurrentRequests int
+	// OrganizationID — UUID организации в МойСклад, от имени которой создаются CustomerOrder.
+	// AgentID — UUID контрагента-покупателя по умолчанию (например, "Розничный покупатель").
+	// Узнать UUID можно через GET /entity/organization и /entity/counterparty.
+	OrganizationID string
+	AgentID        string
 }
 
 type RedisConfig struct {
@@ -118,6 +123,8 @@ func Load() (*Config, error) {
 			CircuitFailThreshold:  parseInt(getEnv("MOYSKLAD_CIRCUIT_FAIL_THRESHOLD", "5")),
 			CircuitOpenTimeout:    parseDuration(getEnv("MOYSKLAD_CIRCUIT_OPEN_TIMEOUT", "60s")),
 			MaxConcurrentRequests: parseInt(getEnv("MOYSKLAD_MAX_CONCURRENT_REQUESTS", "8")),
+			OrganizationID:        getEnv("MOYSKLAD_ORGANIZATION_ID", ""),
+			AgentID:               getEnv("MOYSKLAD_AGENT_ID", ""),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "redis"),

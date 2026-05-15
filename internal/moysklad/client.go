@@ -26,6 +26,11 @@ type Client struct {
 	maxRetries  int
 	breaker     *resilience.CircuitBreaker
 	outboundSem chan struct{}
+	// organizationID — UUID организации в МойСклад, от имени которой создаются заказы.
+	// agentID — UUID контрагента-покупателя по умолчанию (например, "Розничный покупатель").
+	// Оба обязательны для CustomerOrder API; если не заданы, создание заказа в МойСклад вернёт ошибку.
+	organizationID string
+	agentID        string
 }
 
 // ClientOption настраивает клиент МойСклад.
@@ -45,6 +50,15 @@ func WithOutboundConcurrency(n int) ClientOption {
 func WithCircuitBreaker(b *resilience.CircuitBreaker) ClientOption {
 	return func(c *Client) {
 		c.breaker = b
+	}
+}
+
+// WithOrderDefaults задаёт UUID организации и контрагента, которые подставляются
+// при создании CustomerOrder. Без них API МойСклад заказ не примет.
+func WithOrderDefaults(organizationID, agentID string) ClientOption {
+	return func(c *Client) {
+		c.organizationID = organizationID
+		c.agentID = agentID
 	}
 }
 
@@ -157,8 +171,9 @@ type MoyskladMeta struct {
 }
 
 type MoyskladOrder struct {
-	ID           string             `json:"id"`
-	Name         string             `json:"name"`
+	ID           string             `json:"id,omitempty"`
+	Name         string             `json:"name,omitempty"`
+	Description  string             `json:"description,omitempty"`
 	Positions    []MoyskladPosition `json:"positions"`
 	State        *MoyskladState     `json:"state,omitempty"`
 	Organization *OrderMeta         `json:"organization,omitempty"`
@@ -169,6 +184,10 @@ type MoyskladPosition struct {
 	Quantity   int        `json:"quantity"`
 	Assortment *OrderMeta `json:"assortment"`
 	Price      float64    `json:"price"`
+	// Reserve — количество товара, которое должно быть зарезервировано на складе.
+	// Обычно равно Quantity. Именно это поле делает заказ "бронью" в МойСклад
+	// (товар уйдёт в "в резерве" в отчётах остатков).
+	Reserve int `json:"reserve,omitempty"`
 }
 
 type MoyskladState struct {
@@ -615,10 +634,9 @@ func (c *Client) extractIDFromHref(href string) string {
 	return ""
 }
 
-func (c *Client) CreateOrder(ctx context.Context, order interface{}) (*string, error) {
-	// Преобразуем наш заказ в формат МойСклад
-	// Временно возвращаем ошибку, так как этот метод не используется
-	return nil, fmt.Errorf("CreateOrder method not implemented")
+// HasOrderDefaults сообщает, заданы ли organization/agent (без них CustomerOrder в МойСклад не создаётся).
+func (c *Client) HasOrderDefaults() bool {
+	return c.organizationID != "" && c.agentID != ""
 }
 
 func (c *Client) GetOrganizations(ctx context.Context) (*MoyskladResponse, error) {

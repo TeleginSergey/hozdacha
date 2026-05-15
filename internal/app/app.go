@@ -89,7 +89,12 @@ func NewApp() (*App, error) {
 			cfg.Moysklad.MaxRetries,
 			moysklad.WithOutboundConcurrency(maxConc),
 			moysklad.WithCircuitBreaker(cb),
+			moysklad.WithOrderDefaults(cfg.Moysklad.OrganizationID, cfg.Moysklad.AgentID),
 		)
+		if cfg.Moysklad.OrganizationID == "" || cfg.Moysklad.AgentID == "" {
+			logger.Warn("Moysklad organization/agent ID not set — orders will NOT be sent to Moysklad",
+				zap.String("hint", "set MOYSKLAD_ORGANIZATION_ID and MOYSKLAD_AGENT_ID env vars"))
+		}
 		logger.Info("Moysklad client initialized",
 			zap.Int("max_concurrent_requests", maxConc),
 			zap.Int("circuit_fail_threshold", cfg.Moysklad.CircuitFailThreshold))
