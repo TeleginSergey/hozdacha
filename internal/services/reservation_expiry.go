@@ -109,7 +109,7 @@ func (s *ReservationExpiryService) tick(ctx context.Context) {
 }
 
 func (s *ReservationExpiryService) expireOne(ctx context.Context, orderID int64) error {
-	moyskladID, alreadyHandled, restored, err := s.orderQuery.ExpireOrderAtomic(ctx, orderID)
+	moyskladID, alreadyHandled, restored, err := s.orderQuery.CancelPendingOrderAtomic(ctx, orderID, "expired", nil)
 	if err != nil {
 		return fmt.Errorf("expire order atomic: %w", err)
 	}

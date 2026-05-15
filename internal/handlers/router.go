@@ -202,6 +202,8 @@ func SetupRouter(
 		{
 			orders.POST("", orderHandler.CreateOrder)
 			orders.GET("", orderHandler.GetUserOrders)
+			// Пользователь отменяет свою же бронь — возврат стока и удаление в МойСклад.
+			orders.POST("/:id/cancel", orderHandler.CancelOrder)
 		}
 
 		// Webhook для МойСклад (публичный endpoint, но защищен подписью)
@@ -229,6 +231,15 @@ func SetupRouter(
 		// Синхронизация с МойСклад
 		admin.POST("/products/sync", moyskladSyncHandler.SyncProducts)
 		admin.POST("/products/sync/full", moyskladSyncHandler.SyncProductsFull)
+
+		// Управление заказами в магазине (требует роль admin).
+		// /ship  — клиент пришёл и выкупил → status=completed
+		// /expire — ручное истечение брони → возврат стока + удаление в МойСклад
+		adminOrders := admin.Group("/orders", middleware.RequireAdmin())
+		{
+			adminOrders.POST("/:id/ship", orderHandler.ShipOrder)
+			adminOrders.POST("/:id/expire", orderHandler.ExpireOrder)
+		}
 
 		if webhookHandler != nil {
 			admin.GET("/webhooks/dead-letter", webhookHandler.ListDeadLetter)

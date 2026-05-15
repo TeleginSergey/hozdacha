@@ -22,6 +22,9 @@ const DefaultReservationTTL = 48 * time.Hour
 type OrderRepository interface {
 	InsertWithItems(ctx context.Context, order *db.Order, items []db.OrderItem) (*db.Order, error)
 	CreateOrderAtomic(ctx context.Context, order *db.Order, items []db.OrderItem, clearCartForUserID int64) (*db.Order, []*db.Product, error)
+	CancelPendingOrderAtomic(ctx context.Context, orderID int64, targetStatus string, ownerUserID *int64) (*string, bool, []*db.Product, error)
+	CompleteOrder(ctx context.Context, orderID int64) (bool, error)
+	GetByID(ctx context.Context, id int64) (*db.Order, error)
 	Update(ctx context.Context, order *db.Order, id int64) (*db.Order, error)
 	GetByUserID(ctx context.Context, userID int64) ([]*db.Order, error)
 }
@@ -182,6 +185,75 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 	}
 
 	return order, nil
+}
+
+// CancelOrderByUser отменяет pending-заказ пользователя: возвращает товары на склад
+// и удаляет CustomerOrder в МойСклад. Заказ остаётся в БД со статусом 'cancelled' для истории.
+func (u *OrderUsecase) CancelOrderByUser(ctx context.Context, userID, orderID int64) error {
+	return u.cancelOrder(ctx, orderID, "cancelled", &userID)
+}
+
+// ExpireOrderByAdmin — ручной триггер истечения брони (форсирует то, что обычно делает cron).
+func (u *OrderUsecase) ExpireOrderByAdmin(ctx context.Context, orderID int64) error {
+	return u.cancelOrder(ctx, orderID, "expired", nil)
+}
+
+func (u *OrderUsecase) cancelOrder(ctx context.Context, orderID int64, targetStatus string, ownerUserID *int64) error {
+	moyskladID, alreadyHandled, restored, err := u.orders.CancelPendingOrderAtomic(ctx, orderID, targetStatus, ownerUserID)
+	if err != nil {
+		return fmt.Errorf("failed to cancel order: %w", err)
+	}
+	if alreadyHandled {
+		// Заказ уже не pending — считаем идемпотентной операцией.
+		return nil
+	}
+
+	// Обновляем Redis-кэш остатков (best effort).
+	if u.stockCache != nil {
+		for _, p := range restored {
+			msID := ""
+			if p.MoyskladID != nil {
+				msID = *p.MoyskladID
+			}
+			if err := u.stockCache.SetStock(ctx, p.ID, msID, p.Stock); err != nil {
+				u.logger.Warn("Failed to refresh stock cache after order cancel",
+					zap.Int64("product_id", p.ID), zap.Error(err))
+			}
+		}
+	}
+
+	// Удаляем заказ в МойСклад (best effort). Если упадёт — БД уже консистентна,
+	// админ почистит вручную или MoyskladID останется висеть.
+	if moyskladID != nil && *moyskladID != "" && u.moysklad != nil {
+		delCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
+		defer cancel()
+		if err := u.moysklad.DeleteCustomerOrder(delCtx, *moyskladID); err != nil {
+			u.logger.Warn("Failed to delete order in Moysklad",
+				zap.Int64("order_id", orderID),
+				zap.Stringp("moysklad_id", moyskladID),
+				zap.Error(err))
+		}
+	}
+
+	u.logger.Info("Order cancelled",
+		zap.Int64("order_id", orderID),
+		zap.String("status", targetStatus))
+	return nil
+}
+
+// CompleteOrder помечает заказ как выкупленный в магазине.
+// Сток в БД не возвращается (товар продан). Резерв в МойСклад снимает продавец отгрузкой.
+func (u *OrderUsecase) CompleteOrder(ctx context.Context, orderID int64) error {
+	alreadyHandled, err := u.orders.CompleteOrder(ctx, orderID)
+	if err != nil {
+		return fmt.Errorf("failed to complete order: %w", err)
+	}
+	if alreadyHandled {
+		// Уже не pending — идемпотентно.
+		return nil
+	}
+	u.logger.Info("Order completed by admin", zap.Int64("order_id", orderID))
+	return nil
 }
 
 func (u *OrderUsecase) GetUserOrders(ctx context.Context, userID int64) ([]*db.Order, error) {

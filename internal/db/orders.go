@@ -22,6 +22,9 @@ const OrderItemsTable = "order_items"
 // и она имеет приоритет над любыми кэшами.
 var ErrInsufficientStock = errors.New("insufficient stock")
 
+// ErrOrderForbidden возвращается, если пользователь пытается изменить не свой заказ.
+var ErrOrderForbidden = errors.New("order does not belong to user")
+
 const (
 	OrdersID            = "orders_id_pk"
 	OrdersUserID        = "orders_user_id_fk"
@@ -90,10 +93,16 @@ type OrderQuery interface {
 	// ListExpiredPendingIDs возвращает id pending-заказов, у которых reserved_until < now (TTL истёк).
 	// Используется cron-задачей для автоматической отмены брони.
 	ListExpiredPendingIDs(ctx context.Context, now time.Time, limit int) ([]int64, error)
-	// ExpireOrderAtomic переводит заказ в expired и атомарно возвращает товары на склад.
-	// Возвращает moysklad_id (если был), чтобы можно было удалить CustomerOrder в МойСклад.
-	// alreadyHandled = true, если заказ уже не pending (другой воркер обработал).
-	ExpireOrderAtomic(ctx context.Context, orderID int64) (moyskladID *string, alreadyHandled bool, restored []*Product, err error)
+	// CancelPendingOrderAtomic атомарно отменяет pending-заказ: переводит его в targetStatus
+	// (например, 'expired' для cron или 'cancelled' для ручной отмены пользователем),
+	// и возвращает товары на склад в той же транзакции.
+	// Возвращает moysklad_id (если был) — чтобы вызывающий мог удалить CustomerOrder в МойСклад.
+	// alreadyHandled = true, если заказ уже не pending (другой воркер обработал / уже отменён).
+	// ownerUserID != nil — дополнительно проверяем что заказ принадлежит этому юзеру (для cancel юзером).
+	CancelPendingOrderAtomic(ctx context.Context, orderID int64, targetStatus string, ownerUserID *int64) (moyskladID *string, alreadyHandled bool, restored []*Product, err error)
+	// CompleteOrder помечает pending-заказ как completed. Сток не возвращается
+	// (товар выкуплен в магазине). Резерв в МойСклад продавец снимает сам отгрузкой.
+	CompleteOrder(ctx context.Context, orderID int64) (alreadyHandled bool, err error)
 	// CreateOrderAtomic выполняет в одной транзакции:
 	//  1. UPDATE products SET stock = stock - qty WHERE id = ? AND stock >= qty (для каждого item)
 	//  2. INSERT INTO orders
@@ -432,7 +441,17 @@ func (o *orderQuery) ListExpiredPendingIDs(ctx context.Context, now time.Time, l
 	return ids, rows.Err()
 }
 
-func (o *orderQuery) ExpireOrderAtomic(ctx context.Context, orderID int64) (*string, bool, []*Product, error) {
+// allowedCancelStatuses — куда можно перевести pending-заказ.
+var allowedCancelStatuses = map[string]struct{}{
+	"expired":   {},
+	"cancelled": {},
+}
+
+func (o *orderQuery) CancelPendingOrderAtomic(ctx context.Context, orderID int64, targetStatus string, ownerUserID *int64) (*string, bool, []*Product, error) {
+	if _, ok := allowedCancelStatuses[targetStatus]; !ok {
+		return nil, false, nil, fmt.Errorf("invalid target status %q (expected 'expired' or 'cancelled')", targetStatus)
+	}
+
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -445,21 +464,27 @@ func (o *orderQuery) ExpireOrderAtomic(ctx context.Context, orderID int64) (*str
 	// Захватываем заказ с FOR UPDATE SKIP LOCKED, чтобы параллельные воркеры не брали одно и то же.
 	var order Order
 	lockSQL := `
-		SELECT ` + OrdersID + `, ` + OrdersStatus + `, ` + OrdersMoyskladID + `
+		SELECT ` + OrdersID + `, ` + OrdersUserID + `, ` + OrdersStatus + `, ` + OrdersMoyskladID + `
 		FROM ` + OrdersTable + `
 		WHERE ` + OrdersID + ` = $1
 		FOR UPDATE SKIP LOCKED
 	`
 	row := tx.QueryRow(ctx, lockSQL, orderID)
-	if err := row.Scan(&order.ID, &order.Status, &order.MoyskladID); err != nil {
+	if err := row.Scan(&order.ID, &order.UserID, &order.Status, &order.MoyskladID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Кто-то уже забрал блокировку — пропустим этот заказ.
+			// Либо заказа нет, либо его уже кто-то залочил — пропустим.
 			return nil, true, nil, nil
 		}
 		return nil, false, nil, fmt.Errorf("failed to lock order: %w", err)
 	}
 	if order.Status != "pending" {
 		return nil, true, nil, nil
+	}
+	// Проверка владельца — для cancel от пользователя.
+	if ownerUserID != nil {
+		if order.UserID == nil || *order.UserID != *ownerUserID {
+			return nil, false, nil, ErrOrderForbidden
+		}
 	}
 
 	// Возвращаем сток по каждой позиции и собираем итоговые остатки для обновления кэша.
@@ -482,24 +507,44 @@ func (o *orderQuery) ExpireOrderAtomic(ctx context.Context, orderID int64) (*str
 		return nil, false, nil, fmt.Errorf("failed to scan restored products: %w", err)
 	}
 
-	// Помечаем заказ как expired.
-	expireSQL := `
+	updateSQL := `
 		UPDATE ` + OrdersTable + `
-		SET ` + OrdersStatus + ` = 'expired', ` + OrdersUpdatedAt + ` = NOW()
+		SET ` + OrdersStatus + ` = $2, ` + OrdersUpdatedAt + ` = NOW()
 		WHERE ` + OrdersID + ` = $1
 	`
-	if _, err := tx.Exec(ctx, expireSQL, orderID); err != nil {
-		return nil, false, nil, fmt.Errorf("failed to mark order expired: %w", err)
+	if _, err := tx.Exec(ctx, updateSQL, orderID, targetStatus); err != nil {
+		return nil, false, nil, fmt.Errorf("failed to mark order %s: %w", targetStatus, err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return nil, false, nil, fmt.Errorf("failed to commit expire tx: %w", err)
+		return nil, false, nil, fmt.Errorf("failed to commit cancel tx: %w", err)
 	}
 
-	o.logger.Info("Order expired and stock restored",
+	o.logger.Info("Order cancelled and stock restored",
 		zap.Int64("order_id", orderID),
+		zap.String("target_status", targetStatus),
 		zap.Int("products_restored", len(restored)))
 	return order.MoyskladID, false, restored, nil
+}
+
+func (o *orderQuery) CompleteOrder(ctx context.Context, orderID int64) (bool, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// Меняем статус только если заказ ещё pending.
+	tag, err := o.runner.Exec(ctx, `
+		UPDATE `+OrdersTable+`
+		SET `+OrdersStatus+` = 'completed', `+OrdersUpdatedAt+` = NOW()
+		WHERE `+OrdersID+` = $1 AND `+OrdersStatus+` = 'pending'
+	`, orderID)
+	if err != nil {
+		return false, fmt.Errorf("failed to complete order: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return true, nil // уже не pending
+	}
+	o.logger.Info("Order marked completed", zap.Int64("order_id", orderID))
+	return false, nil
 }
 
 func (o *orderQuery) Update(ctx context.Context, order *Order, id int64) (*Order, error) {
