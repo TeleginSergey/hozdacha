@@ -157,15 +157,26 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		}
 	}
 
-	// Создание заказа в МойСклад
+	// Создание CustomerOrder в МойСклад с резервом позиций.
+	// Если МойСклад недоступен — заказ всё равно сохранён в БД, но продавец
+	// не увидит его в кассе. Логируем как Error, чтобы это всплывало в алертах.
 	if u.moysklad != nil {
 		moyskladID, err := u.moysklad.CreateOrderFromDB(ctx, order, u.products)
 		if err != nil {
-			u.logger.Warn("Failed to create order in Moysklad", zap.Error(err))
+			u.logger.Error("Failed to create order in Moysklad — order saved locally only",
+				zap.Int64("order_id", order.ID),
+				zap.Error(err))
 		} else if moyskladID != nil {
 			order.MoyskladID = moyskladID
 			if _, err := u.orders.Update(ctx, order, order.ID); err != nil {
-				u.logger.Warn("Failed to update order with Moysklad ID", zap.Error(err))
+				u.logger.Error("Failed to persist Moysklad ID on order",
+					zap.Int64("order_id", order.ID),
+					zap.Stringp("moysklad_id", moyskladID),
+					zap.Error(err))
+			} else {
+				u.logger.Info("Order created in Moysklad",
+					zap.Int64("order_id", order.ID),
+					zap.Stringp("moysklad_id", moyskladID))
 			}
 		}
 	}
