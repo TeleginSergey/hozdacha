@@ -86,6 +86,10 @@ type UserQuery interface {
 	GetByEmailAndCode(ctx context.Context, email string, code string) (*User, error)
 	VerifyEmailByCode(ctx context.Context, userID int64) error
 	BeginTx(ctx context.Context) (pgx.Tx, error)
+	// SearchUsers — поиск пользователей по username/email/phone (из заказов) с пагинацией.
+	SearchUsers(ctx context.Context, query string, limit, offset int) ([]*UserListItem, int, error)
+	// FindUserIDByPhone — находит ID пользователя по телефону из его заказов.
+	FindUserIDByPhone(ctx context.Context, phone string) (*int64, error)
 }
 
 type userQuery struct {

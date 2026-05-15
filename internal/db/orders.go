@@ -111,6 +111,18 @@ type OrderQuery interface {
 	// Если у любого товара недостаточно стока — возвращает ErrInsufficientStock и транзакция откатывается.
 	// updatedProducts содержит новые остатки товаров после списания (для обновления кэша после коммита).
 	CreateOrderAtomic(ctx context.Context, order *Order, items []OrderItem, clearCartForUserID int64) (createdOrder *Order, updatedProducts []*Product, err error)
+
+	// --- Админка ---
+	// ListOrders — список заказов с фильтрами + общий count для пагинации.
+	ListOrders(ctx context.Context, f OrderListFilter) ([]*Order, int, error)
+	// StatsByStatus — счётчики заказов по статусам за период (для дашборда).
+	StatsByStatus(ctx context.Context, from, to *time.Time) (map[string]int, error)
+	// GetUserStats — агрегаты по конкретному клиенту.
+	GetUserStats(ctx context.Context, userID int64) (*UserOrderStats, error)
+	// GetUserTopProducts — топ-N товаров клиента по completed-заказам.
+	GetUserTopProducts(ctx context.Context, userID int64, limit int) ([]*UserTopProduct, error)
+	// GetItemsByOrderID — позиции заказа (для карточки).
+	GetItemsByOrderID(ctx context.Context, orderID int64) ([]*OrderItem, error)
 }
 
 type orderQuery struct {

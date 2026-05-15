@@ -22,6 +22,7 @@ import (
 // благодаря FOR UPDATE SKIP LOCKED в ExpireOrderAtomic.
 type ReservationExpiryService struct {
 	orderQuery     db.OrderQuery
+	eventQuery     db.OrderEventQuery
 	moyskladClient *moysklad.Client
 	stockCache     *cache.StockCache
 	logger         *zap.Logger
@@ -32,6 +33,7 @@ type ReservationExpiryService struct {
 
 func NewReservationExpiryService(
 	orderQuery db.OrderQuery,
+	eventQuery db.OrderEventQuery,
 	moyskladClient *moysklad.Client,
 	stockCache *cache.StockCache,
 	interval time.Duration,
@@ -46,6 +48,7 @@ func NewReservationExpiryService(
 	}
 	return &ReservationExpiryService{
 		orderQuery:     orderQuery,
+		eventQuery:     eventQuery,
 		moyskladClient: moyskladClient,
 		stockCache:     stockCache,
 		logger:         logger,
@@ -115,6 +118,16 @@ func (s *ReservationExpiryService) expireOne(ctx context.Context, orderID int64)
 	}
 	if alreadyHandled {
 		return nil
+	}
+
+	// Audit log: системное событие (actor = nil).
+	if s.eventQuery != nil {
+		if err := s.eventQuery.Insert(ctx, orderID, db.OrderEventExpired, nil, map[string]any{
+			"reason": "ttl_expired_by_cron",
+		}); err != nil {
+			s.logger.Warn("Failed to record expiry event",
+				zap.Int64("order_id", orderID), zap.Error(err))
+		}
 	}
 
 	// Обновляем Redis-кэш остатков (best effort).

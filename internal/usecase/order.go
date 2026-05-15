@@ -40,6 +40,7 @@ type OrderUsecase struct {
 	stockCache  *cache.StockCache
 	moysklad    *moysklad.Client
 	telegramBot *telegram.Bot
+	events      db.OrderEventQuery
 	logger      *zap.Logger
 }
 
@@ -49,6 +50,7 @@ func NewOrderUsecase(
 	stockCache *cache.StockCache,
 	moyskladClient *moysklad.Client,
 	telegramBot *telegram.Bot,
+	events db.OrderEventQuery,
 	logger *zap.Logger,
 ) *OrderUsecase {
 	return &OrderUsecase{
@@ -57,6 +59,7 @@ func NewOrderUsecase(
 		stockCache:  stockCache,
 		moysklad:    moyskladClient,
 		telegramBot: telegramBot,
+		events:      events,
 		logger:      logger,
 	}
 }
@@ -135,6 +138,11 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
+	// Audit log.
+	u.recordEvent(ctx, order.ID, db.OrderEventCreated, &req.UserID, map[string]any{
+		"items_count": len(items),
+		"total_price": order.TotalPrice,
+	})
 
 	// После коммита обновляем Redis-кэш остатков и сбрасываем резервы
 	// best-effort: если Redis не отвечает — заказ всё равно создан корректно.
@@ -169,6 +177,9 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 			u.logger.Error("Failed to create order in Moysklad — order saved locally only",
 				zap.Int64("order_id", order.ID),
 				zap.Error(err))
+			u.recordEvent(ctx, order.ID, db.OrderEventMoyskladFailed, nil, map[string]any{
+				"error": err.Error(),
+			})
 		} else if moyskladID != nil {
 			order.MoyskladID = moyskladID
 			if _, err := u.orders.Update(ctx, order, order.ID); err != nil {
@@ -180,6 +191,9 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 				u.logger.Info("Order created in Moysklad",
 					zap.Int64("order_id", order.ID),
 					zap.Stringp("moysklad_id", moyskladID))
+				u.recordEvent(ctx, order.ID, db.OrderEventMoyskladSynced, nil, map[string]any{
+					"moysklad_id": *moyskladID,
+				})
 			}
 		}
 	}
@@ -190,15 +204,29 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 // CancelOrderByUser отменяет pending-заказ пользователя: возвращает товары на склад
 // и удаляет CustomerOrder в МойСклад. Заказ остаётся в БД со статусом 'cancelled' для истории.
 func (u *OrderUsecase) CancelOrderByUser(ctx context.Context, userID, orderID int64) error {
-	return u.cancelOrder(ctx, orderID, "cancelled", &userID)
+	return u.cancelOrder(ctx, orderID, "cancelled", &userID, &userID)
 }
 
 // ExpireOrderByAdmin — ручной триггер истечения брони (форсирует то, что обычно делает cron).
-func (u *OrderUsecase) ExpireOrderByAdmin(ctx context.Context, orderID int64) error {
-	return u.cancelOrder(ctx, orderID, "expired", nil)
+// adminUserID опционально — если задан, фиксируется в audit log как actor.
+func (u *OrderUsecase) ExpireOrderByAdmin(ctx context.Context, orderID int64, adminUserID *int64) error {
+	return u.cancelOrder(ctx, orderID, "expired", nil, adminUserID)
 }
 
-func (u *OrderUsecase) cancelOrder(ctx context.Context, orderID int64, targetStatus string, ownerUserID *int64) error {
+// recordEvent — best-effort запись в audit log. Не должна ломать основной поток.
+func (u *OrderUsecase) recordEvent(ctx context.Context, orderID int64, eventType string, actorUserID *int64, payload any) {
+	if u.events == nil {
+		return
+	}
+	if err := u.events.Insert(ctx, orderID, eventType, actorUserID, payload); err != nil {
+		u.logger.Warn("Failed to record order event",
+			zap.Int64("order_id", orderID),
+			zap.String("event_type", eventType),
+			zap.Error(err))
+	}
+}
+
+func (u *OrderUsecase) cancelOrder(ctx context.Context, orderID int64, targetStatus string, ownerUserID, actorUserID *int64) error {
 	moyskladID, alreadyHandled, restored, err := u.orders.CancelPendingOrderAtomic(ctx, orderID, targetStatus, ownerUserID)
 	if err != nil {
 		return fmt.Errorf("failed to cancel order: %w", err)
@@ -207,6 +235,15 @@ func (u *OrderUsecase) cancelOrder(ctx context.Context, orderID int64, targetSta
 		// Заказ уже не pending — считаем идемпотентной операцией.
 		return nil
 	}
+
+	// Audit log: фиксируем кто и почему отменил.
+	eventType := db.OrderEventCancelled
+	if targetStatus == "expired" {
+		eventType = db.OrderEventExpired
+	}
+	u.recordEvent(ctx, orderID, eventType, actorUserID, map[string]any{
+		"target_status": targetStatus,
+	})
 
 	// Обновляем Redis-кэш остатков (best effort).
 	if u.stockCache != nil {
@@ -243,7 +280,8 @@ func (u *OrderUsecase) cancelOrder(ctx context.Context, orderID int64, targetSta
 
 // CompleteOrder помечает заказ как выкупленный в магазине.
 // Сток в БД не возвращается (товар продан). Резерв в МойСклад снимает продавец отгрузкой.
-func (u *OrderUsecase) CompleteOrder(ctx context.Context, orderID int64) error {
+// adminUserID опционально — для записи в audit log кто из админов нажал кнопку.
+func (u *OrderUsecase) CompleteOrder(ctx context.Context, orderID int64, adminUserID *int64) error {
 	alreadyHandled, err := u.orders.CompleteOrder(ctx, orderID)
 	if err != nil {
 		return fmt.Errorf("failed to complete order: %w", err)
@@ -252,6 +290,7 @@ func (u *OrderUsecase) CompleteOrder(ctx context.Context, orderID int64) error {
 		// Уже не pending — идемпотентно.
 		return nil
 	}
+	u.recordEvent(ctx, orderID, db.OrderEventShipped, adminUserID, nil)
 	u.logger.Info("Order completed by admin", zap.Int64("order_id", orderID))
 	return nil
 }
