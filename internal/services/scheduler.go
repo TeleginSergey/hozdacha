@@ -176,16 +176,10 @@ func (s *Scheduler) FullSync(ctx context.Context) error {
 
 	s.logger.Info("Products retrieved from Moysklad", zap.Int("total", len(moyskladProducts)))
 
-	// Разбиваем на маленькие батчи и отправляем в worker pool
-	batchSize := 3 // Очень маленький батч
+	// Разбиваем на батчи и отправляем в worker pool.
+	// Worker'ы обрабатывают параллельно через семафор — батчи по 20 товаров.
+	const batchSize = 20
 	totalProducts := len(moyskladProducts)
-
-	if totalProducts > 1000 {
-		batchSize = 2
-	}
-	if totalProducts > 5000 {
-		batchSize = 1
-	}
 
 	totalBatches := (totalProducts + batchSize - 1) / batchSize
 	s.logger.Info("Splitting products into batches for worker pool",
