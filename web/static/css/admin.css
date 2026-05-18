@@ -59,5 +59,342 @@
     background-color: #e67e22;
 }
 
+.btn-secondary {
+    background-color: #95a5a6;
+}
+
+.btn-secondary:hover {
+    background-color: #7f8c8d;
+}
+
+.btn-sm {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+/* ===== Табы ===== */
+.admin-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    margin: -2rem -2rem 1.5rem;
+    padding: 0.5rem 1rem 0;
+    border-bottom: 1px solid #e0e6ed;
+    background: #f8f9fa;
+    border-radius: 10px 10px 0 0;
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    font-size: 0.95rem;
+    color: #555;
+    border-bottom: 3px solid transparent;
+    transition: all 0.15s;
+    font-weight: 500;
+}
+
+.tab-btn:hover {
+    color: #2c3e50;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.tab-btn.active {
+    color: #2c3e50;
+    border-bottom-color: #3498db;
+    background: white;
+}
+
+.tab-btn-logout {
+    margin-left: auto;
+    color: #e74c3c;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* ===== Дашборд ===== */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+.period-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.stat-card {
+    background: linear-gradient(135deg, #f8f9fa, #ffffff);
+    border: 1px solid #e0e6ed;
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+}
+
+.stat-card .stat-label {
+    color: #7f8c8d;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card .stat-value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #2c3e50;
+}
+
+.stat-card .stat-sub {
+    font-size: 0.85rem;
+    color: #95a5a6;
+    margin-top: 0.25rem;
+}
+
+.stat-card.stat-warn .stat-value { color: #e67e22; }
+.stat-card.stat-bad .stat-value { color: #e74c3c; }
+.stat-card.stat-good .stat-value { color: #27ae60; }
+
+/* ===== Фильтры ===== */
+.filters-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 1.5rem;
+    align-items: center;
+}
+
+.filter-input {
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 0.95rem;
+    min-width: 150px;
+}
+
+.filter-input:focus {
+    outline: none;
+    border-color: #3498db;
+}
+
+/* ===== Таблицы ===== */
+.orders-table-wrap {
+    overflow-x: auto;
+    margin-top: 1rem;
+}
+
+.admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.admin-table thead th {
+    background: #2c3e50;
+    color: white;
+    text-align: left;
+    padding: 0.75rem;
+    font-weight: 600;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.admin-table tbody td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #ecf0f1;
+    vertical-align: middle;
+}
+
+.admin-table tbody tr:hover {
+    background: #f8fbfd;
+    cursor: pointer;
+}
+
+.admin-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* ===== Статусы ===== */
+.status-badge {
+    display: inline-block;
+    padding: 0.25rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-pending { background: #fff3cd; color: #856404; }
+.status-completed { background: #d4edda; color: #155724; }
+.status-cancelled { background: #f8d7da; color: #721c24; }
+.status-expired { background: #e2e3e5; color: #383d41; }
+
+/* ===== Пагинация ===== */
+.pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.pagination span {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+/* ===== Карточка заказа ===== */
+.modal-wide {
+    max-width: 800px;
+    width: 92%;
+}
+
+.order-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.order-info-block {
+    background: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+}
+
+.order-info-block h4 {
+    margin: 0 0 0.5rem;
+    color: #7f8c8d;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+
+.order-info-block .info-value {
+    font-size: 1rem;
+    color: #2c3e50;
+    word-break: break-word;
+}
+
+.order-items-list {
+    margin-top: 1rem;
+}
+
+.order-item-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem;
+    border-bottom: 1px solid #ecf0f1;
+}
+
+.order-item-row:last-child {
+    border-bottom: none;
+    font-weight: 600;
+    border-top: 2px solid #2c3e50;
+    padding-top: 1rem;
+}
+
+.audit-timeline {
+    margin-top: 1rem;
+    padding-left: 1rem;
+    border-left: 2px solid #ecf0f1;
+}
+
+.audit-event {
+    position: relative;
+    padding: 0.5rem 0 0.5rem 1rem;
+}
+
+.audit-event::before {
+    content: '';
+    position: absolute;
+    left: -7px;
+    top: 1rem;
+    width: 12px;
+    height: 12px;
+    background: #3498db;
+    border-radius: 50%;
+    border: 2px solid white;
+}
+
+.audit-event.event-shipped::before { background: #27ae60; }
+.audit-event.event-cancelled::before { background: #e74c3c; }
+.audit-event.event-expired::before { background: #95a5a6; }
+.audit-event.event-moysklad_failed::before { background: #e67e22; }
+
+.audit-event .event-time {
+    color: #95a5a6;
+    font-size: 0.8rem;
+}
+
+.audit-event .event-title {
+    font-weight: 600;
+    margin: 0.15rem 0;
+}
+
+.audit-event .event-payload {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    color: #555;
+    background: #f8f9fa;
+    padding: 0.25rem 0.5rem;
+    border-radius: 3px;
+    margin-top: 0.25rem;
+    word-break: break-all;
+}
+
+.text-muted {
+    color: #95a5a6;
+    font-style: italic;
+}
+
+.action-bar {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 1rem;
+    padding-top: 1rem;
+    border-top: 1px solid #ecf0f1;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    .admin-tabs {
+        margin: -1rem -1rem 1rem;
+    }
+    .tab-btn {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.85rem;
+    }
+    .filters-bar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .filter-input {
+        width: 100%;
+    }
+}
+
 
 
