@@ -1,107 +1,137 @@
-# Хозяйкин Дом - Интернет-магазин хозяйственных товаров
+# Телегинс Шоп
 
-Веб-сайт для магазина хозяйственных товаров с интеграцией МойСклад и email-верификацией для регистрации.
+Интернет-магазин с бронированием товаров и интеграцией с МойСклад.
 
-## Функционал
+## Стек
 
-- 📦 Каталог товаров с поиском
-- 🎯 Акции на главной странице
-- 🛒 Корзина и оформление заказов
-- 👨‍💼 Админ-панель для управления акциями и товарами
-- � Регистрация с email-верификацией
-- 🔗 Интеграция с МойСклад для синхронизации товаров
+- **Go** 1.22+ (Gin, pgx, squirrel, scany)
+- **PostgreSQL** 15+ (основное хранилище)
+- **Redis** 7+ (кэш остатков)
+- **МойСклад API** (учётная система, касса, CRM)
 
-## Установка
+## Возможности
 
-### Вариант 1: С Docker (рекомендуется) ⭐
+### Магазин
+- Каталог товаров с поиском и фильтрацией по категориям
+- Корзина (wishlist) с проверкой доступности
+- Оформление заказа с атомарным списанием стока
+- Бронирование товара на 48 часов
+- Личный кабинет: профиль, история заказов, отмена брони
 
-**Быстрый старт:**
+### Админ-панель (`/admin`)
+- Дашборд: статистика по статусам заказов, процент no-show
+- Список заказов с фильтрами (статус, дата, поиск по имени/телефону)
+- Карточка заказа: состав, таймлайн событий, кнопки «Выкуплен» / «Истечь»
+- Поиск клиентов по имени, email, телефону
+- Карточка клиента: статистика, топ товаров, средний чек
+- Управление акциями
+- Ручная синхронизация с МойСклад (дельта / полная)
+
+### Интеграция с МойСклад
+- Webhook-first обновление остатков (реальное время)
+- Создание CustomerOrder с резервом позиций при оформлении заказа
+- Автоматическое удаление заказа в МС при отмене/истечении
+- Дельта-синхронизация карточек товаров (резервная, раз в час)
+- Полная пересинхронизация (раз в сутки)
+
+### Аудит
+- Лог всех событий по заказу: создание, синхронизация с МС, выкуп, отмена, истечение
+- Фиксация actor (кто из админов выполнил действие)
+
+## Быстрый старт
+
+### Переменные окружения
+
 ```bash
-# 1. Создайте .env файл из примера
-cp .env.example .env
-nano .env  # Заполните необходимые значения
-
-# 2. Запустите
-docker compose up -d --build
-
-# 3. Создайте администратора
-docker compose exec app sh -c "cd /root && ./create_admin admin admin@example.com your_password"
-
-# 4. Откройте http://localhost:8081
+DATABASE_URL=postgres://user:pass@localhost:5432/telegins_shop?sslmode=disable
+REDIS_URL=redis://localhost:6379/0
+JWT_SECRET=your-secret-key
+MOYSKLAD_TOKEN=your-token
+MOYSKLAD_WEBHOOK_SECRET=your-webhook-secret
+MOYSKLAD_AUTO_SYNC=true
+MOYSKLAD_SYNC_INTERVAL=1h
+MOYSKLAD_RESEED_FULL_INTERVAL=24h
+MOYSKLAD_STOCK_BUFFER=3.0
 ```
 
-Приложение будет доступно по адресу `http://localhost:8081`
+### Запуск
 
-📖 **Полная инструкция с МойСклад:** [COMPLETE_SETUP.md](COMPLETE_SETUP.md)  
-🚀 **Деплой в продакшн:** [DEPLOY.md](DEPLOY.md)  
-🔒 **Безопасность:** [SECURITY.md](SECURITY.md)
-
-### Вариант 2: Локальная установка
-
-1. Установите зависимости:
 ```bash
 go mod download
+go run cmd/server/main.go
+# или
+go build -o server cmd/server/main.go && ./server
 ```
 
-2. Создайте файл `.env` на основе `.env.example` и заполните необходимые переменные
+Сервер на порту из `PORT` (по умолчанию 8080).
 
-3. Создайте базу данных PostgreSQL:
-```sql
-CREATE DATABASE telegins_shop;
-```
+### Docker
 
-4. Запустите миграции:
 ```bash
-psql -U postgres -d telegins_shop -f migrations/001_init.sql
+docker build -t telegins-shop .
+docker run -p 8080:8080 --env-file .env telegins-shop
 ```
 
-5. Создайте первого администратора:
-```bash
-go run cmd/create_admin/main.go admin admin@example.com your_password
-```
-
-6. Запустите приложение:
-```bash
-go run cmd/main.go
-```
-
-Приложение будет доступно по адресу `http://localhost:8080`
-
-## Структура проекта
+## Структура
 
 ```
-telegins_shop/
-├── cmd/              # Точка входа приложения
-├── internal/
-│   ├── config/       # Конфигурация
-│   ├── db/           # Работа с БД
-│   ├── models/       # Модели данных
-│   ├── handlers/     # HTTP handlers
-│   ├── middleware/   # Middleware
-│   ├── services/     # Бизнес-логика
-│   ├── moysklad/     # Интеграция с МойСклад
-│   └── telegram/     # Telegram-бот
-├── web/              # Frontend (HTML, CSS, JS)
-├── migrations/       # SQL миграции
-└── go.mod
+cmd/server/          # Точка входа
+internal/
+  app/               # Композиция зависимостей
+  cache/             # Redis: кэш остатков, Lua-скрипты
+  config/            # Конфигурация из env
+  db/                # Доступ к данным (SQL)
+  handlers/          # HTTP-обработчики (Gin)
+  middleware/        # JWT, CORS, rate-limit
+  moysklad/          # Клиент API МойСклад
+  resilience/        # Circuit breaker, retry
+  services/          # Синхронизация, email, планировщик
+  usecase/           # Бизнес-логика
+migrations/          # SQL-миграции
+web/
+  static/            # CSS, JS
+  templates/         # HTML-шаблоны
 ```
 
-## API Endpoints
+## API
 
 ### Публичные
-- `GET /` - Главная страница
-- `GET /catalog` - Каталог товаров
-- `GET /api/products` - Список товаров
-- `GET /api/products/:id` - Детали товара
-- `GET /api/promotions` - Активные акции
-- `POST /api/cart/add` - Добавить в корзину
-- `POST /api/orders` - Создать заявку
 
-### Админ
-- `POST /api/admin/login` - Вход в админ-панель
-- `GET /admin` - Админ-панель
-- `POST /api/admin/promotions` - Создать акцию
-- `PUT /api/admin/promotions/:id` - Обновить акцию
-- `DELETE /api/admin/promotions/:id` - Удалить акцию
-- `POST /api/admin/products/sync` - Синхронизация с МойСклад
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/products` | Список товаров |
+| GET | `/api/products/search?q=` | Поиск |
+| GET | `/api/products/:id` | Карточка товара |
+| GET | `/api/promotions` | Активные акции |
+| POST | `/api/auth/register` | Регистрация |
+| POST | `/api/auth/login` | Вход |
 
+### Авторизованные (JWT)
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET/PUT | `/api/auth/profile` | Профиль |
+| GET/POST/PUT/DELETE | `/api/cart` | Корзина |
+| POST | `/api/orders` | Создать заказ |
+| GET | `/api/orders` | Мои заказы |
+| POST | `/api/orders/:id/cancel` | Отменить бронь |
+
+### Админские (JWT + admin)
+
+| Метод | Путь | Описание |
+|-------|------|----------|
+| GET | `/api/admin/orders` | Список с фильтрами |
+| GET | `/api/admin/orders/today` | Брони на сегодня |
+| GET | `/api/admin/orders/stats` | Статистика |
+| GET | `/api/admin/orders/lookup` | Быстрый поиск |
+| GET | `/api/admin/orders/:id` | Карточка заказа |
+| POST | `/api/admin/orders/:id/ship` | Выкуплен |
+| POST | `/api/admin/orders/:id/expire` | Истечь |
+| GET | `/api/admin/users` | Поиск клиентов |
+| GET | `/api/admin/users/:id/stats` | Карточка клиента |
+| POST | `/api/admin/products/sync` | Дельта-синк |
+| POST | `/api/admin/products/sync/full` | Полный синк |
+
+## Лицензия
+
+MIT

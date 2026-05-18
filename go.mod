@@ -7,7 +7,6 @@ require (
 	github.com/elgris/stom v0.0.0-20160204063428-05ccb51a70bb
 	github.com/georgysavva/scany/v2 v2.1.4
 	github.com/gin-gonic/gin v1.12.0
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/joho/godotenv v1.5.1
@@ -15,7 +14,6 @@ require (
 	github.com/redis/go-redis/v9 v9.18.0
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.49.0
-	gopkg.in/telebot.v3 v3.3.8
 )
 
 require (
