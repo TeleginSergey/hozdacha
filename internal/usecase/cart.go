@@ -107,12 +107,35 @@ func (c *CartUsecase) GetCart(ctx context.Context, userID int64) ([]*CartRespons
 		return nil, fmt.Errorf("failed to get cart items: %w", err)
 	}
 
+	// Собираем все productID и тянем одним запросом.
+	productIDs := make([]int64, 0, len(cartItems))
+	for _, item := range cartItems {
+		productIDs = append(productIDs, item.ProductID)
+	}
+	productMap := make(map[int64]*db.Product, len(productIDs))
+	if len(productIDs) > 0 {
+		products, err := c.productQuery.GetByIDs(ctx, productIDs)
+		if err != nil {
+			c.logger.Warn("Batch product fetch failed, falling back to individual", zap.Error(err))
+		} else {
+			for _, p := range products {
+				if p != nil {
+					productMap[p.ID] = p
+				}
+			}
+		}
+	}
+
 	responses := make([]*CartResponse, 0, len(cartItems))
 	for _, item := range cartItems {
-		product, err := c.productQuery.GetByID(ctx, item.ProductID)
-		if err != nil {
-			c.logger.Error("Failed to get product for cart item", zap.Error(err), zap.Int64("product_id", item.ProductID))
-			continue
+		product := productMap[item.ProductID]
+		if product == nil {
+			// Fallback: индивидуальный запрос если батч не сработал.
+			product, err = c.productQuery.GetByID(ctx, item.ProductID)
+			if err != nil {
+				c.logger.Error("Failed to get product for cart item", zap.Error(err), zap.Int64("product_id", item.ProductID))
+				continue
+			}
 		}
 		responses = append(responses, &CartResponse{
 			ID:        item.ID,
