@@ -93,8 +93,10 @@ func SetupRouter(
 		})
 	})
 
-	// Админ-панель (требует роли администратора)
-	router.GET("/admin", middleware.RequireAdmin(), func(c *gin.Context) {
+	// Админ-панель: страница публичная (содержит форму логина), сами API под
+	// /api/admin защищены AuthMiddleware + RequireAdmin. JS проверяет токен
+	// в localStorage и переключает loginSection ↔ adminSection.
+	router.GET("/admin", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "admin.html", gin.H{
 			"title": "Админ-панель",
 		})

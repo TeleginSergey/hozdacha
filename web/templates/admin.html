@@ -29,14 +29,114 @@
         </div>
 
         <div id="adminSection" class="admin-section" style="display: none;">
-            <h2>Управление акциями</h2>
-            <button class="btn" onclick="showCreatePromotionForm()">Создать акцию</button>
-            
-            <div id="promotionsList"></div>
+            <!-- Табы -->
+            <div class="admin-tabs" role="tablist">
+                <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Дашборд</button>
+                <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">🧾 Заказы</button>
+                <button class="tab-btn" data-tab="users" onclick="switchTab('users')">👥 Клиенты</button>
+                <button class="tab-btn" data-tab="promotions" onclick="switchTab('promotions')">🎁 Акции</button>
+                <button class="tab-btn" data-tab="sync" onclick="switchTab('sync')">🔄 Синхронизация</button>
+                <button class="tab-btn tab-btn-logout" onclick="logoutAdmin()">Выход</button>
+            </div>
 
-            <h2 style="margin-top: 3rem;">Синхронизация с МойСклад</h2>
-            <button class="btn" onclick="syncProducts()" id="syncBtn">🔄 Обновить товары сейчас</button>
-            <div id="syncResult" style="margin-top: 1rem;"></div>
+            <!-- Дашборд -->
+            <section id="tab-dashboard" class="tab-content active">
+                <div class="dashboard-header">
+                    <h2>Дашборд</h2>
+                    <div class="period-filter">
+                        <label>Период:</label>
+                        <select id="dashPeriod" onchange="loadDashboard()">
+                            <option value="today">Сегодня</option>
+                            <option value="week">Неделя</option>
+                            <option value="month" selected>Месяц</option>
+                            <option value="all">Всё время</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="stats-grid" id="statsGrid">
+                    <!-- Карточки статистики заполняются JS -->
+                </div>
+
+                <h3 style="margin-top: 2rem;">⏰ Брони на сегодня</h3>
+                <div id="todayOrders" class="orders-table-wrap">
+                    <p class="text-muted">Загрузка...</p>
+                </div>
+            </section>
+
+            <!-- Заказы -->
+            <section id="tab-orders" class="tab-content">
+                <h2>Заказы</h2>
+
+                <!-- Фильтры -->
+                <div class="filters-bar">
+                    <input type="text" id="ordersSearch" placeholder="Поиск: имя, телефон, ID заказа..." class="filter-input">
+                    <select id="ordersStatus" class="filter-input">
+                        <option value="">Все статусы</option>
+                        <option value="pending">⏳ Ожидание</option>
+                        <option value="completed">✅ Выкуплены</option>
+                        <option value="cancelled">❌ Отменены</option>
+                        <option value="expired">⌛ Истекли</option>
+                    </select>
+                    <input type="date" id="ordersFrom" class="filter-input" title="С даты">
+                    <input type="date" id="ordersTo" class="filter-input" title="По дату">
+                    <select id="ordersSort" class="filter-input">
+                        <option value="created_at">По дате создания</option>
+                        <option value="total_price">По сумме</option>
+                        <option value="reserved_until">По дедлайну брони</option>
+                    </select>
+                    <button class="btn" onclick="loadOrders()">Применить</button>
+                    <button class="btn btn-secondary" onclick="resetOrderFilters()">Сбросить</button>
+                </div>
+
+                <div id="ordersTable" class="orders-table-wrap">
+                    <p class="text-muted">Загрузка...</p>
+                </div>
+
+                <div class="pagination">
+                    <button class="btn btn-secondary" id="ordersPrev" onclick="ordersPage(-1)">← Назад</button>
+                    <span id="ordersPageInfo">—</span>
+                    <button class="btn btn-secondary" id="ordersNext" onclick="ordersPage(1)">Вперёд →</button>
+                </div>
+            </section>
+
+            <!-- Клиенты -->
+            <section id="tab-users" class="tab-content">
+                <h2>Клиенты</h2>
+
+                <div class="filters-bar">
+                    <input type="text" id="usersSearch" placeholder="Поиск: имя, email, телефон..." class="filter-input">
+                    <button class="btn" onclick="loadUsers()">Найти</button>
+                    <button class="btn btn-secondary" onclick="resetUserFilters()">Сбросить</button>
+                </div>
+
+                <div id="usersTable" class="orders-table-wrap">
+                    <p class="text-muted">Загрузка...</p>
+                </div>
+
+                <div class="pagination">
+                    <button class="btn btn-secondary" id="usersPrev" onclick="usersPage(-1)">← Назад</button>
+                    <span id="usersPageInfo">—</span>
+                    <button class="btn btn-secondary" id="usersNext" onclick="usersPage(1)">Вперёд →</button>
+                </div>
+            </section>
+
+            <!-- Акции -->
+            <section id="tab-promotions" class="tab-content">
+                <h2>Управление акциями</h2>
+                <button class="btn" onclick="showCreatePromotionForm()">Создать акцию</button>
+                <div id="promotionsList"></div>
+            </section>
+
+            <!-- Синхронизация -->
+            <section id="tab-sync" class="tab-content">
+                <h2>Синхронизация с МойСклад</h2>
+                <p class="text-muted">Webhook'и работают автоматически. Эта кнопка — резервная: дельта-синк
+                    по изменённым карточкам товаров.</p>
+                <button class="btn" onclick="syncProducts()" id="syncBtn">🔄 Обновить товары сейчас</button>
+                <button class="btn btn-secondary" onclick="syncProductsFull()" id="syncFullBtn">🔁 Полная пересинхронизация</button>
+                <div id="syncResult" style="margin-top: 1rem;"></div>
+            </section>
         </div>
     </main>
 
@@ -58,6 +158,26 @@
                 <input type="datetime-local" id="promotionEndDate" placeholder="Дата окончания">
                 <button type="submit" class="btn">Сохранить</button>
             </form>
+        </div>
+    </div>
+
+    <!-- Модальное окно карточки заказа -->
+    <div id="orderModal" class="modal">
+        <div class="modal-content modal-wide">
+            <span class="close" onclick="closeOrderModal()">&times;</span>
+            <div id="orderModalBody">
+                <p class="text-muted">Загрузка...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно карточки клиента -->
+    <div id="userModal" class="modal">
+        <div class="modal-content modal-wide">
+            <span class="close" onclick="closeUserModal()">&times;</span>
+            <div id="userModalBody">
+                <p class="text-muted">Загрузка...</p>
+            </div>
         </div>
     </div>
 
