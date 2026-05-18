@@ -161,11 +161,13 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		}
 	}
 
-	// Telegram-уведомление
+	// Telegram-уведомление — асинхронно, не блокируем ответ клиенту.
 	if u.telegramBot != nil {
-		if err := u.telegramBot.SendOrderNotification(ctx, order); err != nil {
-			u.logger.Warn("Failed to send telegram notification", zap.Error(err))
-		}
+		go func(o *db.Order) {
+			if err := u.telegramBot.SendOrderNotification(context.Background(), o); err != nil {
+				u.logger.Warn("Failed to send telegram notification", zap.Error(err))
+			}
+		}(order)
 	}
 
 	// Создание CustomerOrder в МойСклад с резервом позиций.

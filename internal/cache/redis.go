@@ -264,6 +264,95 @@ func (c *StockCache) SetStockToCache(ctx context.Context, productID int64, stock
 	return c.SetStock(ctx, productID, "", stock)
 }
 
+// BatchGetAvailableStocks получает доступные остатки для списка товаров одним пайплайном.
+// Возвращает map[productID]availableStock. Товары с холодным кэшем получают stock из БД.
+func (c *StockCache) BatchGetAvailableStocks(ctx context.Context, productIDs []int64, productQuery db.ProductQuery) (map[int64]int, error) {
+	if len(productIDs) == 0 {
+		return map[int64]int{}, nil
+	}
+
+	// 1. Пачкой читаем stock из Redis через pipeline.
+	pipe := c.client.Pipeline()
+	stockCmds := make([]*redis.StringCmd, len(productIDs))
+	reservedCmds := make([]*redis.StringCmd, len(productIDs))
+	for i, pid := range productIDs {
+		stockCmds[i] = pipe.Get(ctx, fmt.Sprintf("stock:%d", pid))
+		reservedCmds[i] = pipe.Get(ctx, fmt.Sprintf("reserved:%d", pid))
+	}
+	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
+		// Pipeline error — не фатально, но логируем.
+		c.logger.Warn("Batch stock pipeline failed", zap.Error(err))
+	}
+
+	// 2. Собираем холодные ID (те, которых нет в Redis).
+	coldIDs := make([]int64, 0)
+	stockMap := make(map[int64]int, len(productIDs))
+	reservedMap := make(map[int64]int, len(productIDs))
+	for i, pid := range productIDs {
+		val, err := stockCmds[i].Result()
+		if err == redis.Nil {
+			coldIDs = append(coldIDs, pid)
+			continue
+		}
+		if err != nil {
+			coldIDs = append(coldIDs, pid)
+			continue
+		}
+		var info StockInfo
+		if err := json.Unmarshal([]byte(val), &info); err != nil {
+			coldIDs = append(coldIDs, pid)
+			continue
+		}
+		stockMap[pid] = info.Stock
+
+		// Reserved.
+		rval, err := reservedCmds[i].Result()
+		if err == nil {
+			var r int
+			fmt.Sscanf(rval, "%d", &r)
+			reservedMap[pid] = r
+		}
+	}
+
+	// 3. Холодные — тянем из БД и греем кэш.
+	if len(coldIDs) > 0 {
+		dbProducts, err := productQuery.GetByIDs(ctx, coldIDs)
+		if err != nil {
+			c.logger.Warn("Batch DB fetch for cold cache failed", zap.Error(err))
+		} else {
+			for _, p := range dbProducts {
+				if p != nil {
+					stockMap[p.ID] = p.Stock
+					msID := ""
+					if p.MoyskladID != nil {
+						msID = *p.MoyskladID
+					}
+					_ = c.SetStock(ctx, p.ID, msID, p.Stock)
+				}
+			}
+		}
+		// Для товаров, которых нет в БД — stock = 0.
+		for _, pid := range coldIDs {
+			if _, ok := stockMap[pid]; !ok {
+				stockMap[pid] = 0
+			}
+		}
+	}
+
+	// 4. Вычисляем available = stock - reserved.
+	result := make(map[int64]int, len(productIDs))
+	for _, pid := range productIDs {
+		s := stockMap[pid]
+		r := reservedMap[pid]
+		avail := s - r
+		if avail < 0 {
+			avail = 0
+		}
+		result[pid] = avail
+	}
+	return result, nil
+}
+
 // BatchSetStocks массово устанавливает остатки в кэш
 func (c *StockCache) BatchSetStocks(ctx context.Context, products []*db.Product) error {
 	for _, product := range products {

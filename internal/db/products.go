@@ -61,6 +61,7 @@ func (p *Product) columns(pref string) []string {
 
 type ProductQuery interface {
 	GetByID(ctx context.Context, id int64) (*Product, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]*Product, error)
 	GetByMoyskladID(ctx context.Context, moyskladID string) (*Product, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*Product, error)
 	GetActive(ctx context.Context, limit, offset int) ([]*Product, error)
@@ -121,6 +122,28 @@ func (p *productQuery) GetByID(ctx context.Context, id int64) (*Product, error) 
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	return product, nil
+}
+
+// GetByIDs возвращает товары по списку ID (один SQL-запрос с IN).
+func (p *productQuery) GetByIDs(ctx context.Context, ids []int64) ([]*Product, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	products := make([]*Product, 0, len(ids))
+	qb, args, err := p.sq.Select((&Product{}).columns("")...).
+		From(ProductsTable).
+		Where(squirrel.Eq{ProductsID: ids}).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("build GetByIDs: %w", err)
+	}
+	if err := pgxscan.Select(ctx, p.runner, &products, qb, args...); err != nil {
+		return nil, fmt.Errorf("GetByIDs: %w", err)
+	}
+	return products, nil
 }
 
 func (p *productQuery) GetByMoyskladID(ctx context.Context, moyskladID string) (*Product, error) {

@@ -12,6 +12,7 @@ import (
 // ProductRepository описывает минимальный контракт, который нужен бизнес-логике продуктов.
 type ProductRepository interface {
 	GetByID(ctx context.Context, id int64) (*db.Product, error)
+	GetByIDs(ctx context.Context, ids []int64) ([]*db.Product, error)
 	GetByMoyskladID(ctx context.Context, moyskladID string) (*db.Product, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*db.Product, error)
 	GetActive(ctx context.Context, limit, offset int) ([]*db.Product, error)
@@ -29,6 +30,7 @@ type ProductUsecase struct {
 	repo       ProductRepository
 	stockCache interface {
 		GetAvailableStock(ctx context.Context, productID int64, productQuery db.ProductQuery) (int, error)
+		BatchGetAvailableStocks(ctx context.Context, productIDs []int64, productQuery db.ProductQuery) (map[int64]int, error)
 		SetStockToCache(ctx context.Context, productID int64, stock int) error
 		InvalidateStockCache(ctx context.Context, productID int64) error
 		BatchSetStocks(ctx context.Context, products []*db.Product) error
@@ -80,36 +82,29 @@ func (u *ProductUsecase) GetCatalogProducts(ctx context.Context, limit, offset i
 			break
 		}
 
-		u.applyStockBuffer(ctx, products)
+		// Собираем ID для батчевого запроса в Redis.
+		ids := make([]int64, 0, len(products))
 		for _, p := range products {
 			if p != nil {
-				// Проверяем доступный остаток через кэш (фактический - зарезервированный)
-				availableStock, err := u.stockCache.GetAvailableStock(ctx, p.ID, u.repo)
-				if err != nil {
-					u.logger.Warn("Failed to get available stock", zap.Int64("product_id", p.ID), zap.Error(err))
-					// Если не удалось получить из кэша, используем остаток из БД
-					if p.Stock > 0 {
-						collected = append(collected, p)
-						if len(collected) >= limit {
-							break
-						}
-					}
-				} else if availableStock >= 0 {
-					p.Stock = availableStock // Используем доступный остаток
-					collected = append(collected, p)
-					if len(collected) >= limit {
-						break
-					}
-				} else {
-					// availableStock == 0 - используем остаток из БД
-					if p.Stock > 0 {
-						collected = append(collected, p)
-						if len(collected) >= limit {
-							break
-						}
-					}
+				ids = append(ids, p.ID)
+			}
+		}
+		// Один пайплайн в Redis вместо N отдельных вызовов.
+		availableMap, _ := u.stockCache.BatchGetAvailableStocks(ctx, ids, u.repo)
+		u.applyStockBuffer(ctx, products, availableMap)
+
+		for _, p := range products {
+			if p == nil {
+				continue
+			}
+			if avail, ok := availableMap[p.ID]; ok {
+				p.Stock = avail
+			}
+			if p.Stock > 0 {
+				collected = append(collected, p)
+				if len(collected) >= limit {
+					break
 				}
-				// Товары с доступным остатком = 0 полностью игнорируем
 			}
 		}
 
@@ -173,9 +168,24 @@ func (u *ProductUsecase) SearchProducts(ctx context.Context, q string, limit, of
 			break
 		}
 
-		u.applyStockBuffer(ctx, products)
+		// Батчевый запрос в Redis (как в каталоге).
+		ids := make([]int64, 0, len(products))
 		for _, p := range products {
-			if p != nil && p.Stock > 0 {
+			if p != nil {
+				ids = append(ids, p.ID)
+			}
+		}
+		availableMap, _ := u.stockCache.BatchGetAvailableStocks(ctx, ids, u.repo)
+		u.applyStockBuffer(ctx, products, availableMap)
+
+		for _, p := range products {
+			if p == nil {
+				continue
+			}
+			if avail, ok := availableMap[p.ID]; ok {
+				p.Stock = avail
+			}
+			if p.Stock > 0 {
 				collected = append(collected, p)
 				if len(collected) >= limit {
 					break
@@ -206,19 +216,16 @@ func (u *ProductUsecase) GetSearchProductsCount(ctx context.Context, query strin
 }
 
 // applyStockBuffer повторно использует уже существующую логику по смещению остатков.
-func (u *ProductUsecase) applyStockBuffer(ctx context.Context, products []*db.Product) {
-	if u.stockCache == nil || u.stockBuffer <= 0 {
+func (u *ProductUsecase) applyStockBuffer(ctx context.Context, products []*db.Product, availableMap map[int64]int) {
+	if u.stockBuffer <= 0 {
 		return
 	}
-
 	for _, product := range products {
-		availableStock, err := u.stockCache.GetAvailableStock(ctx, product.ID, u.repo)
-		if err != nil {
-			u.logger.Error("Failed to get cached stock", zap.Error(err))
+		if product == nil {
 			continue
 		}
-		if availableStock >= 0 {
-			product.Stock = availableStock
+		if avail, ok := availableMap[product.ID]; ok && avail >= 0 {
+			product.Stock = avail
 		} else {
 			bufferedStock := float64(product.Stock) * (1 - u.stockBuffer/100)
 			product.Stock = int(bufferedStock)
