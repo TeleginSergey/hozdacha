@@ -107,7 +107,7 @@ func NewApp() (*App, error) {
 	authService := services.NewAuthService(userRepo, cfg.JWT.Secret, logger)
 	userUC := usecase.NewUserUsecase(userRepo, logger, cfg.JWT.Secret)
 	productUC := usecase.NewProductUsecase(productRepo, stockCache, cfg.Moysklad.StockBuffer, logger)
-	orderUC := usecase.NewOrderUsecase(orderRepo, productRepo, stockCache, moyskladClient, nil, orderEventRepo, logger)
+	orderUC := usecase.NewOrderUsecase(orderRepo, productRepo, stockCache, moyskladClient, orderEventRepo, logger)
 	moyskladSyncService := services.NewMoyskladSyncService(
 		moyskladClient,
 		productRepo, // реализует ProductRepository

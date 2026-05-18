@@ -10,7 +10,6 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/cache"
 	"github.com/TeleginSergey/hozdacha/internal/db"
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
-	"github.com/TeleginSergey/hozdacha/internal/telegram"
 )
 
 // DefaultReservationTTL — на сколько товар бронируется для пользователя
@@ -35,13 +34,12 @@ type ProductReadRepository interface {
 }
 
 type OrderUsecase struct {
-	orders      OrderRepository
-	products    ProductReadRepository
-	stockCache  *cache.StockCache
-	moysklad    *moysklad.Client
-	telegramBot *telegram.Bot
-	events      db.OrderEventQuery
-	logger      *zap.Logger
+	orders     OrderRepository
+	products   ProductReadRepository
+	stockCache *cache.StockCache
+	moysklad   *moysklad.Client
+	events     db.OrderEventQuery
+	logger     *zap.Logger
 }
 
 func NewOrderUsecase(
@@ -49,18 +47,16 @@ func NewOrderUsecase(
 	productRepo ProductReadRepository,
 	stockCache *cache.StockCache,
 	moyskladClient *moysklad.Client,
-	telegramBot *telegram.Bot,
 	events db.OrderEventQuery,
 	logger *zap.Logger,
 ) *OrderUsecase {
 	return &OrderUsecase{
-		orders:      orderRepo,
-		products:    productRepo,
-		stockCache:  stockCache,
-		moysklad:    moyskladClient,
-		telegramBot: telegramBot,
-		events:      events,
-		logger:      logger,
+		orders:     orderRepo,
+		products:   productRepo,
+		stockCache: stockCache,
+		moysklad:   moyskladClient,
+		events:     events,
+		logger:     logger,
 	}
 }
 
@@ -159,15 +155,6 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 				u.logger.Warn("Failed to release reservation after order", zap.Int64("product_id", p.ID), zap.Error(err))
 			}
 		}
-	}
-
-	// Telegram-уведомление — асинхронно, не блокируем ответ клиенту.
-	if u.telegramBot != nil {
-		go func(o *db.Order) {
-			if err := u.telegramBot.SendOrderNotification(context.Background(), o); err != nil {
-				u.logger.Warn("Failed to send telegram notification", zap.Error(err))
-			}
-		}(order)
 	}
 
 	// Создание CustomerOrder в МойСклад с резервом позиций.
