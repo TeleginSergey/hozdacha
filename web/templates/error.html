@@ -3,24 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.title}} — ХозДача</title>
+    <title>{{.title}} - ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div data-header-slot></div>
+    <header>
+        <div class="container">
+            <h1>ХозДача</h1>
+            <nav>
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+            </nav>
+        </div>
+    </header>
 
     <main class="container">
-        <div style="text-align:center;padding:80px 20px">
-            <div style="font-size:5rem;margin-bottom:16px">😕</div>
-            <h1 style="margin-bottom:12px">{{.title}}</h1>
-            <p style="color:var(--gray-600);margin-bottom:24px">{{.message}}</p>
-            <a href="/" class="btn btn-primary">На главную</a>
-            <a href="/catalog" class="btn btn-outline" style="margin-left:8px">К каталогу</a>
+        <div style="text-align: center; padding: 3rem 0;">
+            <h2>{{.title}}</h2>
+            <p>{{.message}}</p>
+            <a href="/catalog" class="btn">Вернуться в каталог</a>
         </div>
     </main>
 
-    <div data-footer-slot></div>
-
-    <script src="/static/js/app.js"></script>
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 ХозДача. Все права защищены.</p>
+        </div>
+    </footer>
 </body>
 </html>
+
+
