@@ -167,9 +167,11 @@ func (m *MoyskladOrderUsecase) createMoyskladOrder(ctx context.Context, cartItem
 		position := moysklad.MoyskladPosition{
 			Quantity: item.Quantity,
 			Price:    product.Price * 100, // В МойСклад цена в копейках
-			Assortment: &moysklad.OrderMeta{
-				Href: fmt.Sprintf("%s/entity/product/%s", m.moyskladClient.GetBaseURL(), *product.MoyskladID),
-				Type: "product",
+			Assortment: &moysklad.MoyskladEntity{
+				Meta: &moysklad.OrderMeta{
+					Href: fmt.Sprintf("%s/entity/product/%s", m.moyskladClient.GetBaseURL(), *product.MoyskladID),
+					Type: "product",
+				},
 			},
 		}
 		positions = append(positions, position)

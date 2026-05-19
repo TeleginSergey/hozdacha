@@ -185,9 +185,9 @@ type MoyskladEntity struct {
 }
 
 type MoyskladPosition struct {
-	Quantity   int        `json:"quantity"`
-	Assortment *OrderMeta `json:"assortment"`
-	Price      float64    `json:"price"`
+	Quantity   int             `json:"quantity"`
+	Assortment *MoyskladEntity `json:"assortment"`
+	Price      float64         `json:"price"`
 	// Reserve — количество товара, которое должно быть зарезервировано на складе.
 	// Обычно равно Quantity. Именно это поле делает заказ "бронью" в МойСклад
 	// (товар уйдёт в "в резерве" в отчётах остатков).

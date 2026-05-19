@@ -67,9 +67,11 @@ func (c *Client) CreateOrderFromDB(ctx context.Context, order *db.Order, product
 			Reserve:  item.Quantity, // ← это и делает заказ "бронью": товар уйдёт в резерв на складе
 			// API МойСклад принимает цену в копейках.
 			Price: item.Price * 100,
-			Assortment: &OrderMeta{
-				Href: fmt.Sprintf("%s/entity/product/%s", c.baseURL, *product.MoyskladID),
-				Type: "product",
+			Assortment: &MoyskladEntity{
+				Meta: &OrderMeta{
+					Href: fmt.Sprintf("%s/entity/product/%s", c.baseURL, *product.MoyskladID),
+					Type: "product",
+				},
 			},
 		})
 	}
@@ -134,9 +136,11 @@ func (c *Client) CreateOrderFromRequest(ctx context.Context, name, customerName,
 			Quantity: item.Quantity,
 			Reserve:  item.Quantity,
 			Price:    item.Price * 100,
-			Assortment: &OrderMeta{
-				Href: fmt.Sprintf("%s/entity/product/%s", c.baseURL, *product.MoyskladID),
-				Type: "product",
+			Assortment: &MoyskladEntity{
+				Meta: &OrderMeta{
+					Href: fmt.Sprintf("%s/entity/product/%s", c.baseURL, *product.MoyskladID),
+					Type: "product",
+				},
 			},
 		})
 	}
