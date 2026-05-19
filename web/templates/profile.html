@@ -69,8 +69,8 @@
             <div>
                 <h3 class="section-title">Редактирование</h3>
                 <form id="editForm">
-                    <div class="form-row"><label>Имя</label><input name="name" required></div>
-                    <div class="form-row"><label>Телефон</label><input name="phone" required></div>
+                    <div class="form-row"><label>Имя</label><input name="name" required minlength="2"></div>
+                    <div class="form-row"><label>Телефон *</label><input name="phone" required type="tel" placeholder="+7 (999) 123-45-67"></div>
                     <button type="submit" class="btn">Сохранить</button>
                 </form>
             </div>
@@ -109,11 +109,18 @@
     document.getElementById('editForm').onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
+        const name = fd.get('name').trim();
+        const phone = fd.get('phone').trim();
+
+        if (name.length < 2) { showMsg(msgErr, 'Имя должно содержать минимум 2 символа'); return; }
+        if (!phone) { showMsg(msgErr, 'Телефон обязателен'); return; }
+        if (!/^[\d\s\+\-\(\)]{7,20}$/.test(phone)) { showMsg(msgErr, 'Некорректный формат телефона'); return; }
+
         try {
             const r = await api('/api/auth/profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ full_name: fd.get('name'), phone: fd.get('phone') })
+                body: JSON.stringify({ full_name: name, phone: phone })
             });
             const d = await r.json();
             if (!r.ok) throw new Error(d.error || 'Ошибка');

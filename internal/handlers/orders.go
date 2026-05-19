@@ -14,17 +14,19 @@ import (
 )
 
 type OrderHandler struct {
-	orderUC *usecase.OrderUsecase
-	cartUC  *usecase.CartUsecase
-	logger  *zap.Logger
+	orderUC  *usecase.OrderUsecase
+	cartUC   *usecase.CartUsecase
+	userRepo db.UserQuery
+	logger   *zap.Logger
 }
 
 // Новый конструктор поверх usecase.
-func NewOrderHandlerWithUsecase(orderUC *usecase.OrderUsecase, cartUC *usecase.CartUsecase, logger *zap.Logger) *OrderHandler {
+func NewOrderHandlerWithUsecase(orderUC *usecase.OrderUsecase, cartUC *usecase.CartUsecase, userRepo db.UserQuery, logger *zap.Logger) *OrderHandler {
 	return &OrderHandler{
-		orderUC: orderUC,
-		cartUC:  cartUC,
-		logger:  logger,
+		orderUC:  orderUC,
+		cartUC:   cartUC,
+		userRepo: userRepo,
+		logger:   logger,
 	}
 }
 
@@ -53,13 +55,11 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
-	// Получаем данные пользователя из профиля, если не указаны в запросе
+	// Если имя или телефон не указаны в запросе — берём из профиля пользователя.
 	if req.CustomerName == "" || req.Phone == "" {
-		// Получаем информацию о пользователе
 		username, _ := c.Get("username")
 		email, _ := c.Get("email")
 
-		// Если имя не указано, используем username или email
 		if req.CustomerName == "" {
 			if name, ok := username.(string); ok && name != "" {
 				req.CustomerName = name
@@ -71,10 +71,13 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 			}
 		}
 
-		// Телефон должен быть указан в профиле
 		if req.Phone == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Phone number is required. Please update your profile."})
-			return
+			user, err := h.userRepo.GetByID(c.Request.Context(), userID.(int64))
+			if err != nil || user == nil || user.Phone == nil || *user.Phone == "" {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Phone number is required. Please update your profile."})
+				return
+			}
+			req.Phone = *user.Phone
 		}
 	}
 
