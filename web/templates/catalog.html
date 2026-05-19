@@ -61,14 +61,14 @@
 
     <!-- Модальное окно корзины -->
     <div id="cartModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content" style="max-width:700px;width:95%;padding:24px">
             <span class="close" onclick="closeCart()">&times;</span>
-            <h2>Корзина</h2>
-            <div id="cartItems"></div>
-            <div class="cart-total">
-                <p>Итого: <span id="cartTotal">0</span> руб.</p>
+            <h2 style="margin-bottom:16px">🛒 Корзина</h2>
+            <div id="cartItems" style="max-height:55vh;overflow-y:auto;margin-bottom:16px"></div>
+            <div style="border-top:2px solid #eee;padding-top:16px;display:flex;justify-content:space-between;align-items:center">
+                <span style="font-size:1.15rem;font-weight:700;color:#5D4037">Итого: <span id="cartTotal">0</span> ₽</span>
+                <button class="btn" onclick="checkout()" style="background:#FF8F00">Оформить заказ</button>
             </div>
-            <button class="btn" onclick="checkout()">Оформить заказ</button>
         </div>
     </div>
 

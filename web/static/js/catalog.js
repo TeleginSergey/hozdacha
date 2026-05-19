@@ -358,26 +358,44 @@ function updateCartUI() {
     
     if (itemsEl) {
         if (cart.length === 0) {
-            itemsEl.innerHTML = '<p>Корзина пуста</p>';
+            itemsEl.innerHTML = '<div style="text-align:center;padding:30px;color:#888">Корзина пуста</div>';
         } else {
             itemsEl.innerHTML = cart.map((item, index) => {
                 const name = escapeHtml(item.name || '');
-                const price = parseFloat(item.price || 0).toFixed(2);
+                const price = parseFloat(item.price || 0);
                 const quantity = parseInt(item.quantity || 0);
+                const subtotal = price * quantity;
                 return `
-                <div class="cart-item">
-                    <span>${name} - ${price} руб. x ${quantity}</span>
-                    <button onclick="removeFromCart(${index})">Удалить</button>
-                </div>
-            `;
+                <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eee;align-items:center">
+                    <div style="flex:1;min-width:0">
+                        <div style="font-weight:600;font-size:0.92rem;margin-bottom:2px">${name}</div>
+                        <div style="color:#5D4037;font-weight:700;font-size:0.9rem">${price.toFixed(0)} ₽</div>
+                    </div>
+                    <div style="display:inline-flex;align-items:center;border:1px solid #ddd;border-radius:5px;overflow:hidden">
+                        <button onclick="changeCartQty(${index}, -1)" style="width:30px;height:30px;border:none;background:white;cursor:pointer;font-size:1rem;color:#555">−</button>
+                        <span style="min-width:32px;text-align:center;font-weight:600;border-left:1px solid #ddd;border-right:1px solid #ddd;padding:5px 0;font-size:0.9rem">${quantity}</span>
+                        <button onclick="changeCartQty(${index}, 1)" style="width:30px;height:30px;border:none;background:white;cursor:pointer;font-size:1rem;color:#555">+</button>
+                    </div>
+                    <span style="font-weight:700;color:#5D4037;min-width:70px;text-align:right;font-size:0.9rem">${subtotal.toFixed(0)} ₽</span>
+                    <button onclick="removeFromCart(${index})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:1rem;padding:4px" title="Удалить">✕</button>
+                </div>`;
             }).join('');
         }
     }
     
     if (totalEl) {
         const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-        totalEl.textContent = total.toFixed(2);
+        totalEl.textContent = total.toFixed(0);
     }
+}
+
+function changeCartQty(index, delta) {
+    if (index < 0 || index >= cart.length) return;
+    cart[index].quantity += delta;
+    if (cart[index].quantity <= 0) cart.splice(index, 1);
+    saveCart();
+    updateCartUI();
+    loadProducts(currentQuery);
 }
 
 // Удаление из корзины
