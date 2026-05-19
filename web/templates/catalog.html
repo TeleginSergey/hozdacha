@@ -73,19 +73,17 @@
         <div class="modal-content">
             <span class="close" onclick="closeCheckout()">&times;</span>
             <h2>Оформление заказа</h2>
+            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Бронь действует 48 часов, затем автоматически отменится.</p>
             <form id="checkoutForm">
-                <input type="text" name="customer_name" placeholder="Ваше имя" required>
-                <input type="tel" name="phone" placeholder="Телефон" required>
-                <input type="text" name="address" placeholder="Адрес (необязательно)">
-                <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
-                <button type="submit" class="btn">Отправить заявку</button>
+                <textarea name="comment" placeholder="Комментарий к заказу (необязательно)"></textarea>
+                <button type="submit" class="btn">Подтвердить заказ</button>
             </form>
         </div>
     </div>
 
     <footer>
         <div class="container">
-            <p>&copy; 2024 ХозДача. Все права защищены.</p>
+            <p>&copy; <span class="footer-year"></span> ХозДача</p>
         </div>
     </footer>
 
@@ -138,7 +136,7 @@
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', checkAuthState);
 </script>
-<script src="/static/js/catalog.js?v=4"></script>
+<script src="/static/js/catalog.js?v=5"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>

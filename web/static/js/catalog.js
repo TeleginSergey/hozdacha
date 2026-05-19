@@ -437,29 +437,13 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
     e.preventDefault();
     
     const formData = new FormData(e.target);
-    
-    // Валидация и санитизация данных
-    const customerName = (formData.get('customer_name') || '').trim();
-    const phone = (formData.get('phone') || '').trim();
-    const address = (formData.get('address') || '').trim() || null;
     const comment = (formData.get('comment') || '').trim() || null;
-    
-    if (!customerName || customerName.length < 2 || customerName.length > 255) {
-        alert('Имя должно быть от 2 до 255 символов');
-        return;
-    }
-    
-    if (!phone || !/^[\d\s\+\-\(\)]{10,20}$/.test(phone)) {
-        alert('Введите корректный номер телефона');
-        return;
-    }
     
     if (cart.length === 0) {
         alert('Корзина пуста');
         return;
     }
     
-    // Валидация товаров в корзине
     const validItems = cart.filter(item => {
         return item.id > 0 && item.quantity > 0 && item.quantity <= 1000;
     });
@@ -470,9 +454,6 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
     }
     
     const order = {
-        customer_name: customerName,
-        phone: phone,
-        address: address,
         comment: comment,
         items: validItems.map(item => ({
             product_id: parseInt(item.id),
