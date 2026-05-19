@@ -31,7 +31,7 @@ func (c *Client) CreateOrderFromDB(ctx context.Context, order *db.Order, product
 		description += "\nКомментарий: " + *order.Comment
 	}
 
-	moyskladOrder := &MoyskladOrder{
+	moyskladOrder := &MoyskladOrderRequest{
 		Name:      fmt.Sprintf("Online-%d", order.ID),
 		Positions: make([]MoyskladPosition, 0, len(order.Items)),
 		Organization: &MoyskladEntity{
@@ -101,7 +101,7 @@ func (c *Client) CreateOrderFromRequest(ctx context.Context, name, customerName,
 		description += "\nКомментарий: " + *comment
 	}
 
-	moyskladOrder := &MoyskladOrder{
+	moyskladOrder := &MoyskladOrderRequest{
 		Name:      name,
 		Positions: make([]MoyskladPosition, 0, len(items)),
 		Organization: &MoyskladEntity{
