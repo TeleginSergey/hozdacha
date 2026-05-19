@@ -157,32 +157,63 @@ func (m *MigrateRunner) runMigration(filename string, content string) error {
 	return tx.Commit(ctx)
 }
 
-// splitStatements разделяет SQL скрипт на отдельные команды
+// splitStatements разделяет SQL скрипт на отдельные команды.
+// Учитывает доллар-строки ($$, $tag$) чтобы не разрывать DO-блоки и тела функций.
 func splitStatements(content string) []string {
-	// Простое разделение по точке с запятой
-	// В реальном production коде нужно учитывать строковые литералы и комментарии
 	var statements []string
 	var current strings.Builder
+	inDollar := false
+	dollarTag := ""
 
 	lines := strings.Split(content, "\n")
 	for _, line := range lines {
-		// Пропускаем комментарии
 		trimmed := strings.TrimSpace(line)
-		if strings.HasPrefix(trimmed, "--") || strings.HasPrefix(trimmed, "/*") {
+
+		// Пропускаем строки-комментарии (только если не внутри доллар-строки).
+		if !inDollar && (strings.HasPrefix(trimmed, "--") || strings.HasPrefix(trimmed, "/*")) {
 			continue
 		}
 
 		current.WriteString(line)
 		current.WriteString("\n")
 
-		// Если строка заканчивается на точку с запятой - это конец команды
-		if strings.HasSuffix(trimmed, ";") {
+		if !inDollar {
+			// Ищем начало доллар-строки: $$ или $tag$
+			if idx := strings.Index(trimmed, "$"); idx >= 0 {
+				rest := trimmed[idx:]
+				// Ищем закрывающий $ на этой же строке (простой $$)
+				if strings.HasPrefix(rest, "$$") {
+					after := rest[2:]
+					if endIdx := strings.Index(after, "$$"); endIdx >= 0 {
+						// $$ ... $$ на одной строке — не переключаем состояние
+					} else {
+						inDollar = true
+						dollarTag = "$$"
+					}
+				} else {
+					// Именованный тег $tag$
+					if endTagIdx := strings.Index(rest[1:], "$"); endTagIdx >= 0 {
+						tag := rest[:endTagIdx+2]
+						inDollar = true
+						dollarTag = tag
+					}
+				}
+			}
+		} else {
+			// Внутри доллар-строки — ищем закрывающий тег.
+			if strings.Contains(trimmed, dollarTag) {
+				inDollar = false
+				dollarTag = ""
+			}
+		}
+
+		// Конец команды — точка с запятой вне доллар-строки.
+		if !inDollar && strings.HasSuffix(trimmed, ";") {
 			statements = append(statements, current.String())
 			current.Reset()
 		}
 	}
 
-	// Добавляем остаток, если есть
 	if current.Len() > 0 {
 		statements = append(statements, current.String())
 	}
