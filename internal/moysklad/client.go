@@ -165,6 +165,18 @@ type MoyskladImage struct {
 	Title string `json:"title"`
 }
 
+// MoyskladImageDetail — полная информация об изображении (ответ GET /entity/product/{id}/images/{imageId}).
+type MoyskladImageDetail struct {
+	Filename  string `json:"filename"`
+	Content   string `json:"content,omitempty"` // base64
+	Miniature struct {
+		Href string `json:"href"`
+	} `json:"miniature"`
+	Tiny struct {
+		Href string `json:"href"`
+	} `json:"tiny"`
+}
+
 type MoyskladMeta struct {
 	Href string `json:"href"`
 	Type string `json:"type"`
@@ -780,4 +792,70 @@ func (c *Client) DeleteCustomerOrder(ctx context.Context, moyskladID string) err
 
 func (c *Client) GetBaseURL() string {
 	return c.baseURL
+}
+
+// DownloadImage скачивает изображение товара из МойСклад по href изображения.
+// Возвращает байты изображения и его формат (из Content-Type).
+func (c *Client) DownloadImage(ctx context.Context, imageHref string) ([]byte, string, error) {
+	// Сначала получаем метаданные изображения (miniature URL для скачивания).
+	metaReq, err := http.NewRequestWithContext(ctx, "GET", imageHref, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create request: %w", err)
+	}
+	metaReq.Header.Set("Authorization", "Bearer "+c.token)
+	metaReq.Header.Set("Accept", "application/json;charset=utf-8")
+
+	metaResp, err := c.doRequestWithRetry(ctx, metaReq)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to get image metadata: %w", err)
+	}
+	defer metaResp.Body.Close()
+
+	if metaResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(metaResp.Body)
+		return nil, "", fmt.Errorf("moysklad image metadata error: %s, body: %s", metaResp.Status, string(body))
+	}
+
+	var detail MoyskladImageDetail
+	if err := json.NewDecoder(metaResp.Body).Decode(&detail); err != nil {
+		return nil, "", fmt.Errorf("failed to decode image metadata: %w", err)
+	}
+
+	// Скачиваем миниатюру (меньше размер — экономим RAM и диск).
+	downloadURL := detail.Miniature.Href
+	if downloadURL == "" {
+		downloadURL = detail.Tiny.Href
+	}
+	if downloadURL == "" {
+		return nil, "", fmt.Errorf("no download URL in image metadata")
+	}
+
+	imgReq, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create download request: %w", err)
+	}
+	imgReq.Header.Set("Authorization", "Bearer "+c.token)
+
+	imgResp, err := c.doRequestWithRetry(ctx, imgReq)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to download image: %w", err)
+	}
+	defer imgResp.Body.Close()
+
+	if imgResp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(imgResp.Body)
+		return nil, "", fmt.Errorf("moysklad image download error: %s, body: %s", imgResp.Status, string(body))
+	}
+
+	data, err := io.ReadAll(imgResp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read image data: %w", err)
+	}
+
+	contentType := imgResp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+
+	return data, contentType, nil
 }
