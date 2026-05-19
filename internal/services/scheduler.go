@@ -107,6 +107,14 @@ func (s *Scheduler) runReseedFullLoop(ctx context.Context) {
 }
 
 func (s *Scheduler) runImageSyncLoop(ctx context.Context) {
+	// Первый запуск при деплое — не ждём расписания.
+	s.logger.Info("Running initial image sync on startup")
+	rctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+	if err := s.imageSync.SyncImages(rctx); err != nil {
+		s.logger.Error("Initial image sync failed", zap.Error(err))
+	}
+	cancel()
+
 	// Определяем режим: точное время суток или интервал.
 	if s.imageSyncTime != "" {
 		s.runImageSyncAtTime(ctx)
