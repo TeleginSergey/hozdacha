@@ -3,79 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.product.Name}} — ХозДача</title>
+    <title>{{.product.Name}} - ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/product-detail.css">
 </head>
 <body>
-    <div data-header-slot></div>
+    <header>
+        <div class="container">
+            <h1>ХозДача</h1>
+            <nav>
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+                <a href="/cart">Корзина</a>
+            </nav>
+        </div>
+    </header>
 
     <main class="container">
-        <p style="margin:16px 0;font-size:0.9rem"><a href="/catalog">← Назад к каталогу</a></p>
-
         <div class="product-detail">
-            <img class="product-detail-img" id="productImg"
-                src="{{if .product.ImageURL}}{{.product.ImageURL}}{{end}}"
-                alt="{{.product.Name}}">
-
+            <div class="product-detail-image">
+                {{if .product.ImageURL}}
+                    <img src="{{.product.ImageURL}}" alt="{{.product.Name}}" id="productImage">
+                {{else}}
+                    <div class="no-image">Нет изображения</div>
+                {{end}}
+            </div>
+            
             <div class="product-detail-info">
                 <h1>{{.product.Name}}</h1>
-                <div class="product-detail-price">{{.product.Price}} ₽</div>
-
-                <div id="stockBlock"></div>
-
+                
                 {{if .product.Description}}
-                <div class="product-detail-desc">{{.product.Description}}</div>
-                {{end}}
-
-                <div style="display:flex;gap:8px;align-items:center;margin-top:16px">
-                    <div class="cart-item-qty" style="margin:0">
-                        <button id="qtyDec">−</button>
-                        <span id="qtyValue">1</span>
-                        <button id="qtyInc">+</button>
+                    <div class="product-description">
+                        <h3>Описание</h3>
+                        <p>{{.product.Description}}</p>
                     </div>
-                    <button class="btn btn-accent" id="addToCart" style="flex:1">В корзину</button>
+                {{end}}
+                
+                <div class="product-price-stock">
+                    <p class="price">Цена: <span>{{printf "%.2f" .product.Price}} руб.</span></p>
+                    {{if gt .product.Stock 0}}
+                        <p class="stock">В наличии: <span>{{.product.Stock}} шт.</span></p>
+                    {{else}}
+                        <p class="stock out-of-stock">Сейчас нет в наличии</p>
+                    {{end}}
+                </div>
+                
+                <div class="product-actions">
+                    <button class="btn btn-primary" onclick="addToCartFromDetail({{.product.ID}}, '{{.product.Name}}', {{.product.Price}})" 
+                            {{if or (not .product.Active) (eq .product.Stock 0)}}disabled{{end}}>
+                        В корзину
+                    </button>
+                    <a href="/catalog" class="btn btn-secondary">Вернуться в каталог</a>
                 </div>
             </div>
         </div>
     </main>
 
-    <div data-footer-slot></div>
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 ХозДача. Все права защищены.</p>
+        </div>
+    </footer>
 
-    <script src="/static/js/app.js"></script>
+    <script src="/static/js/catalog.js?v=3"></script>
     <script>
-    (function () {
-        const product = {
-            id: {{.product.ID}},
-            name: {{.product.Name | printf "%q"}},
-            price: {{.product.Price}},
-            stock: {{.product.Stock}},
-            image: {{if .product.ImageURL}}{{.product.ImageURL | printf "%q"}}{{else}}""{{end}}
-        };
-
-        // Placeholder для битой картинки
-        const img = document.getElementById('productImg');
-        if (!img.getAttribute('src')) img.src = App.PLACEHOLDER_IMG;
-        img.onerror = () => { img.src = App.PLACEHOLDER_IMG; };
-
-        // Сток-блок
-        const stockEl = document.getElementById('stockBlock');
-        if (product.stock <= 0) {
-            stockEl.innerHTML = '<span class="product-card-stock stock-out">Нет в наличии</span>';
-            document.getElementById('addToCart').disabled = true;
-        } else if (product.stock < 5) {
-            stockEl.innerHTML = `<span class="product-card-stock stock-low">Осталось ${product.stock} шт.</span>`;
-        } else {
-            stockEl.innerHTML = '<span class="product-card-stock stock-ok">В наличии</span>';
+        function addToCartFromDetail(productId, name, price) {
+            addToCart(productId, name, price);
+            updateCartCount();
+            var t = document.createElement('div');
+            t.style.cssText = 'position:fixed;top:80px;right:20px;background:#2E7D32;color:white;padding:12px 20px;border-radius:6px;z-index:9999;font-weight:500;animation:slideIn 0.3s ease';
+            t.textContent = 'Добавлено в корзину';
+            document.body.appendChild(t);
+            setTimeout(function() { t.remove(); }, 2500);
         }
-
-        let qty = 1;
-        const qtyEl = document.getElementById('qtyValue');
-        document.getElementById('qtyDec').onclick = () => { if (qty > 1) { qty--; qtyEl.textContent = qty; } };
-        document.getElementById('qtyInc').onclick = () => { if (qty < product.stock) { qty++; qtyEl.textContent = qty; } };
-        document.getElementById('addToCart').onclick = () => {
-            App.Cart.add(product, qty);
-        };
-    })();
     </script>
 </body>
 </html>
+

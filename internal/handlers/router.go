@@ -48,7 +48,7 @@ func SetupRouter(
 	// Главная страница
 	router.GET("/", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "index.html", gin.H{
-			"title": "Телегинс Шоп",
+			"title": "ХозДача",
 		})
 	})
 
@@ -67,20 +67,20 @@ func SetupRouter(
 	// Корзина: как /profile — отдаём HTML без RequireAuth; проверка JWT в JS (checkAuth + Bearer в API).
 	router.GET("/cart", middleware.AuthMiddleware(jwtSecret), func(c *gin.Context) {
 		c.HTML(http.StatusOK, "cart.html", gin.H{
-			"title": "Корзина - Телегинс Шоп",
+			"title": "Корзина - ХозДача",
 		})
 	})
 
 	// Страницы аутентификации
 	router.GET("/login", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "login.html", gin.H{
-			"title": "Вход - Телегинс Шоп",
+			"title": "Вход - ХозДача",
 		})
 	})
 
 	router.GET("/register", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "register.html", gin.H{
-			"title": "Регистрация - Телегинс Шоп",
+			"title": "Регистрация - ХозДача",
 		})
 	})
 
@@ -89,7 +89,7 @@ func SetupRouter(
 	// Профиль (требует авторизации)
 	router.GET("/profile", middleware.AuthMiddleware(jwtSecret), func(c *gin.Context) {
 		c.HTML(http.StatusOK, "profile.html", gin.H{
-			"title": "Личный кабинет - Телегинс Шоп",
+			"title": "Личный кабинет - ХозДача",
 		})
 	})
 

@@ -3,66 +3,421 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Регистрация — ХозДача</title>
+    <title>Регистрация - ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .auth-container {
+            max-width: 400px;
+            margin: 100px auto;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .auth-form {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .form-group label {
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group input {
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        .btn {
+            background: #28a745;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        .btn:hover {
+            background: #218838;
+        }
+        .btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .btn-secondary:disabled {
+            background: #868e96;
+            cursor: not-allowed;
+        }
+        .error-message {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .success-message {
+            background: #d4edda;
+            color: #155724;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+        .password-strength {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+        }
+        .login-link a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
 </head>
 <body>
-    <div data-header-slot></div>
-
-    <main class="container">
-        <div class="auth-page">
-            <div class="auth-card">
-                <h2>Регистрация</h2>
-                <form id="registerForm">
-                    <input name="name" type="text" placeholder="Имя" required>
-                    <input name="email" type="email" placeholder="Email" required autocomplete="email">
-                    <input name="phone" type="tel" placeholder="Телефон (+79001234567)" required>
-                    <input name="username" type="text" placeholder="Логин (необязательно)" autocomplete="username">
-                    <input name="password" type="password" placeholder="Пароль (мин. 8 символов)" required minlength="8" autocomplete="new-password">
-                    <input name="website" type="text" tabindex="-1" autocomplete="off" style="position:absolute;left:-9999px" aria-hidden="true">
-                    <button type="submit" class="btn btn-primary">Зарегистрироваться</button>
-                </form>
-                <div class="form-footer">
-                    Уже есть аккаунт? <a href="/login">Войти</a>
+    <div class="container">
+        <div class="auth-container">
+            <h2>Регистрация</h2>
+            
+            <div id="error-message" class="error-message" style="display: none;"></div>
+            <div id="success-message" class="success-message" style="display: none;"></div>
+            
+            <form id="register-form" class="auth-form">
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" required>
                 </div>
+                
+                <div class="form-group">
+                    <label for="name">Полное имя *</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">Телефон *</label>
+                    <input type="tel" id="phone" name="phone" required placeholder="+7 XXX XXX-XX-XX">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Пароль</label>
+                    <input type="password" id="password" name="password" required>
+                    <div id="password-strength" class="password-strength"></div>
+                </div>
+                
+                <div class="form-group" style="display: none;">
+                    <label for="website">Сайт (необязательно)</label>
+                    <input type="text" id="website" name="website" autocomplete="off">
+                </div>
+                
+                <div class="form-group" id="verification-group" style="display: none;">
+                    <label for="verification_code">Код подтверждения</label>
+                    <input type="text" id="verification_code" name="verification_code" placeholder="Введите код из письма">
+                    <button type="button" id="resend-code" class="btn-secondary">Отправить код повторно</button>
+                </div>
+                
+                <button type="submit" class="btn" id="register-btn">Зарегистрироваться</button>
+            </form>
+            
+            <div class="login-link">
+                <p>Уже есть аккаунт? <a href="/login">Войдите</a></p>
             </div>
         </div>
-    </main>
+    </div>
 
-    <div data-footer-slot></div>
-
-    <script src="/static/js/app.js"></script>
     <script>
-    document.getElementById('registerForm').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        const btn = e.target.querySelector('button');
-        btn.disabled = true; btn.textContent = 'Регистрация...';
-        try {
-            const body = {
-                name: fd.get('name'),
-                email: fd.get('email'),
-                phone: fd.get('phone'),
-                password: fd.get('password'),
-                website: fd.get('website') || ''
-            };
-            const username = (fd.get('username') || '').trim();
-            if (username) body.username = username;
-            const res = await fetch('/api/auth/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Ошибка регистрации');
-            App.toast('Регистрация успешна! Войдите.', 'success');
-            setTimeout(() => { window.location.href = '/login'; }, 1000);
-        } catch (err) {
-            App.toast(err.message, 'error');
-        } finally {
-            btn.disabled = false; btn.textContent = 'Зарегистрироваться';
+        document.getElementById('password').addEventListener('input', function(e) {
+            const password = e.target.value;
+            const strengthDiv = document.getElementById('password-strength');
+            
+            if (password.length < 6) {
+                strengthDiv.textContent = 'Слишком короткий пароль (минимум 6 символов)';
+                strengthDiv.style.color = '#dc3545';
+            } else if (isWeakPassword(password)) {
+                strengthDiv.textContent = 'Слабый пароль. Используйте комбинацию букв, цифр и символов.';
+                strengthDiv.style.color = '#ffc107';
+            } else {
+                strengthDiv.textContent = 'Хороший пароль';
+                strengthDiv.style.color = '#28a745';
+            }
+        });
+
+        function isWeakPassword(password) {
+            const weakPasswords = ['password', '123456', '123456789', 'qwerty', 'abc123', 'password123', 'admin', 'letmein'];
+            const passwordLower = password.toLowerCase();
+            
+            for (let weak of weakPasswords) {
+                if (passwordLower === weak) return true;
+            }
+            
+            if (passwordLower.includes('123') || passwordLower.includes('qwerty') || passwordLower.includes('abc')) {
+                return true;
+            }
+            
+            return false;
         }
-    });
+
+        let registrationStep = 1; // 1: ввод email/пароль, 2: ввод кода
+        let pendingRegistration = null;
+
+        // Запускаем таймер когда пользователь начинает заполнять форму
+        document.getElementById('email').addEventListener('focus', function() {
+            if (!window.formStartTime) {
+                window.formStartTime = Date.now();
+            }
+        });
+
+        document.getElementById('password').addEventListener('focus', function() {
+            if (!window.formStartTime) {
+                window.formStartTime = Date.now();
+            }
+        });
+
+        document.getElementById('register-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const btn = document.getElementById('register-btn');
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            
+            // Если таймер не запущен (пользователь сразу нажал submit), запускаем его
+            if (!window.formStartTime) {
+                window.formStartTime = Date.now();
+            }
+            
+            // Скрываем предыдущие сообщения
+            errorDiv.style.display = 'none';
+            successDiv.style.display = 'none';
+            
+            if (registrationStep === 1) {
+                // Шаг 1: Регистрация с отправкой кода
+                await handleFirstStep(btn, errorDiv, successDiv);
+            } else {
+                // Шаг 2: Подтверждение кода
+                await handleSecondStep(btn, errorDiv, successDiv);
+            }
+        });
+
+        async function handleFirstStep(btn, errorDiv, successDiv) {
+            // Проверяем honeypot поле (боты часто заполняют все поля)
+            const websiteField = document.getElementById('website');
+            if (websiteField && websiteField.value.trim() !== '') {
+                errorDiv.textContent = 'Bot detected. Please leave the website field empty.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Проверяем скорость заполнения формы
+            const formFillTime = Date.now() - window.formStartTime;
+            if (formFillTime < 1000) { // Меньше 1 секунды - подозрительно быстро
+                errorDiv.textContent = 'Please slow down. This helps prevent automated registrations.';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            // Блокируем кнопку
+            btn.disabled = true;
+            btn.textContent = 'Регистрация...';
+            
+            const formData = {
+                email: document.getElementById('email').value,
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                password: document.getElementById('password').value
+            };
+            
+            try {
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Сохраняем данные регистрации для второго шага
+                    pendingRegistration = formData;
+                    
+                    // Показываем поле для ввода кода
+                    document.getElementById('verification-group').style.display = 'block';
+                    btn.textContent = 'Подтвердить регистрацию';
+                    registrationStep = 2;
+                    
+                    // Проверяем специальный случай - существующий пользователь
+                    if (data.requires_verification) {
+                        successDiv.textContent = data.message || 'Пользователь с таким email уже существует, но не подтвержден. Новый код отправлен на вашу почту!';
+                    } else {
+                        successDiv.textContent = 'Код подтверждения отправлен на вашу почту! Проверьте email и введите код ниже.';
+                    }
+                    successDiv.style.display = 'block';
+                    
+                    // Очищаем только поле пароля для безопасности
+                    document.getElementById('password').value = '';
+                    document.getElementById('password-strength').textContent = '';
+                } else if (response.status === 202) {
+                    // Специальный случай: пользователь существует но не подтвержден
+                    const data = await response.json();
+                    
+                    // Сохраняем email для верификации
+                    pendingRegistration = { email: formData.email };
+                    
+                    // Показываем поле для ввода кода
+                    document.getElementById('verification-group').style.display = 'block';
+                    btn.textContent = 'Подтвердить регистрацию';
+                    registrationStep = 2;
+                    
+                    successDiv.textContent = data.message || 'Пользователь с таким email уже существует, но не подтвержден. Новый код отправлен на вашу почту!';
+                    successDiv.style.display = 'block';
+                    
+                    // Очищаем только поле пароля для безопасности
+                    document.getElementById('password').value = '';
+                    document.getElementById('password-strength').textContent = '';
+                } else {
+                    errorDiv.textContent = data.error || 'Ошибка регистрации';
+                    errorDiv.style.display = 'block';
+                    
+                    // Если слишком много попыток, показываем когда можно повторить
+                    if (data.retry_after) {
+                        setTimeout(() => {
+                            btn.disabled = false;
+                            btn.textContent = 'Зарегистрироваться';
+                        }, data.retry_after * 1000);
+                        return;
+                    }
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Ошибка сети. Попробуйте еще раз.';
+                errorDiv.style.display = 'block';
+            } finally {
+                // Всегда разблокируем кнопку
+                btn.disabled = false;
+                if (registrationStep === 1) {
+                    btn.textContent = 'Зарегистрироваться';
+                } else {
+                    btn.textContent = 'Подтвердить регистрацию';
+                }
+            }
+        }
+
+        async function handleSecondStep(btn, errorDiv, successDiv) {
+            const verificationCode = document.getElementById('verification_code').value;
+            
+            if (!verificationCode) {
+                errorDiv.textContent = 'Пожалуйста, введите код подтверждения';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            
+            btn.disabled = true;
+            btn.textContent = 'Подтверждение...';
+            
+            try {
+                const response = await fetch('/api/auth/verify-email', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email: pendingRegistration.email,
+                        code: verificationCode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    successDiv.textContent = 'Email успешно подтвержден! Регистрация завершена. Теперь вы можете войти.';
+                    successDiv.style.display = 'block';
+                    
+                    // Очищаем форму
+                    document.getElementById('register-form').reset();
+                    document.getElementById('verification-group').style.display = 'none';
+                    
+                    // Перенаправляем на страницу входа через 3 секунды с сохранением redirect
+                    setTimeout(() => {
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const redirectUrl = urlParams.get('redirect');
+                        const loginUrl = redirectUrl ? `/login?redirect=${redirectUrl}` : '/login';
+                        window.location.href = loginUrl;
+                    }, 3000);
+                } else {
+                    errorDiv.textContent = data.error || 'Неверный код подтверждения';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Ошибка сети. Попробуйте еще раз.';
+                errorDiv.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Подтвердить регистрацию';
+            }
+        }
+
+        // Обработчик для кнопки "Отправить код повторно"
+        document.getElementById('resend-code').addEventListener('click', async function() {
+            if (!pendingRegistration) return;
+            
+            const btn = this;
+            const errorDiv = document.getElementById('error-message');
+            const successDiv = document.getElementById('success-message');
+            
+            btn.disabled = true;
+            btn.textContent = 'Отправка...';
+            
+            try {
+                const response = await fetch('/api/auth/send-verification', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ email: pendingRegistration.email })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    successDiv.textContent = 'Код отправлен повторно! Проверьте почту.';
+                    successDiv.style.display = 'block';
+                } else {
+                    errorDiv.textContent = data.error || 'Ошибка отправки кода';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Ошибка сети. Попробуйте еще раз.';
+                errorDiv.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Отправить код повторно';
+            }
+        });
     </script>
 </body>
 </html>

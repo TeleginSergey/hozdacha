@@ -5,185 +5,167 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Личный кабинет — ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .profile-wrap { max-width: 800px; margin: 30px auto; background: white; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); padding: 24px; }
+        .profile-top { display: flex; gap: 20px; align-items: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        .avatar-lg { width: 80px; height: 80px; border-radius: 50%; background: #5D4037; color: white; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; flex-shrink: 0; }
+        .profile-top-info h2 { margin: 0 0 6px; font-size: 1.3rem; }
+        .profile-top-info p { margin: 3px 0; color: #666; font-size: 0.9rem; }
+        .section-title { font-size: 1.05rem; font-weight: 700; color: #5D4037; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid #5D4037; }
+        .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
+        .form-row label { font-weight: 600; font-size: 0.9rem; color: #333; }
+        .form-row input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.95rem; }
+        .btn { background: #5D4037; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+        .btn:hover { background: #3E2723; }
+        .btn-danger { background: #C62828; }
+        .btn-danger:hover { background: #B71C1C; }
+        .msg { padding: 10px 14px; border-radius: 5px; margin-bottom: 12px; display: none; font-size: 0.9rem; }
+        .msg-ok { background: #E8F5E9; color: #2E7D32; }
+        .msg-err { background: #FFEBEE; color: #C62828; }
+        .order-card { background: #faf7f2; padding: 14px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #5D4037; }
+        .order-card-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .badge-pending { background: #FFF3E0; color: #F57F17; }
+        .badge-completed { background: #E8F5E9; color: #2E7D32; }
+        .badge-cancelled { background: #eee; color: #888; }
+        .badge-expired { background: #FFEBEE; color: #C62828; }
+    </style>
 </head>
 <body>
-    <div data-header-slot></div>
-
-    <main class="container">
-        <h1 style="margin:24px 0">Личный кабинет</h1>
-
-        <div class="profile-grid">
-            <aside class="profile-sidebar">
-                <div class="profile-avatar-lg" id="profileAvatar">U</div>
-                <div id="profileName" style="font-weight:600;font-size:1.05rem"></div>
-                <div id="profileEmail" style="color:var(--gray-600);font-size:0.85rem;margin-top:4px"></div>
-                <div id="profilePhone" style="color:var(--gray-600);font-size:0.85rem;margin-top:4px"></div>
-                <button class="btn btn-outline btn-sm" style="margin-top:16px;width:100%" id="editProfileBtn">Редактировать</button>
-            </aside>
-
-            <div class="profile-main">
-                <div class="profile-card">
-                    <h2 style="margin-bottom:16px">📦 Мои заказы</h2>
-                    <div id="ordersList">
-                        <p style="color:var(--gray-500);text-align:center;padding:20px">Загрузка...</p>
+    <header>
+        <div class="container">
+            <h1>ХозДача</h1>
+            <nav class="main-nav">
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+                <a href="/cart">Корзина</a>
+            </nav>
+            <div class="user-area" id="userArea">
+                <div class="auth-buttons" id="authButtons">
+                    <a href="/register" class="btn btn-outline">Регистрация</a>
+                    <a href="/login" class="btn btn-primary">Вход</a>
+                </div>
+                <div class="user-menu" id="userMenu" style="display:none">
+                    <div class="user-avatar" id="userAvatar"><span id="avatarLetter">U</span></div>
+                    <div class="dropdown-menu" id="dropdownMenu">
+                        <a href="/profile">Профиль</a>
+                        <a href="#" id="logoutLink">Выход</a>
                     </div>
                 </div>
             </div>
         </div>
+    </header>
 
-        <!-- Edit profile modal -->
-        <div class="modal-overlay" id="editModal">
-            <div class="modal-box" style="position:relative">
-                <button class="modal-close" id="editClose">×</button>
-                <h2>Редактировать профиль</h2>
+    <div class="container">
+        <div class="profile-wrap">
+            <div class="profile-top">
+                <div class="avatar-lg" id="profileInitial">U</div>
+                <div class="profile-top-info">
+                    <h2 id="profileName">Загрузка...</h2>
+                    <p id="profileEmail"></p>
+                    <p id="profilePhone"></p>
+                </div>
+                <button class="btn btn-danger" style="margin-left:auto" id="logoutBtn">Выйти</button>
+            </div>
+
+            <div class="msg msg-err" id="msgErr"></div>
+            <div class="msg msg-ok" id="msgOk"></div>
+
+            <div style="margin-bottom:28px">
+                <h3 class="section-title">Редактирование</h3>
                 <form id="editForm">
-                    <input name="name" type="text" placeholder="Имя" required>
-                    <input name="phone" type="tel" placeholder="Телефон" required>
-                    <input name="email" type="email" placeholder="Email" required>
-                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <div class="form-row"><label>Имя</label><input name="name" required></div>
+                    <div class="form-row"><label>Телефон</label><input name="phone" required></div>
+                    <div class="form-row"><label>Адрес</label><input name="address"></div>
+                    <button type="submit" class="btn">Сохранить</button>
                 </form>
             </div>
+
+            <div>
+                <h3 class="section-title">Мои заказы</h3>
+                <div id="ordersList"><p style="color:#888">Загрузка...</p></div>
+            </div>
         </div>
-    </main>
+    </div>
 
-    <div data-footer-slot></div>
+    <footer><div class="container"><p>&copy; 2024 ХозДача</p></div></footer>
 
-    <script src="/static/js/app.js"></script>
     <script>
-    (function () {
-        const { Auth, toast, formatPrice, escapeHtml } = App;
+    const token = localStorage.getItem('auth_token');
+    if (!token) location.href = '/login';
 
-        if (!Auth.isLoggedIn()) {
-            window.location.href = '/login?redirect=/profile';
-            return;
-        }
+    const api = (url, opts = {}) => fetch(url, { ...opts, headers: { ...opts.headers, Authorization: 'Bearer ' + token } });
 
-        const STATUS_LABELS = {
-            pending: { text: 'Бронь', color: 'var(--amber)' },
-            completed: { text: 'Выкуплен', color: 'var(--green)' },
-            cancelled: { text: 'Отменён', color: 'var(--gray-500)' },
-            expired: { text: 'Истёк', color: 'var(--red)' }
-        };
+    function showMsg(el, text) { el.textContent = text; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 3500); }
 
-        async function loadProfile() {
-            try {
-                const res = await fetch('/api/auth/profile', { headers: Auth.headers() });
-                if (res.status === 401) { Auth.logout(); return; }
-                const data = await res.json();
-                const user = data.user || data;
-                localStorage.setItem('user', JSON.stringify(user));
-                renderProfile(user);
-                fillEditForm(user);
-            } catch {
-                toast('Не удалось загрузить профиль', 'error');
-            }
-        }
-
-        function renderProfile(u) {
-            document.getElementById('profileAvatar').textContent = (u.name || u.username || u.email || 'U').charAt(0).toUpperCase();
-            document.getElementById('profileName').textContent = u.name || u.username || '';
+    async function loadProfile() {
+        try {
+            const r = await api('/api/auth/profile');
+            if (r.status === 401) { logout(); return; }
+            const d = await r.json();
+            const u = d.user || d;
+            localStorage.setItem('user', JSON.stringify(u));
+            document.getElementById('profileName').textContent = u.name || u.username || '—';
             document.getElementById('profileEmail').textContent = u.email || '';
             document.getElementById('profilePhone').textContent = u.phone || '';
-        }
+            document.getElementById('profileInitial').textContent = (u.name || u.username || u.email || 'U').charAt(0).toUpperCase();
+            document.getElementById('avatarLetter').textContent = (u.name || u.username || u.email || 'U').charAt(0).toUpperCase();
+            document.querySelector('[name=name]').value = u.name || '';
+            document.querySelector('[name=phone]').value = u.phone || '';
+            document.querySelector('[name=address]').value = u.address || '';
+            document.getElementById('authButtons').style.display = 'none';
+            document.getElementById('userMenu').style.display = 'flex';
+        } catch { showMsg(msgErr, 'Ошибка загрузки'); }
+    }
 
-        function fillEditForm(u) {
-            const f = document.getElementById('editForm');
-            f.name.value = u.name || '';
-            f.phone.value = u.phone || '';
-            f.email.value = u.email || '';
-        }
-
-        async function loadOrders() {
+    async function loadOrders() {
+        try {
+            const r = await api('/api/orders');
+            const orders = await r.json();
             const list = document.getElementById('ordersList');
-            try {
-                const res = await fetch('/api/orders', { headers: Auth.headers() });
-                if (res.status === 401) { Auth.logout(); return; }
-                const data = await res.json();
-                const orders = data.orders || data || [];
-                if (orders.length === 0) {
-                    list.innerHTML = '<p style="color:var(--gray-500);text-align:center;padding:20px">Заказов пока нет. <a href="/catalog">К каталогу →</a></p>';
-                    return;
-                }
-                list.innerHTML = `
-                    <table class="order-history-table">
-                        <thead>
-                            <tr><th>№</th><th>Дата</th><th>Сумма</th><th>Статус</th><th></th></tr>
-                        </thead>
-                        <tbody>
-                            ${orders.map((o) => {
-                                const id = o.ID || o.id;
-                                const status = o.Status || o.status || 'pending';
-                                const sLabel = STATUS_LABELS[status] || { text: status, color: 'var(--gray-500)' };
-                                const total = o.TotalPrice || o.total_price || 0;
-                                const created = (o.CreatedAt || o.created_at || '').slice(0, 16).replace('T', ' ');
-                                return `
-                                    <tr>
-                                        <td>#${id}</td>
-                                        <td>${escapeHtml(created)}</td>
-                                        <td>${formatPrice(total)}</td>
-                                        <td><span style="color:${sLabel.color};font-weight:600">${sLabel.text}</span></td>
-                                        <td>${status === 'pending' ? `<button class="btn btn-sm btn-outline" data-cancel="${id}">Отменить</button>` : ''}</td>
-                                    </tr>`;
-                            }).join('')}
-                        </tbody>
-                    </table>
-                `;
-                list.querySelectorAll('[data-cancel]').forEach((btn) => {
-                    btn.onclick = () => cancelOrder(Number(btn.dataset.cancel));
-                });
-            } catch {
-                list.innerHTML = '<p style="color:var(--red);text-align:center;padding:20px">Ошибка загрузки заказов</p>';
-            }
-        }
+            if (!orders || orders.length === 0) { list.innerHTML = '<p style="color:#888">Заказов пока нет</p>'; return; }
+            const labels = { pending: ['В обработке', 'badge-pending'], completed: ['Выполнен', 'badge-completed'], cancelled: ['Отменён', 'badge-cancelled'], expired: ['Истёк', 'badge-expired'] };
+            list.innerHTML = orders.map(o => {
+                const [txt, cls] = labels[o.status || o.Status] || [o.status || '?', ''];
+                return `<div class="order-card">
+                    <div class="order-card-header"><span>Заказ #${o.id || o.ID}</span><span class="badge ${cls}">${txt}</span></div>
+                    <div>Сумма: ${o.total_price || o.TotalPrice || 0} ₽</div>
+                    <div style="font-size:0.85rem;color:#888">${(o.created_at || o.CreatedAt || '').slice(0,10)}</div>
+                </div>`;
+            }).join('');
+        } catch { document.getElementById('ordersList').innerHTML = '<p style="color:red">Ошибка</p>'; }
+    }
 
-        async function cancelOrder(id) {
-            if (!confirm('Отменить бронь?')) return;
-            try {
-                const res = await fetch(`/api/orders/${id}/cancel`, { method: 'POST', headers: Auth.headers() });
-                if (!res.ok) throw new Error((await res.json()).error || 'Ошибка');
-                toast('Бронь отменена', 'success');
-                loadOrders();
-            } catch (err) {
-                toast(err.message, 'error');
-            }
-        }
+    document.getElementById('editForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        try {
+            const r = await api('/api/auth/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: fd.get('name'), phone: fd.get('phone'), address: fd.get('address') })
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error || 'Ошибка');
+            showMsg(msgOk, 'Сохранено!');
+            loadProfile();
+        } catch (err) { showMsg(msgErr, err.message); }
+    };
 
-        // Edit modal
-        const modal = document.getElementById('editModal');
-        document.getElementById('editProfileBtn').onclick = () => modal.classList.add('open');
-        document.getElementById('editClose').onclick = () => modal.classList.remove('open');
-        modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.remove('open'); });
+    function logout() { localStorage.removeItem('auth_token'); localStorage.removeItem('user'); location.href = '/login'; }
+    document.getElementById('logoutBtn').onclick = logout;
+    document.getElementById('logoutLink').onclick = (e) => { e.preventDefault(); logout(); };
 
-        document.getElementById('editForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const fd = new FormData(e.target);
-            const btn = e.target.querySelector('button');
-            btn.disabled = true; btn.textContent = 'Сохранение...';
-            try {
-                const res = await fetch('/api/auth/profile', {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', ...Auth.headers() },
-                    body: JSON.stringify({
-                        name: fd.get('name'),
-                        phone: fd.get('phone'),
-                        email: fd.get('email')
-                    })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Ошибка');
-                toast('Профиль обновлён', 'success');
-                modal.classList.remove('open');
-                loadProfile();
-            } catch (err) {
-                toast(err.message, 'error');
-            } finally {
-                btn.disabled = false; btn.textContent = 'Сохранить';
-            }
-        });
+    document.getElementById('userAvatar').onclick = () => {
+        const dd = document.getElementById('dropdownMenu');
+        dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+    };
+    document.addEventListener('click', (e) => {
+        if (!document.getElementById('userMenu').contains(e.target)) document.getElementById('dropdownMenu').style.display = 'none';
+    });
 
-        loadProfile();
-        loadOrders();
-    })();
+    loadProfile();
+    loadOrders();
     </script>
 </body>
 </html>

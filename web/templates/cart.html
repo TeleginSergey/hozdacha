@@ -5,80 +5,191 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Корзина — ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .cart-page { max-width: 900px; margin: 30px auto; }
+        .cart-card { background: white; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); padding: 24px; }
+        .cart-row { display: flex; gap: 16px; padding: 16px 0; border-bottom: 1px solid #eee; align-items: center; }
+        .cart-row:last-child { border-bottom: none; }
+        .cart-row-img { width: 80px; height: 80px; border-radius: 6px; object-fit: cover; background: #f5f5f5; flex-shrink: 0; }
+        .cart-row-info { flex: 1; min-width: 0; }
+        .cart-row-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
+        .cart-row-price { color: #5D4037; font-weight: 700; }
+        .cart-row-qty { display: inline-flex; align-items: center; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; margin-top: 6px; }
+        .cart-row-qty button { width: 32px; height: 32px; border: none; background: white; font-size: 1rem; cursor: pointer; color: #555; }
+        .cart-row-qty button:hover { background: #faf7f2; color: #5D4037; }
+        .cart-row-qty span { min-width: 36px; text-align: center; font-weight: 600; border-left: 1px solid #ddd; border-right: 1px solid #ddd; padding: 6px 0; }
+        .cart-row-total { font-weight: 700; color: #5D4037; font-size: 1rem; min-width: 90px; text-align: right; }
+        .cart-row-del { background: none; border: none; color: #ccc; cursor: pointer; font-size: 1.1rem; padding: 4px 8px; }
+        .cart-row-del:hover { color: #C62828; }
+        .cart-summary { margin-top: 20px; padding-top: 20px; border-top: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .cart-summary-total { font-size: 1.2rem; font-weight: 700; color: #5D4037; }
+        .btn { background: #5D4037; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+        .btn:hover { background: #3E2723; }
+        .btn-accent { background: #FF8F00; }
+        .btn-accent:hover { background: #F57F17; }
+        .cart-empty { text-align: center; padding: 60px 20px; }
+        .cart-empty-icon { font-size: 4rem; margin-bottom: 12px; }
+        .cart-empty h2 { margin-bottom: 8px; }
+        .cart-empty p { color: #888; margin-bottom: 20px; }
+    </style>
 </head>
 <body>
-    <div data-header-slot></div>
-    <main class="container">
-        <h1 style="margin:24px 0">🛒 Корзина</h1>
-        <div id="cartPage"></div>
-    </main>
-    <div data-footer-slot></div>
-    <script src="/static/js/app.js"></script>
-    <script>
-    (function () {
-        const { Cart, escapeHtml, formatPrice, PLACEHOLDER_IMG, startCheckout } = App;
-
-        function render() {
-            const items = Cart.items();
-            const root = document.getElementById('cartPage');
-            if (items.length === 0) {
-                root.innerHTML = `
-                    <div style="background:white;padding:60px;text-align:center;border-radius:10px;box-shadow:var(--shadow-sm)">
-                        <div style="font-size:4rem;margin-bottom:12px">🛒</div>
-                        <h2>Корзина пуста</h2>
-                        <p style="color:var(--gray-600);margin:12px 0 20px">Добавьте товары из каталога</p>
-                        <a href="/catalog" class="btn btn-primary">К каталогу</a>
-                    </div>`;
-                return;
-            }
-            root.innerHTML = `
-                <div style="background:white;padding:24px;border-radius:10px;box-shadow:var(--shadow-sm)">
-                    ${items.map((it) => `
-                        <div class="cart-item-row" data-id="${it.id}">
-                            <img class="cart-item-img" src="${escapeHtml(it.image) || PLACEHOLDER_IMG}" onerror="this.src='${PLACEHOLDER_IMG}'">
-                            <div class="cart-item-info">
-                                <div class="cart-item-name"><a href="/product/${it.id}">${escapeHtml(it.name)}</a></div>
-                                <div class="cart-item-price">${formatPrice(it.price)} × ${it.quantity} = <strong>${formatPrice(it.price * it.quantity)}</strong></div>
-                                <div class="cart-item-qty">
-                                    <button data-action="dec">−</button>
-                                    <span>${it.quantity}</span>
-                                    <button data-action="inc">+</button>
-                                </div>
-                            </div>
-                            <button class="cart-item-remove" data-action="remove">🗑️</button>
-                        </div>
-                    `).join('')}
-                    <div class="cart-total-row" style="margin-top:20px;padding-top:20px;border-top:2px solid var(--gray-200)">
-                        <span>Итого:</span>
-                        <span>${formatPrice(Cart.total())}</span>
+    <header>
+        <div class="container">
+            <h1>ХозДача</h1>
+            <nav class="main-nav">
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+                <a href="/cart" class="active">Корзина</a>
+            </nav>
+            <div class="user-area" id="userArea">
+                <div class="auth-buttons" id="authButtons">
+                    <a href="/register" class="btn btn-outline">Регистрация</a>
+                    <a href="/login" class="btn btn-primary">Вход</a>
+                </div>
+                <div class="user-menu" id="userMenu" style="display:none">
+                    <div class="user-avatar" id="userAvatar"><span id="avatarLetter">U</span></div>
+                    <div class="dropdown-menu" id="dropdownMenu">
+                        <a href="/profile">Профиль</a>
+                        <a href="#" id="logoutLink">Выход</a>
                     </div>
-                    <button class="btn btn-accent" style="width:100%;margin-top:12px" id="goCheckout">Оформить заказ</button>
-                </div>`;
+                </div>
+            </div>
+        </div>
+    </header>
 
-            root.querySelectorAll('.cart-item-row').forEach((row) => {
-                const id = Number(row.dataset.id);
-                row.querySelector('[data-action="dec"]').onclick = () => {
-                    const i = Cart.items().find((x) => x.id === id);
-                    if (i) Cart.setQty(id, i.quantity - 1);
-                    render();
-                };
-                row.querySelector('[data-action="inc"]').onclick = () => {
-                    const i = Cart.items().find((x) => x.id === id);
-                    if (i) Cart.setQty(id, i.quantity + 1);
-                    render();
-                };
-                row.querySelector('[data-action="remove"]').onclick = () => {
-                    Cart.remove(id);
-                    render();
-                };
-            });
+    <div class="container">
+        <div class="cart-page">
+            <h2 style="margin-bottom:20px">🛒 Корзина</h2>
+            <div class="cart-card" id="cartContent"></div>
+        </div>
+    </div>
 
-            document.getElementById('goCheckout').onclick = startCheckout;
+    <footer><div class="container"><p>&copy; 2024 ХозДача</p></div></footer>
+
+    <script src="/static/js/catalog.js?v=3"></script>
+    <script>
+    // Auth UI
+    (function() {
+        const token = localStorage.getItem('auth_token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (token && user) {
+            document.getElementById('authButtons').style.display = 'none';
+            document.getElementById('userMenu').style.display = 'flex';
+            document.getElementById('avatarLetter').textContent = (user.name || user.username || user.email || 'U').charAt(0).toUpperCase();
+        }
+        document.getElementById('userAvatar').onclick = () => {
+            const dd = document.getElementById('dropdownMenu');
+            dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
+        };
+        document.addEventListener('click', (e) => {
+            if (!document.getElementById('userMenu').contains(e.target)) document.getElementById('dropdownMenu').style.display = 'none';
+        });
+        document.getElementById('logoutLink').onclick = (e) => { e.preventDefault(); localStorage.removeItem('auth_token'); localStorage.removeItem('user'); location.href = '/login'; };
+    })();
+
+    function renderCart() {
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        const el = document.getElementById('cartContent');
+
+        if (cart.length === 0) {
+            el.innerHTML = `<div class="cart-empty">
+                <div class="cart-empty-icon">🛒</div>
+                <h2>Корзина пуста</h2>
+                <p>Добавьте товары из каталога</p>
+                <a href="/catalog" class="btn">К каталогу</a>
+            </div>`;
+            return;
         }
 
-        document.addEventListener('DOMContentLoaded', render);
-        window.addEventListener('cart:changed', render);
-    })();
+        const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+        el.innerHTML = cart.map((item, idx) => `
+            <div class="cart-row">
+                <img class="cart-row-img" src="${item.image || ''}" alt="" onerror="this.style.display='none'">
+                <div class="cart-row-info">
+                    <div class="cart-row-name"><a href="/product/${item.id}" style="color:inherit">${item.name}</a></div>
+                    <div class="cart-row-price">${item.price} ₽</div>
+                    <div class="cart-row-qty">
+                        <button onclick="changeQty(${idx}, -1)">−</button>
+                        <span>${item.quantity}</span>
+                        <button onclick="changeQty(${idx}, 1)">+</button>
+                    </div>
+                </div>
+                <div class="cart-row-total">${(item.price * item.quantity).toLocaleString('ru-RU')} ₽</div>
+                <button class="cart-row-del" onclick="removeItem(${idx})" title="Удалить">✕</button>
+            </div>
+        `).join('') + `
+            <div class="cart-summary">
+                <div class="cart-summary-total">Итого: ${total.toLocaleString('ru-RU')} ₽</div>
+                <button class="btn btn-accent" onclick="checkout()">Оформить заказ</button>
+            </div>`;
+    }
+
+    function changeQty(idx, delta) {
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        if (idx < 0 || idx >= cart.length) return;
+        cart[idx].quantity += delta;
+        if (cart[idx].quantity <= 0) cart.splice(idx, 1);
+        localStorage.setItem('cart', JSON.stringify(cart));
+        renderCart();
+        updateCartCount();
+    }
+
+    function removeItem(idx) {
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        cart.splice(idx, 1);
+        localStorage.setItem('cart', JSON.stringify(cart));
+        renderCart();
+        updateCartCount();
+    }
+
+    function checkout() {
+        const token = localStorage.getItem('auth_token');
+        if (!token) { alert('Войдите, чтобы оформить заказ'); location.href = '/login?redirect=/cart'; return; }
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        if (cart.length === 0) { alert('Корзина пуста'); return; }
+
+        const modal = document.createElement('div');
+        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center';
+        modal.innerHTML = `<div style="background:white;padding:24px;border-radius:10px;width:90%;max-width:440px;max-height:90vh;overflow-y:auto">
+            <h3 style="margin-bottom:12px">Оформление заказа</h3>
+            <p style="color:#888;font-size:0.9rem;margin-bottom:14px">Товар будет забронирован на 48 часов. Менеджер свяжется с вами.</p>
+            <form id="coForm" style="display:flex;flex-direction:column;gap:10px">
+                <input name="customer_name" placeholder="Ваше имя" required style="padding:10px;border:1px solid #ddd;border-radius:5px">
+                <input name="phone" placeholder="Телефон" required style="padding:10px;border:1px solid #ddd;border-radius:5px">
+                <input name="address" placeholder="Адрес (необязательно)" style="padding:10px;border:1px solid #ddd;border-radius:5px">
+                <textarea name="comment" placeholder="Комментарий" style="padding:10px;border:1px solid #ddd;border-radius:5px;min-height:70px;resize:vertical"></textarea>
+                <button type="submit" class="btn btn-accent">Подтвердить</button>
+                <button type="button" class="btn" style="background:#888" onclick="this.closest('[style*=fixed]').remove()">Отмена</button>
+            </form>
+        </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+        modal.querySelector('#coForm').onsubmit = async (e) => {
+            e.preventDefault();
+            const fd = new FormData(e.target);
+            const items = cart.map(i => ({ product_id: i.id, quantity: i.quantity }));
+            const btn = e.target.querySelector('button[type=submit]');
+            btn.disabled = true; btn.textContent = 'Отправка...';
+            try {
+                const r = await fetch('/api/orders', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                    body: JSON.stringify({ customer_name: fd.get('customer_name'), phone: fd.get('phone'), address: fd.get('address') || null, comment: fd.get('comment') || null, items })
+                });
+                const d = await r.json();
+                if (!r.ok) throw new Error(d.error || 'Ошибка');
+                alert('Заказ оформлен!');
+                localStorage.setItem('cart', '[]');
+                modal.remove();
+                location.href = '/profile';
+            } catch (err) { alert(err.message); }
+            finally { btn.disabled = false; btn.textContent = 'Подтвердить'; }
+        };
+    }
+
+    renderCart();
     </script>
 </body>
 </html>

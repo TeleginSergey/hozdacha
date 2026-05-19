@@ -3,44 +3,130 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ХозДача — хозяйственные товары для дома и дачи</title>
-    <meta name="description" content="ХозДача — магазин хозяйственных товаров, инструментов и инвентаря для сада и дачи.">
+    <title>{{.title}} - Магазин хозяйственных товаров</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <div data-header-slot></div>
+    <header>
+        <div class="container">
+            <h1>ХозДача</h1>
+            <nav class="main-nav">
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+                <a href="/cart">Корзина</a>
+            </nav>
+            <div class="user-area" id="userArea">
+                <div class="auth-buttons" id="authButtons">
+                    <a href="/register" class="btn btn-outline">Регистрация</a>
+                    <a href="/login" class="btn btn-primary">Вход</a>
+                </div>
+                <div class="user-menu" id="userMenu" style="display: none;">
+                    <div class="user-avatar" id="userAvatar">
+                        <span id="avatarLetter">U</span>
+                    </div>
+                    <div class="dropdown-menu" id="dropdownMenu">
+                        <a href="/profile">Личный кабинет</a>
+                        <a href="#" onclick="logout()">Выход</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
 
     <main class="container">
         <section class="hero">
-            <h2>Всё для дома, дачи и хозяйства</h2>
-            <p>Инструменты · Сад · Хозтовары · Инвентарь</p>
-            <form class="hero-search" onsubmit="event.preventDefault(); window.location.href='/catalog?q='+encodeURIComponent(this.q.value)">
-                <input name="q" type="search" placeholder="Что ищем? Например: грабли, перчатки, шланг..." autocomplete="off">
-                <button type="submit">Найти</button>
-            </form>
+            <h2>Добро пожаловать в наш магазин!</h2>
+            <p>Широкий ассортимент хозяйственных товаров для вашего дома</p>
         </section>
 
-        <section class="section">
-            <div class="section-header">
-                <h2>🔥 Хиты продаж</h2>
-                <a href="/catalog" class="btn btn-outline btn-sm">Весь каталог →</a>
-            </div>
-            <div class="product-grid" id="featuredGrid">
-                <p style="grid-column:1/-1;text-align:center;color:var(--gray-500)">Загрузка...</p>
+        <section class="promotions" id="promotions">
+            <h2>Акции</h2>
+            <div class="promotions-grid" id="promotionsGrid">
+                <p>Загрузка акций...</p>
             </div>
         </section>
 
-        <section class="section">
-            <h2>🎁 Акции</h2>
-            <div class="product-grid" id="promotionsGrid">
-                <p style="grid-column:1/-1;text-align:center;color:var(--gray-500)">Загрузка акций...</p>
+        <section class="products-preview">
+            <h2>Популярные товары</h2>
+            <div class="products-grid" id="productsGrid">
+                <p>Загрузка товаров...</p>
             </div>
+            <a href="/catalog" class="btn">Смотреть все товары</a>
         </section>
     </main>
 
-    <div data-footer-slot></div>
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 ХозДача. Все права защищены.</p>
+        </div>
+    </footer>
 
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/home.js"></script>
+    <script>
+        // Check user authentication state
+        function checkAuthState() {
+            const token = localStorage.getItem('auth_token');
+            const user = localStorage.getItem('user');
+            
+            if (token && user) {
+                showUserMenu(JSON.parse(user));
+            } else {
+                showAuthButtons();
+            }
+        }
+
+        // Show user menu with avatar
+        function showUserMenu(user) {
+            const authButtons = document.getElementById('authButtons');
+            const userMenu = document.getElementById('userMenu');
+            const avatarLetter = document.getElementById('avatarLetter');
+            
+            // Hide auth buttons, show user menu
+            authButtons.style.display = 'none';
+            userMenu.style.display = 'flex';
+            
+            // Set avatar letter (first letter of name, then username, then email)
+            const name = user.name || user.username || user.email || 'U';
+            avatarLetter.textContent = name.charAt(0).toUpperCase();
+        }
+
+        // Show auth buttons for guests
+        function showAuthButtons() {
+            const authButtons = document.getElementById('authButtons');
+            const userMenu = document.getElementById('userMenu');
+            
+            // Show auth buttons, hide user menu
+            authButtons.style.display = 'flex';
+            userMenu.style.display = 'none';
+        }
+
+        // Logout function
+        function logout() {
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('user');
+            showAuthButtons();
+            window.location.href = '/login';
+        }
+
+        // Toggle dropdown menu
+        document.getElementById('userAvatar')?.addEventListener('click', function() {
+            const dropdown = document.getElementById('dropdownMenu');
+            dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(event) {
+            const userMenu = document.getElementById('userMenu');
+            const dropdown = document.getElementById('dropdownMenu');
+            
+            if (!userMenu.contains(event.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', checkAuthState);
+    </script>
+
+    <script src="/static/js/main.js"></script>
 </body>
 </html>
