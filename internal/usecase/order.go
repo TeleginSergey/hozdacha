@@ -88,6 +88,12 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		return nil, fmt.Errorf("at least one item is required")
 	}
 
+	// Если МойСклад настроен но не сконфигурирован до конца — не создаём заказ.
+	// Локальный заказ без синхронизации с МойСклад приводит к расхождению остатков.
+	if u.moysklad != nil && !u.moysklad.HasOrderDefaults() {
+		return nil, fmt.Errorf("moysklad integration is not fully configured (missing organization/agent IDs)")
+	}
+
 	var totalPrice float64
 	items := make([]db.OrderItem, 0, len(req.Items))
 
