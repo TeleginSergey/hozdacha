@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -200,7 +201,12 @@ func (p *SyncWorkerPool) logStats() {
 		zap.Int64("failed_tasks", failed),
 		zap.Int32("active_workers", active),
 		zap.Int32("queued_tasks", queued),
-		zap.Float64("success_rate", float64(processed)/float64(total)*100))
+		zap.String("success_rate", func() string {
+			if total == 0 {
+				return "N/A"
+			}
+			return fmt.Sprintf("%.1f%%", float64(processed)/float64(total)*100)
+		}()))
 }
 
 func (p *SyncWorkerPool) PushTask(task SyncTask) {
