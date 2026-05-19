@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои заказы — ХозДача</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .orders-page { max-width: 900px; margin: 30px auto; }
+        .order-card { background: white; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        .order-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        .order-header-left { font-weight: 700; font-size: 1rem; }
+        .order-header-right { font-size: 0.85rem; color: #888; }
+        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .badge-pending { background: #FFF3E0; color: #F57F17; }
+        .badge-completed { background: #E8F5E9; color: #2E7D32; }
+        .badge-cancelled { background: #eee; color: #888; }
+        .badge-expired { background: #FFEBEE; color: #C62828; }
+        .item-row { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f5f5f5; align-items: center; }
+        .item-row:last-child { border-bottom: none; }
+        .item-name { flex: 1; min-width: 0; font-weight: 500; font-size: 0.92rem; }
+        .item-qty { color: #888; font-size: 0.85rem; min-width: 60px; text-align: center; }
+        .item-price { font-weight: 600; color: #5D4037; min-width: 80px; text-align: right; font-size: 0.9rem; }
+        .item-subtotal { font-weight: 700; color: #5D4037; min-width: 90px; text-align: right; font-size: 0.92rem; }
+        .order-total { margin-top: 12px; padding-top: 10px; border-top: 2px solid #eee; text-align: right; font-size: 1.05rem; font-weight: 700; color: #5D4037; }
+        .empty-state { text-align: center; padding: 60px 20px; background: white; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+        .empty-state h2 { margin-bottom: 8px; }
+        .empty-state p { color: #888; margin-bottom: 20px; }
+        .btn { background: #5D4037; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.95rem; text-decoration: none; display: inline-block; }
+        .btn:hover { background: #3E2723; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>ХозДача</h1>
+            <nav class="main-nav">
+                <a href="/">Главная</a>
+                <a href="/catalog">Каталог</a>
+                <a href="/cart">Корзина</a>
+            </nav>
+            <div class="user-area" id="userArea">
+                <div class="auth-buttons" id="authButtons">
+                    <a href="/register" class="btn btn-outline">Регистрация</a>
+                    <a href="/login" class="btn btn-primary">Вход</a>
+                </div>
+                <a href="/profile" id="userMenu" style="display:none;text-decoration:none">
+                    <div class="user-avatar"><span id="avatarLetter">U</span></div>
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="orders-page">
+            <h2 style="margin-bottom:20px">📋 Мои заказы</h2>
+            <div id="ordersContent"></div>
+        </div>
+    </div>
+
+    <footer><div class="container"><p>&copy; <span class="footer-year"></span> ХозДача</p></div></footer>
+
+    <script>
+    const token = localStorage.getItem('auth_token');
+    if (!token) location.href = '/login';
+
+    (function() {
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (token && user) {
+            document.getElementById('authButtons').style.display = 'none';
+            document.getElementById('userMenu').style.display = 'flex';
+            document.getElementById('avatarLetter').textContent = (user.full_name || user.username || user.email || 'U').charAt(0).toUpperCase();
+        }
+    })();
+
+    const labels = {
+        pending: ['В обработке', 'badge-pending'],
+        completed: ['Выполнен', 'badge-completed'],
+        cancelled: ['Отменён', 'badge-cancelled'],
+        expired: ['Истёк', 'badge-expired']
+    };
+
+    async function loadOrders() {
+        const el = document.getElementById('ordersContent');
+        try {
+            const r = await fetch('/api/orders', { headers: { Authorization: 'Bearer ' + token } });
+            if (r.status === 401) { localStorage.removeItem('auth_token'); location.href = '/login'; return; }
+            const orders = await r.json();
+            if (!orders || orders.length === 0) {
+                el.innerHTML = `<div class="empty-state"><h2>Заказов пока нет</h2><p>Вы ещё ничего не заказывали</p><a href="/catalog" class="btn">К каталогу</a></div>`;
+                return;
+            }
+            el.innerHTML = orders.map(o => {
+                const [statusText, statusClass] = labels[o.status] || [o.status, ''];
+                const itemsHTML = (o.items || []).map(i => `
+                    <div class="item-row">
+                        <span class="item-name">${esc(i.product_name || 'Товар #'+i.product_id)}</span>
+                        <span class="item-qty">×${i.quantity}</span>
+                        <span class="item-price">${i.price.toFixed(0)} ₽</span>
+                        <span class="item-subtotal">${(i.price * i.quantity).toFixed(0)} ₽</span>
+                    </div>
+                `).join('');
+                return `<div class="order-card">
+                    <div class="order-header">
+                        <span class="order-header-left">Заказ #${o.id} <span class="badge ${statusClass}">${statusText}</span></span>
+                        <span class="order-header-right">${(o.created_at || '').slice(0,10)}</span>
+                    </div>
+                    ${itemsHTML}
+                    <div class="order-total">Итого: ${o.total_price.toFixed(0)} ₽</div>
+                </div>`;
+            }).join('');
+        } catch {
+            el.innerHTML = '<div class="empty-state"><p style="color:red">Ошибка загрузки</p></div>';
+        }
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    loadOrders();
+    </script>
+    <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
+</body>
+</html>

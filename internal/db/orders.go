@@ -49,27 +49,28 @@ const (
 )
 
 type Order struct {
-	ID            int64       `db:"orders_id_pk"`
-	UserID        *int64      `db:"orders_user_id_fk" insert:"orders_user_id_fk" update:"orders_user_id_fk"`
-	Status        string      `db:"orders_status" insert:"orders_status" update:"orders_status"`
-	TotalPrice    float64     `db:"orders_total_price" insert:"orders_total_price" update:"orders_total_price"`
-	CustomerName  string      `db:"orders_customer_name" insert:"orders_customer_name" update:"orders_customer_name"`
-	Phone         string      `db:"orders_phone" insert:"orders_phone" update:"orders_phone"`
-	Address       *string     `db:"orders_address" insert:"orders_address" update:"orders_address"`
-	Comment       *string     `db:"orders_comment" insert:"orders_comment" update:"orders_comment"`
-	MoyskladID    *string     `db:"orders_moysklad_id" insert:"orders_moysklad_id" update:"orders_moysklad_id"`
-	CreatedAt     time.Time   `db:"orders_created_at"`
-	UpdatedAt     time.Time   `db:"orders_updated_at" update:"orders_updated_at"`
-	ReservedUntil *time.Time  `db:"orders_reserved_until" insert:"orders_reserved_until" update:"orders_reserved_until"`
-	Items         []OrderItem `db:"-"`
+	ID            int64       `db:"orders_id_pk" json:"id"`
+	UserID        *int64      `db:"orders_user_id_fk" insert:"orders_user_id_fk" update:"orders_user_id_fk" json:"user_id"`
+	Status        string      `db:"orders_status" insert:"orders_status" update:"orders_status" json:"status"`
+	TotalPrice    float64     `db:"orders_total_price" insert:"orders_total_price" update:"orders_total_price" json:"total_price"`
+	CustomerName  string      `db:"orders_customer_name" insert:"orders_customer_name" update:"orders_customer_name" json:"customer_name"`
+	Phone         string      `db:"orders_phone" insert:"orders_phone" update:"orders_phone" json:"phone"`
+	Address       *string     `db:"orders_address" insert:"orders_address" update:"orders_address" json:"address"`
+	Comment       *string     `db:"orders_comment" insert:"orders_comment" update:"orders_comment" json:"comment"`
+	MoyskladID    *string     `db:"orders_moysklad_id" insert:"orders_moysklad_id" update:"orders_moysklad_id" json:"moysklad_id"`
+	CreatedAt     time.Time   `db:"orders_created_at" json:"created_at"`
+	UpdatedAt     time.Time   `db:"orders_updated_at" update:"orders_updated_at" json:"updated_at"`
+	ReservedUntil *time.Time  `db:"orders_reserved_until" insert:"orders_reserved_until" update:"orders_reserved_until" json:"reserved_until"`
+	Items         []OrderItem `db:"-" json:"items,omitempty"`
 }
 
 type OrderItem struct {
-	ID        int64   `db:"order_items_id_pk"`
-	OrderID   int64   `db:"order_items_order_id_fk" insert:"order_items_order_id_fk"`
-	ProductID int64   `db:"order_items_product_id_fk" insert:"order_items_product_id_fk"`
-	Quantity  int     `db:"order_items_quantity" insert:"order_items_quantity"`
-	Price     float64 `db:"order_items_price" insert:"order_items_price"`
+	ID          int64   `db:"order_items_id_pk" json:"id"`
+	OrderID     int64   `db:"order_items_order_id_fk" insert:"order_items_order_id_fk" json:"order_id"`
+	ProductID   int64   `db:"order_items_product_id_fk" insert:"order_items_product_id_fk" json:"product_id"`
+	Quantity    int     `db:"order_items_quantity" insert:"order_items_quantity" json:"quantity"`
+	Price       float64 `db:"order_items_price" insert:"order_items_price" json:"price"`
+	ProductName string  `db:"-" json:"product_name"`
 }
 
 var (
