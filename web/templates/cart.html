@@ -63,7 +63,7 @@
 
     <footer><div class="container"><p>&copy; 2024 ХозДача</p></div></footer>
 
-    <script src="/static/js/catalog.js?v=4"></script>
+    <script src="/static/js/catalog.js?v=5"></script>
     <script>
     // Auth UI
     (function() {
@@ -140,14 +140,11 @@
         const modal = document.createElement('div');
         modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center';
         modal.innerHTML = `<div style="background:white;padding:24px;border-radius:10px;width:90%;max-width:440px;max-height:90vh;overflow-y:auto">
-            <h3 style="margin-bottom:12px">Оформление заказа</h3>
-            <p style="color:#888;font-size:0.9rem;margin-bottom:14px">Товар будет забронирован на 48 часов. Менеджер свяжется с вами.</p>
+            <h3 style="margin-bottom:8px">Оформление заказа</h3>
+            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Бронь действует 48 часов, затем автоматически отменится.</p>
             <form id="coForm" style="display:flex;flex-direction:column;gap:10px">
-                <input name="customer_name" placeholder="Ваше имя" required style="padding:10px;border:1px solid #ddd;border-radius:5px">
-                <input name="phone" placeholder="Телефон" required style="padding:10px;border:1px solid #ddd;border-radius:5px">
-                <input name="address" placeholder="Адрес (необязательно)" style="padding:10px;border:1px solid #ddd;border-radius:5px">
-                <textarea name="comment" placeholder="Комментарий" style="padding:10px;border:1px solid #ddd;border-radius:5px;min-height:70px;resize:vertical"></textarea>
-                <button type="submit" class="btn btn-accent">Подтвердить</button>
+                <textarea name="comment" placeholder="Комментарий к заказу (необязательно)" style="padding:10px;border:1px solid #ddd;border-radius:5px;min-height:70px;resize:vertical"></textarea>
+                <button type="submit" class="btn btn-accent">Подтвердить заказ</button>
                 <button type="button" class="btn" style="background:#888" onclick="this.closest('[style*=fixed]').remove()">Отмена</button>
             </form>
         </div>`;
@@ -164,7 +161,7 @@
                 const r = await fetch('/api/orders', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                    body: JSON.stringify({ customer_name: fd.get('customer_name'), phone: fd.get('phone'), address: fd.get('address') || null, comment: fd.get('comment') || null, items })
+                    body: JSON.stringify({ comment: fd.get('comment') || null, items })
                 });
                 const d = await r.json();
                 if (!r.ok) throw new Error(d.error || 'Ошибка');
