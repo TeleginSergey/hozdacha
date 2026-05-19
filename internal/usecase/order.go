@@ -137,9 +137,37 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		ReservedUntil: &reservedUntil,
 	}
 
+	// Сначала создаём заказ в МойСклад. Если не получилось — не сохраняем локально ничего.
+	var moyskladID *string
+	if u.moysklad != nil {
+		// Временный ID для имени заказа в МойСклад (заменим после сохранения в БД)
+		tmpName := fmt.Sprintf("Online-%d", time.Now().UnixNano()%100000)
+		mid, err := u.moysklad.CreateOrderFromRequest(ctx, tmpName, req.CustomerName, req.Phone, req.Comment, items, u.products)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create order in Moysklad: %w", err)
+		}
+		moyskladID = mid
+	}
+
+	order.MoyskladID = moyskladID
 	order, updatedProducts, err := u.orders.CreateOrderAtomic(ctx, order, items, req.UserID)
 	if err != nil {
+		// Если локальное сохранение не удалось — пытаемся удалить заказ из МойСклад (best-effort)
+		if moyskladID != nil && u.moysklad != nil {
+			if delErr := u.moysklad.DeleteCustomerOrder(ctx, *moyskladID); delErr != nil {
+				u.logger.Error("Failed to rollback Moysklad order after local save failure",
+					zap.Stringp("moysklad_id", moyskladID), zap.Error(delErr))
+			}
+		}
 		return nil, fmt.Errorf("failed to create order: %w", err)
+	}
+
+	// Обновляем имя заказа в МойСклад на реальный ID
+	if moyskladID != nil && u.moysklad != nil {
+		newName := fmt.Sprintf("Online-%d", order.ID)
+		if err := u.moysklad.UpdateOrderName(ctx, *moyskladID, newName); err != nil {
+			u.logger.Warn("Failed to update Moysklad order name", zap.Stringp("moysklad_id", moyskladID), zap.Error(err))
+		}
 	}
 	// Audit log.
 	u.recordEvent(ctx, order.ID, db.OrderEventCreated, &req.UserID, map[string]any{
@@ -164,34 +192,14 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		}
 	}
 
-	// Создание CustomerOrder в МойСклад с резервом позиций.
-	// Если МойСклад недоступен — заказ всё равно сохранён в БД, но продавец
-	// не увидит его в кассе. Логируем как Error, чтобы это всплывало в алертах.
-	if u.moysklad != nil {
-		moyskladID, err := u.moysklad.CreateOrderFromDB(ctx, order, u.products)
-		if err != nil {
-			u.logger.Error("Failed to create order in Moysklad — order saved locally only",
-				zap.Int64("order_id", order.ID),
-				zap.Error(err))
-			u.recordEvent(ctx, order.ID, db.OrderEventMoyskladFailed, nil, map[string]any{
-				"error": err.Error(),
-			})
-		} else if moyskladID != nil {
-			order.MoyskladID = moyskladID
-			if _, err := u.orders.Update(ctx, order, order.ID); err != nil {
-				u.logger.Error("Failed to persist Moysklad ID on order",
-					zap.Int64("order_id", order.ID),
-					zap.Stringp("moysklad_id", moyskladID),
-					zap.Error(err))
-			} else {
-				u.logger.Info("Order created in Moysklad",
-					zap.Int64("order_id", order.ID),
-					zap.Stringp("moysklad_id", moyskladID))
-				u.recordEvent(ctx, order.ID, db.OrderEventMoyskladSynced, nil, map[string]any{
-					"moysklad_id": *moyskladID,
-				})
-			}
-		}
+	// МойСклад уже создан на предыдущем шаге — логируем успех.
+	if moyskladID != nil {
+		u.logger.Info("Order synced to Moysklad",
+			zap.Int64("order_id", order.ID),
+			zap.Stringp("moysklad_id", moyskladID))
+		u.recordEvent(ctx, order.ID, db.OrderEventMoyskladSynced, nil, map[string]any{
+			"moysklad_id": *moyskladID,
+		})
 	}
 
 	return order, nil

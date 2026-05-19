@@ -178,13 +178,17 @@ func (m *MoyskladOrderUsecase) createMoyskladOrder(ctx context.Context, cartItem
 	// Создаем заказ в МойСклад
 	moyskladOrder := &moysklad.MoyskladOrder{
 		Name: fmt.Sprintf("Заказ №%d от %s", orderID, time.Now().Format("2006-01-02 15:04:05")),
-		Organization: &moysklad.OrderMeta{
-			Href: orgs.Rows[0].Href,
-			Type: "organization",
+		Organization: &moysklad.MoyskladEntity{
+			Meta: &moysklad.OrderMeta{
+				Href: orgs.Rows[0].Href,
+				Type: "organization",
+			},
 		},
-		Agent: &moysklad.OrderMeta{
-			Href: agents.Rows[0].Href,
-			Type: "counterparty",
+		Agent: &moysklad.MoyskladEntity{
+			Meta: &moysklad.OrderMeta{
+				Href: agents.Rows[0].Href,
+				Type: "counterparty",
+			},
 		},
 		Positions: positions,
 	}
