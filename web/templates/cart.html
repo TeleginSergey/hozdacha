@@ -76,7 +76,7 @@
         if (token && user) {
             document.getElementById('authButtons').style.display = 'none';
             document.getElementById('userMenu').style.display = 'flex';
-            document.getElementById('avatarLetter').textContent = (user.name || user.username || user.email || 'U').charAt(0).toUpperCase();
+            document.getElementById('avatarLetter').textContent = (user.full_name || user.username || user.email || 'U').charAt(0).toUpperCase();
         }
         document.getElementById('userAvatar').onclick = () => {
             const dd = document.getElementById('dropdownMenu');

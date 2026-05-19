@@ -117,7 +117,7 @@
         userMenu.style.display = 'flex';
         
         // Set avatar letter (first letter of name, then username, then email)
-        const name = user.name || user.username || user.email || 'U';
+        const name = user.full_name || user.username || user.email || 'U';
         avatarLetter.textContent = name.charAt(0).toUpperCase();
     }
 
