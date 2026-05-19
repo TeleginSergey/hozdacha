@@ -3,163 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.title}} - Телегинс Шоп</title>
+    <title>Каталог — ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>Telegins Shop</h1>
-            <nav class="main-nav">
-                <a href="/">Главная</a>
-                <a href="/catalog">Каталог</a>
-                <a href="/cart">Корзина</a>
-            </nav>
-            <div class="user-area" id="userArea">
-                <div class="auth-buttons" id="authButtons">
-                    <a href="/register" class="btn btn-outline">Регистрация</a>
-                    <a href="/login" class="btn btn-primary">Вход</a>
-                </div>
-                <div class="user-menu" id="userMenu" style="display: none;">
-                    <div class="user-avatar" id="userAvatar">
-                        <span id="avatarLetter">U</span>
-                    </div>
-                    <div class="dropdown-menu" id="dropdownMenu">
-                        <a href="/profile">Личный кабинет</a>
-                        <a href="#" onclick="logout()">Выход</a>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </header>
+    <div data-header-slot></div>
 
     <main class="container">
-        <section class="catalog-header">
-            <h2>Каталог товаров</h2>
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Поиск товаров...">
-                <button onclick="searchProducts()">Найти</button>
-            </div>
-        </section>
+        <h1 style="margin:24px 0 16px">Каталог</h1>
 
-        <section class="products-grid" id="productsGrid">
-            <p>Загрузка товаров...</p>
-        </section>
-
-        <div class="pagination" id="paginationContainer">
-            <div style="display:flex; gap:12px; align-items:center; justify-content:center; margin:16px 0;">
-                <button class="btn" id="prevPageBtn" onclick="prevPage()" disabled>Назад</button>
-                <span id="pageInfo">Страница 1</span>
-                <button class="btn" id="nextPageBtn" onclick="nextPage()">Далее</button>
-            </div>
+        <div class="search-bar">
+            <input type="search" id="searchInput" placeholder="Поиск товаров..." autocomplete="off">
+            <button class="btn btn-primary" id="searchBtn">Найти</button>
         </div>
 
-        <div class="cart-section">
-            <button class="cart-btn" onclick="showCart()">Корзина (<span id="cartCount">0</span>)</button>
+        <div class="product-grid" id="productsGrid">
+            <p style="grid-column:1/-1;text-align:center;color:var(--gray-500);padding:40px">Загрузка...</p>
         </div>
+
+        <div class="pagination" id="pagination"></div>
     </main>
 
-    <!-- Модальное окно корзины -->
-    <div id="cartModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeCart()">&times;</span>
-            <h2>Корзина</h2>
-            <div id="cartItems"></div>
-            <div class="cart-total">
-                <p>Итого: <span id="cartTotal">0</span> руб.</p>
-            </div>
-            <button class="btn" onclick="checkout()">Оформить заказ</button>
-        </div>
-    </div>
+    <div data-footer-slot></div>
 
-    <!-- Модальное окно оформления заказа -->
-    <div id="checkoutModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closeCheckout()">&times;</span>
-            <h2>Оформление заказа</h2>
-            <form id="checkoutForm">
-                <input type="text" name="customer_name" placeholder="Ваше имя" required>
-                <input type="tel" name="phone" placeholder="Телефон" required>
-                <input type="text" name="address" placeholder="Адрес (необязательно)">
-                <textarea name="comment" placeholder="Комментарий (необязательно)"></textarea>
-                <button type="submit" class="btn">Отправить заявку</button>
-            </form>
-        </div>
-    </div>
-
-    <footer>
-        <div class="container">
-            <p>&copy; 2024 Телегинс Шоп. Все права защищены.</p>
-        </div>
-    </footer>
-
-    <script>
-    // Check user authentication state
-    function checkAuthState() {
-        const token = localStorage.getItem('auth_token');
-        const user = localStorage.getItem('user');
-        
-        if (token && user) {
-            showUserMenu(JSON.parse(user));
-        } else {
-            showAuthButtons();
-        }
-    }
-
-    // Show user menu with avatar
-    function showUserMenu(user) {
-        const authButtons = document.getElementById('authButtons');
-        const userMenu = document.getElementById('userMenu');
-        const avatarLetter = document.getElementById('avatarLetter');
-        
-        // Hide auth buttons, show user menu
-        authButtons.style.display = 'none';
-        userMenu.style.display = 'flex';
-        
-        // Set avatar letter (first letter of name, then username, then email)
-        const name = user.name || user.username || user.email || 'U';
-        avatarLetter.textContent = name.charAt(0).toUpperCase();
-    }
-
-    // Show auth buttons for guests
-    function showAuthButtons() {
-        const authButtons = document.getElementById('authButtons');
-        const userMenu = document.getElementById('userMenu');
-        
-        // Show auth buttons, hide user menu
-        authButtons.style.display = 'flex';
-        userMenu.style.display = 'none';
-    }
-
-    // Logout function
-    function logout() {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('user');
-        showAuthButtons();
-        window.location.href = '/login';
-    }
-
-    // Toggle dropdown menu
-    document.getElementById('userAvatar')?.addEventListener('click', function() {
-        const dropdown = document.getElementById('dropdownMenu');
-        dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-    });
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(event) {
-        const userMenu = document.getElementById('userMenu');
-        const dropdown = document.getElementById('dropdownMenu');
-        
-        if (!userMenu.contains(event.target)) {
-            dropdown.style.display = 'none';
-        }
-    });
-
-    // Initialize on page load
-    document.addEventListener('DOMContentLoaded', checkAuthState);
-</script>
-<script src="/static/js/catalog.js?v=3"></script>
+    <script src="/static/js/app.js"></script>
+    <script src="/static/js/catalog.js"></script>
 </body>
 </html>
-
-
