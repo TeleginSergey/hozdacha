@@ -176,8 +176,12 @@ type MoyskladOrder struct {
 	Description  string             `json:"description,omitempty"`
 	Positions    []MoyskladPosition `json:"positions"`
 	State        *MoyskladState     `json:"state,omitempty"`
-	Organization *OrderMeta         `json:"organization,omitempty"`
-	Agent        *OrderMeta         `json:"agent,omitempty"`
+	Organization *MoyskladEntity    `json:"organization,omitempty"`
+	Agent        *MoyskladEntity    `json:"agent,omitempty"`
+}
+
+type MoyskladEntity struct {
+	Meta *OrderMeta `json:"meta"`
 }
 
 type MoyskladPosition struct {
