@@ -105,14 +105,13 @@
             const d = await r.json();
             const u = d.user || d;
             localStorage.setItem('user', JSON.stringify(u));
-            document.getElementById('profileName').textContent = u.name || u.username || '—';
+            document.getElementById('profileName').textContent = u.full_name || u.username || '—';
             document.getElementById('profileEmail').textContent = u.email || '';
             document.getElementById('profilePhone').textContent = u.phone || '';
-            document.getElementById('profileInitial').textContent = (u.name || u.username || u.email || 'U').charAt(0).toUpperCase();
-            document.getElementById('avatarLetter').textContent = (u.name || u.username || u.email || 'U').charAt(0).toUpperCase();
-            document.querySelector('[name=name]').value = u.name || '';
+            document.getElementById('profileInitial').textContent = (u.full_name || u.username || u.email || 'U').charAt(0).toUpperCase();
+            document.getElementById('avatarLetter').textContent = (u.full_name || u.username || u.email || 'U').charAt(0).toUpperCase();
+            document.querySelector('[name=name]').value = u.full_name || '';
             document.querySelector('[name=phone]').value = u.phone || '';
-            document.querySelector('[name=address]').value = u.address || '';
             document.getElementById('authButtons').style.display = 'none';
             document.getElementById('userMenu').style.display = 'flex';
         } catch { showMsg(msgErr, 'Ошибка загрузки'); }
@@ -143,7 +142,7 @@
             const r = await api('/api/auth/profile', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: fd.get('name'), phone: fd.get('phone'), address: fd.get('address') })
+                body: JSON.stringify({ full_name: fd.get('name'), phone: fd.get('phone') })
             });
             const d = await r.json();
             if (!r.ok) throw new Error(d.error || 'Ошибка');

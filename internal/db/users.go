@@ -37,25 +37,25 @@ const (
 )
 
 type User struct {
-	ID                     int64      `db:"users_id_pk"`
-	Username               string     `db:"users_username" insert:"users_username" update:"users_username"`
-	Password               string     `db:"users_password_hash" insert:"users_password_hash" update:"users_password_hash"`
-	Email                  string     `db:"users_email" insert:"users_email"`
-	RoleID                 int64      `db:"users_roles_id_fk" insert:"users_roles_id_fk"`
-	AccessTokenSecret      string     `db:"users_access_token_secret" insert:"users_access_token_secret"`
-	RefreshTokenSecret     string     `db:"users_refresh_token_secret" insert:"users_refresh_token_secret"`
-	AccessTokenJTI         *string    `db:"users_access_token_jti" updateAuth:"users_access_token_jti"`
-	RefreshTokenJTI        *string    `db:"users_refresh_token_jti" updateAuth:"users_refresh_token_jti"`
-	AuthTime               *time.Time `db:"users_auth_time" insert:"users_auth_time"`
-	CreatedAt              *time.Time `db:"users_created_at"`
-	UpdatedAt              *time.Time `db:"users_updated_at" updateAuth:"users_updated_at" update:"users_updated_at"`
-	EmailVerified          bool       `db:"users_email_verified" insert:"users_email_verified"`
-	EmailVerificationToken *string    `db:"users_email_verification_token" insert:"users_email_verification_token"`
-	EmailVerificationCode  *string    `db:"users_email_verification_code" insert:"users_email_verification_code"`
-	VerificationExpiresAt  *time.Time `db:"users_verification_expires_at" insert:"users_verification_expires_at"`
-	Website                *string    `db:"users_website" insert:"users_website"` // Honeypot field
-	FullName               *string    `db:"users_full_name" insert:"users_full_name" update:"users_full_name"`
-	Phone                  *string    `db:"users_phone" insert:"users_phone" update:"users_phone"`
+	ID                     int64      `db:"users_id_pk" json:"id"`
+	Username               string     `db:"users_username" insert:"users_username" update:"users_username" json:"username"`
+	Password               string     `db:"users_password_hash" insert:"users_password_hash" update:"users_password_hash" json:"-"`
+	Email                  string     `db:"users_email" insert:"users_email" json:"email"`
+	RoleID                 int64      `db:"users_roles_id_fk" insert:"users_roles_id_fk" json:"role_id"`
+	AccessTokenSecret      string     `db:"users_access_token_secret" insert:"users_access_token_secret" json:"-"`
+	RefreshTokenSecret     string     `db:"users_refresh_token_secret" insert:"users_refresh_token_secret" json:"-"`
+	AccessTokenJTI         *string    `db:"users_access_token_jti" updateAuth:"users_access_token_jti" json:"-"`
+	RefreshTokenJTI        *string    `db:"users_refresh_token_jti" updateAuth:"users_refresh_token_jti" json:"-"`
+	AuthTime               *time.Time `db:"users_auth_time" insert:"users_auth_time" json:"-"`
+	CreatedAt              *time.Time `db:"users_created_at" json:"created_at"`
+	UpdatedAt              *time.Time `db:"users_updated_at" updateAuth:"users_updated_at" update:"users_updated_at" json:"updated_at"`
+	EmailVerified          bool       `db:"users_email_verified" insert:"users_email_verified" json:"email_verified"`
+	EmailVerificationToken *string    `db:"users_email_verification_token" insert:"users_email_verification_token" json:"-"`
+	EmailVerificationCode  *string    `db:"users_email_verification_code" insert:"users_email_verification_code" json:"-"`
+	VerificationExpiresAt  *time.Time `db:"users_verification_expires_at" insert:"users_verification_expires_at" json:"-"`
+	Website                *string    `db:"users_website" insert:"users_website" json:"-"` // Honeypot field
+	FullName               *string    `db:"users_full_name" insert:"users_full_name" update:"users_full_name" json:"full_name"`
+	Phone                  *string    `db:"users_phone" insert:"users_phone" update:"users_phone" json:"phone"`
 }
 
 var (
