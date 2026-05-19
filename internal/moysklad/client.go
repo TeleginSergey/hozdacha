@@ -170,14 +170,22 @@ type MoyskladMeta struct {
 	Type string `json:"type"`
 }
 
-type MoyskladOrder struct {
-	ID           string             `json:"id,omitempty"`
-	Name         string             `json:"name,omitempty"`
+type MoyskladOrderRequest struct {
+	Name         string             `json:"name"`
 	Description  string             `json:"description,omitempty"`
 	Positions    []MoyskladPosition `json:"positions"`
-	State        *MoyskladState     `json:"state,omitempty"`
-	Organization *MoyskladEntity    `json:"organization,omitempty"`
-	Agent        *MoyskladEntity    `json:"agent,omitempty"`
+	Organization *MoyskladEntity    `json:"organization"`
+	Agent        *MoyskladEntity    `json:"agent"`
+}
+
+type MoyskladOrder struct {
+	ID           string          `json:"id,omitempty"`
+	Name         string          `json:"name,omitempty"`
+	Description  string          `json:"description,omitempty"`
+	Positions    json.RawMessage `json:"positions,omitempty"`
+	State        *MoyskladState  `json:"state,omitempty"`
+	Organization *MoyskladEntity `json:"organization,omitempty"`
+	Agent        *MoyskladEntity `json:"agent,omitempty"`
 }
 
 type MoyskladEntity struct {
@@ -701,7 +709,7 @@ func (c *Client) GetCounterparties(ctx context.Context) (*MoyskladResponse, erro
 	return &response, nil
 }
 
-func (c *Client) CreateCustomerOrder(ctx context.Context, order *MoyskladOrder) (*MoyskladOrder, error) {
+func (c *Client) CreateCustomerOrder(ctx context.Context, order *MoyskladOrderRequest) (*MoyskladOrder, error) {
 	orderJSON, err := json.Marshal(order)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal order: %w", err)

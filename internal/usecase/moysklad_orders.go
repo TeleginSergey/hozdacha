@@ -178,7 +178,7 @@ func (m *MoyskladOrderUsecase) createMoyskladOrder(ctx context.Context, cartItem
 	}
 
 	// Создаем заказ в МойСклад
-	moyskladOrder := &moysklad.MoyskladOrder{
+	moyskladOrder := &moysklad.MoyskladOrderRequest{
 		Name: fmt.Sprintf("Заказ №%d от %s", orderID, time.Now().Format("2006-01-02 15:04:05")),
 		Organization: &moysklad.MoyskladEntity{
 			Meta: &moysklad.OrderMeta{
