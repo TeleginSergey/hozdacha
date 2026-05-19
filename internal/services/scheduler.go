@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -17,12 +18,13 @@ type Scheduler struct {
 	interval           time.Duration
 	reseedFullInterval time.Duration
 	imageSyncInterval  time.Duration
+	imageSyncTime      string
 	logger             *zap.Logger
 	stopChan           chan struct{}
 	syncRunning        int32
 }
 
-func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxWorkers int, reseedFullInterval time.Duration, imageSync *ImageSyncService, imageSyncInterval time.Duration, logger *zap.Logger) *Scheduler {
+func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxWorkers int, reseedFullInterval time.Duration, imageSync *ImageSyncService, imageSyncInterval time.Duration, imageSyncTime string, logger *zap.Logger) *Scheduler {
 	if maxWorkers < 1 {
 		maxWorkers = 1
 	}
@@ -36,6 +38,7 @@ func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxW
 		interval:           interval,
 		reseedFullInterval: reseedFullInterval,
 		imageSyncInterval:  imageSyncInterval,
+		imageSyncTime:      imageSyncTime,
 		logger:             logger,
 		stopChan:           make(chan struct{}),
 	}
@@ -55,7 +58,7 @@ func (s *Scheduler) Start(ctx context.Context) {
 	}
 
 	// Запускаем периодическую синхронизацию изображений
-	if s.imageSync != nil && s.imageSyncInterval > 0 {
+	if s.imageSync != nil && (s.imageSyncInterval > 0 || s.imageSyncTime != "") {
 		go s.runImageSyncLoop(ctx)
 	}
 
@@ -104,8 +107,43 @@ func (s *Scheduler) runReseedFullLoop(ctx context.Context) {
 }
 
 func (s *Scheduler) runImageSyncLoop(ctx context.Context) {
-	// Первый запуск через 30 секунд после старта (даём серверу прогреться).
-	time.Sleep(30 * time.Second)
+	// Определяем режим: точное время суток или интервал.
+	if s.imageSyncTime != "" {
+		s.runImageSyncAtTime(ctx)
+	} else if s.imageSyncInterval > 0 {
+		s.runImageSyncByInterval(ctx)
+	}
+}
+
+// runImageSyncAtTime запускает синхронизацию ежедневно в заданное время (например "04:00").
+func (s *Scheduler) runImageSyncAtTime(ctx context.Context) {
+	s.logger.Info("Image sync scheduled daily", zap.String("at", s.imageSyncTime))
+
+	for {
+		now := time.Now()
+		next := nextTimeOfDay(now, s.imageSyncTime)
+		wait := next.Sub(now)
+
+		s.logger.Info("Next image sync", zap.Time("at", next), zap.Duration("in", wait))
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(wait):
+		}
+
+		rctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		s.logger.Info("Starting daily image sync")
+		if err := s.imageSync.SyncImages(rctx); err != nil {
+			s.logger.Error("Image sync failed", zap.Error(err))
+		}
+		cancel()
+	}
+}
+
+// runImageSyncByInterval запускает синхронизацию с фиксированным интервалом.
+func (s *Scheduler) runImageSyncByInterval(ctx context.Context) {
+	time.Sleep(30 * time.Second) // даём серверу прогреться
 
 	t := time.NewTicker(s.imageSyncInterval)
 	defer t.Stop()
@@ -123,6 +161,26 @@ func (s *Scheduler) runImageSyncLoop(ctx context.Context) {
 			cancel()
 		}
 	}
+}
+
+// nextTimeOfDay возвращает ближайший момент времени с заданным временем суток (HH:MM).
+func nextTimeOfDay(from time.Time, timeStr string) time.Time {
+	parts := strings.SplitN(timeStr, ":", 2)
+	hour := 0
+	minute := 0
+	if len(parts) >= 1 {
+		fmt.Sscanf(parts[0], "%d", &hour)
+	}
+	if len(parts) >= 2 {
+		fmt.Sscanf(parts[1], "%d", &minute)
+	}
+
+	loc := from.Location()
+	next := time.Date(from.Year(), from.Month(), from.Day(), hour, minute, 0, 0, loc)
+	if !next.After(from) {
+		next = next.Add(24 * time.Hour)
+	}
+	return next
 }
 
 func (s *Scheduler) syncOnce(ctx context.Context) {

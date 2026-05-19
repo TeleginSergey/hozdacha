@@ -52,6 +52,8 @@ type MoyskladConfig struct {
 	ReseedFullInterval time.Duration
 	// ImageSyncInterval — периодичность скачивания изображений товаров из МойСклад (0 = отключено).
 	ImageSyncInterval time.Duration
+	// ImageSyncTime — точное время суток для запуска (например "04:00"). Имеет приоритет над ImageSyncInterval.
+	ImageSyncTime string
 	// Webhook inbox / worker
 	WebhookWorkerInterval time.Duration
 	WebhookInboxBatch     int
@@ -120,6 +122,7 @@ func Load() (*Config, error) {
 			SyncWorkers:           parseInt(getEnv("MOYSKLAD_SYNC_WORKERS", "3")),
 			ReseedFullInterval:    parseDurationOrZero(getEnv("MOYSKLAD_RESEED_FULL_INTERVAL", "24h")),
 			ImageSyncInterval:     parseDurationOrZero(getEnv("MOYSKLAD_IMAGE_SYNC_INTERVAL", "6h")),
+			ImageSyncTime:         getEnv("MOYSKLAD_IMAGE_SYNC_TIME", ""),
 			WebhookWorkerInterval: parseDuration(getEnv("WEBHOOK_INBOX_POLL_INTERVAL", "2s")),
 			WebhookInboxBatch:     parseInt(getEnv("WEBHOOK_INBOX_BATCH", "10")),
 			WebhookMaxAttempts:    parseInt(getEnv("WEBHOOK_MAX_ATTEMPTS", "15")),

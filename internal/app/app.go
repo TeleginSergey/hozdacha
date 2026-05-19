@@ -128,11 +128,11 @@ func NewApp() (*App, error) {
 		}
 
 		var imageSync *services.ImageSyncService
-		if cfg.Moysklad.ImageSyncInterval > 0 {
+		if cfg.Moysklad.ImageSyncInterval > 0 || cfg.Moysklad.ImageSyncTime != "" {
 			imageSync = services.NewImageSyncService(moyskladClient, productRepo, "./web/static/images/products", logger)
 		}
 
-		scheduler = services.NewScheduler(moyskladSyncService, cfg.Moysklad.SyncInterval, syncWorkers, cfg.Moysklad.ReseedFullInterval, imageSync, cfg.Moysklad.ImageSyncInterval, logger)
+		scheduler = services.NewScheduler(moyskladSyncService, cfg.Moysklad.SyncInterval, syncWorkers, cfg.Moysklad.ReseedFullInterval, imageSync, cfg.Moysklad.ImageSyncInterval, cfg.Moysklad.ImageSyncTime, logger)
 	}
 
 	// Email Service
