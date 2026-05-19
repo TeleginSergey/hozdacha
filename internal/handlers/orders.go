@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
@@ -95,6 +96,12 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 				"error":   "insufficient_stock",
 				"message": "Один из товаров в корзине уже недоступен в нужном количестве. Обновите корзину.",
 			})
+			return
+		}
+		// МойСклад не настроен — не создаём заказ вообще.
+		if strings.Contains(err.Error(), "moysklad integration is not fully configured") {
+			h.logger.Error("Order rejected: Moysklad not configured", zap.Error(err))
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Система приёма заказов временно недоступна. Попробуйте позже."})
 			return
 		}
 		h.logger.Error("Failed to create order", zap.Error(err))
