@@ -12,15 +12,17 @@ import (
 type Scheduler struct {
 	syncService        *MoyskladSyncService
 	workerPool         *SyncWorkerPool
+	imageSync          *ImageSyncService
 	maxWorkers         int
 	interval           time.Duration
 	reseedFullInterval time.Duration
+	imageSyncInterval  time.Duration
 	logger             *zap.Logger
 	stopChan           chan struct{}
 	syncRunning        int32
 }
 
-func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxWorkers int, reseedFullInterval time.Duration, logger *zap.Logger) *Scheduler {
+func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxWorkers int, reseedFullInterval time.Duration, imageSync *ImageSyncService, imageSyncInterval time.Duration, logger *zap.Logger) *Scheduler {
 	if maxWorkers < 1 {
 		maxWorkers = 1
 	}
@@ -29,9 +31,11 @@ func NewScheduler(syncService *MoyskladSyncService, interval time.Duration, maxW
 	return &Scheduler{
 		syncService:        syncService,
 		workerPool:         workerPool,
+		imageSync:          imageSync,
 		maxWorkers:         maxWorkers,
 		interval:           interval,
 		reseedFullInterval: reseedFullInterval,
+		imageSyncInterval:  imageSyncInterval,
 		logger:             logger,
 		stopChan:           make(chan struct{}),
 	}
@@ -48,6 +52,11 @@ func (s *Scheduler) Start(ctx context.Context) {
 
 	if s.reseedFullInterval > 0 {
 		go s.runReseedFullLoop(ctx)
+	}
+
+	// Запускаем периодическую синхронизацию изображений
+	if s.imageSync != nil && s.imageSyncInterval > 0 {
+		go s.runImageSyncLoop(ctx)
 	}
 
 	ticker := time.NewTicker(s.interval)
@@ -88,6 +97,28 @@ func (s *Scheduler) runReseedFullLoop(ctx context.Context) {
 				s.logger.Error("Reseed full sync failed", zap.Error(err))
 			} else {
 				s.logger.Info("Reseed full sync finished")
+			}
+			cancel()
+		}
+	}
+}
+
+func (s *Scheduler) runImageSyncLoop(ctx context.Context) {
+	// Первый запуск через 30 секунд после старта (даём серверу прогреться).
+	time.Sleep(30 * time.Second)
+
+	t := time.NewTicker(s.imageSyncInterval)
+	defer t.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			rctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+			s.logger.Info("Starting periodic image sync")
+			if err := s.imageSync.SyncImages(rctx); err != nil {
+				s.logger.Error("Image sync failed", zap.Error(err))
 			}
 			cancel()
 		}

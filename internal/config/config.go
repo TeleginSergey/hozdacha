@@ -50,6 +50,8 @@ type MoyskladConfig struct {
 	SyncWorkers int
 	// ReseedFullInterval — редкая полная пересинхронизация (0 = отключено).
 	ReseedFullInterval time.Duration
+	// ImageSyncInterval — периодичность скачивания изображений товаров из МойСклад (0 = отключено).
+	ImageSyncInterval time.Duration
 	// Webhook inbox / worker
 	WebhookWorkerInterval time.Duration
 	WebhookInboxBatch     int
@@ -117,6 +119,7 @@ func Load() (*Config, error) {
 			MaxRetries:            parseInt(getEnv("MOYSKLAD_MAX_RETRIES", "5")),              // в т.ч. повторы при 503
 			SyncWorkers:           parseInt(getEnv("MOYSKLAD_SYNC_WORKERS", "3")),
 			ReseedFullInterval:    parseDurationOrZero(getEnv("MOYSKLAD_RESEED_FULL_INTERVAL", "24h")),
+			ImageSyncInterval:     parseDurationOrZero(getEnv("MOYSKLAD_IMAGE_SYNC_INTERVAL", "6h")),
 			WebhookWorkerInterval: parseDuration(getEnv("WEBHOOK_INBOX_POLL_INTERVAL", "2s")),
 			WebhookInboxBatch:     parseInt(getEnv("WEBHOOK_INBOX_BATCH", "10")),
 			WebhookMaxAttempts:    parseInt(getEnv("WEBHOOK_MAX_ATTEMPTS", "15")),
