@@ -18,15 +18,7 @@ CREATE INDEX IF NOT EXISTS idx_orders_reserved_until_pending
 
 -- Допустимые статусы заказа: pending → completed (выкупили в магазине), expired (TTL вышел), cancelled (отменил пользователь/админ).
 -- Снимаем старый CHECK, если он был, и ставим новый.
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM information_schema.check_constraints
-        WHERE constraint_name = 'orders_status_check'
-    ) THEN
-        ALTER TABLE orders DROP CONSTRAINT orders_status_check;
-    END IF;
-END $$;
+ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
 
 ALTER TABLE orders
     ADD CONSTRAINT orders_status_check
