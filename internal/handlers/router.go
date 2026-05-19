@@ -93,6 +93,13 @@ func SetupRouter(
 		})
 	})
 
+	// Мои заказы (требует авторизации)
+	router.GET("/orders", middleware.AuthMiddleware(jwtSecret), func(c *gin.Context) {
+		c.HTML(http.StatusOK, "orders.html", gin.H{
+			"title": "Мои заказы - ХозДача",
+		})
+	})
+
 	// Админ-панель: страница публичная (содержит форму логина), сами API под
 	// /api/admin защищены AuthMiddleware + RequireAdmin. JS проверяет токен
 	// в localStorage и переключает loginSection ↔ adminSection.

@@ -15,20 +15,15 @@
         .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
         .form-row label { font-weight: 600; font-size: 0.9rem; color: #333; }
         .form-row input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.95rem; }
-        .btn { background: #5D4037; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+        .btn { background: #5D4037; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.95rem; text-decoration: none; display: inline-block; }
         .btn:hover { background: #3E2723; }
         .btn-danger { background: #C62828; }
         .btn-danger:hover { background: #B71C1C; }
+        .btn-outline-brown { background: transparent; color: #5D4037; border: 2px solid #5D4037; }
+        .btn-outline-brown:hover { background: #5D4037; color: white; }
         .msg { padding: 10px 14px; border-radius: 5px; margin-bottom: 12px; display: none; font-size: 0.9rem; }
         .msg-ok { background: #E8F5E9; color: #2E7D32; }
         .msg-err { background: #FFEBEE; color: #C62828; }
-        .order-card { background: #faf7f2; padding: 14px; border-radius: 6px; margin-bottom: 10px; border-left: 4px solid #5D4037; }
-        .order-card-header { display: flex; justify-content: space-between; margin-bottom: 6px; font-weight: 600; }
-        .badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-        .badge-pending { background: #FFF3E0; color: #F57F17; }
-        .badge-completed { background: #E8F5E9; color: #2E7D32; }
-        .badge-cancelled { background: #eee; color: #888; }
-        .badge-expired { background: #FFEBEE; color: #C62828; }
     </style>
 </head>
 <body>
@@ -45,13 +40,9 @@
                     <a href="/register" class="btn btn-outline">Регистрация</a>
                     <a href="/login" class="btn btn-primary">Вход</a>
                 </div>
-                <div class="user-menu" id="userMenu" style="display:none">
-                    <div class="user-avatar" id="userAvatar"><span id="avatarLetter">U</span></div>
-                    <div class="dropdown-menu" id="dropdownMenu">
-                        <a href="/profile">Профиль</a>
-                        <a href="#" id="logoutLink">Выход</a>
-                    </div>
-                </div>
+                <a href="/profile" id="userMenu" style="display:none;text-decoration:none">
+                    <div class="user-avatar"><span id="avatarLetter">U</span></div>
+                </a>
             </div>
         </div>
     </header>
@@ -71,24 +62,22 @@
             <div class="msg msg-err" id="msgErr"></div>
             <div class="msg msg-ok" id="msgOk"></div>
 
-            <div style="margin-bottom:28px">
+            <div style="margin-bottom:24px">
+                <a href="/orders" class="btn btn-outline-brown">📋 Мои заказы</a>
+            </div>
+
+            <div>
                 <h3 class="section-title">Редактирование</h3>
                 <form id="editForm">
                     <div class="form-row"><label>Имя</label><input name="name" required></div>
                     <div class="form-row"><label>Телефон</label><input name="phone" required></div>
-                    <div class="form-row"><label>Адрес</label><input name="address"></div>
                     <button type="submit" class="btn">Сохранить</button>
                 </form>
-            </div>
-
-            <div>
-                <h3 class="section-title">Мои заказы</h3>
-                <div id="ordersList"><p style="color:#888">Загрузка...</p></div>
             </div>
         </div>
     </div>
 
-    <footer><div class="container"><p>&copy; 2024 ХозДача</p></div></footer>
+    <footer><div class="container"><p>&copy; <span class="footer-year"></span> ХозДача</p></div></footer>
 
     <script>
     const token = localStorage.getItem('auth_token');
@@ -117,24 +106,6 @@
         } catch { showMsg(msgErr, 'Ошибка загрузки'); }
     }
 
-    async function loadOrders() {
-        try {
-            const r = await api('/api/orders');
-            const orders = await r.json();
-            const list = document.getElementById('ordersList');
-            if (!orders || orders.length === 0) { list.innerHTML = '<p style="color:#888">Заказов пока нет</p>'; return; }
-            const labels = { pending: ['В обработке', 'badge-pending'], completed: ['Выполнен', 'badge-completed'], cancelled: ['Отменён', 'badge-cancelled'], expired: ['Истёк', 'badge-expired'] };
-            list.innerHTML = orders.map(o => {
-                const [txt, cls] = labels[o.status || o.Status] || [o.status || '?', ''];
-                return `<div class="order-card">
-                    <div class="order-card-header"><span>Заказ #${o.id || o.ID}</span><span class="badge ${cls}">${txt}</span></div>
-                    <div>Сумма: ${o.total_price || o.TotalPrice || 0} ₽</div>
-                    <div style="font-size:0.85rem;color:#888">${(o.created_at || o.CreatedAt || '').slice(0,10)}</div>
-                </div>`;
-            }).join('');
-        } catch { document.getElementById('ordersList').innerHTML = '<p style="color:red">Ошибка</p>'; }
-    }
-
     document.getElementById('editForm').onsubmit = async (e) => {
         e.preventDefault();
         const fd = new FormData(e.target);
@@ -153,19 +124,9 @@
 
     function logout() { localStorage.removeItem('auth_token'); localStorage.removeItem('user'); location.href = '/login'; }
     document.getElementById('logoutBtn').onclick = logout;
-    document.getElementById('logoutLink').onclick = (e) => { e.preventDefault(); logout(); };
-
-    document.getElementById('userAvatar').onclick = () => {
-        const dd = document.getElementById('dropdownMenu');
-        dd.style.display = dd.style.display === 'block' ? 'none' : 'block';
-    };
-    document.addEventListener('click', (e) => {
-        if (!document.getElementById('userMenu').contains(e.target)) document.getElementById('dropdownMenu').style.display = 'none';
-    });
 
     loadProfile();
-    loadOrders();
     </script>
-<script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
+    <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>

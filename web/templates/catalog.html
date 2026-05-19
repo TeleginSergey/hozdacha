@@ -20,15 +20,11 @@
                     <a href="/register" class="btn btn-outline">Регистрация</a>
                     <a href="/login" class="btn btn-primary">Вход</a>
                 </div>
-                <div class="user-menu" id="userMenu" style="display: none;">
+                <a href="/profile" id="userMenu" style="display:none;text-decoration:none">
                     <div class="user-avatar" id="userAvatar">
                         <span id="avatarLetter">U</span>
                     </div>
-                    <div class="dropdown-menu" id="dropdownMenu">
-                        <a href="/profile">Личный кабинет</a>
-                        <a href="#" onclick="logout()">Выход</a>
-                    </div>
-                </div>
+                </a>
             </div>
         </div>
     </header>
@@ -138,22 +134,6 @@
         showAuthButtons();
         window.location.href = '/login';
     }
-
-    // Toggle dropdown menu
-    document.getElementById('userAvatar')?.addEventListener('click', function() {
-        const dropdown = document.getElementById('dropdownMenu');
-        dropdown.style.display = dropdown.style.display === 'block' ? 'none' : 'block';
-    });
-
-    // Close dropdown when clicking outside
-    document.addEventListener('click', function(event) {
-        const userMenu = document.getElementById('userMenu');
-        const dropdown = document.getElementById('dropdownMenu');
-        
-        if (!userMenu.contains(event.target)) {
-            dropdown.style.display = 'none';
-        }
-    });
 
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', checkAuthState);

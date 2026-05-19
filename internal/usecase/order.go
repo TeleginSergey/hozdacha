@@ -26,6 +26,7 @@ type OrderRepository interface {
 	GetByID(ctx context.Context, id int64) (*db.Order, error)
 	Update(ctx context.Context, order *db.Order, id int64) (*db.Order, error)
 	GetByUserID(ctx context.Context, userID int64) ([]*db.Order, error)
+	GetItemsByOrderID(ctx context.Context, orderID int64) ([]*db.OrderItem, error)
 }
 
 // ProductReadRepository — контракт чтения товаров; совместим с db.ProductQuery.
@@ -294,6 +295,20 @@ func (u *OrderUsecase) GetUserOrders(ctx context.Context, userID int64) ([]*db.O
 	orders, err := u.orders.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user orders: %w", err)
+	}
+	for _, o := range orders {
+		items, err := u.orders.GetItemsByOrderID(ctx, o.ID)
+		if err != nil {
+			u.logger.Warn("Failed to load items for order", zap.Int64("order_id", o.ID), zap.Error(err))
+			continue
+		}
+		for _, it := range items {
+			product, err := u.products.GetByID(ctx, it.ProductID)
+			if err == nil && product != nil {
+				it.ProductName = product.Name
+			}
+			o.Items = append(o.Items, *it)
+		}
 	}
 	return orders, nil
 }
