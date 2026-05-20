@@ -308,8 +308,8 @@ func (u *UserUsecase) Login(ctx context.Context, req LoginRequest) (*AuthRespons
 
 	// Не возвращаем чувствительные данные
 	user.Password = ""
-	user.AccessTokenSecret = ""
-	user.RefreshTokenSecret = ""
+	user.AccessTokenSecret = nil
+	user.RefreshTokenSecret = nil
 
 	return &AuthResponse{
 		Token: token,
@@ -379,8 +379,8 @@ func (u *UserUsecase) GetProfile(ctx context.Context, userID int64) (*db.User, e
 
 	// Не возвращаем чувствительные данные
 	user.Password = ""
-	user.AccessTokenSecret = ""
-	user.RefreshTokenSecret = ""
+	user.AccessTokenSecret = nil
+	user.RefreshTokenSecret = nil
 
 	return user, nil
 }
