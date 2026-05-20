@@ -23,7 +23,7 @@ function safeParseJSON(str, defaultValue) {
 let cart = safeParseJSON(localStorage.getItem('cart'), []);
 
 // Пагинация
-const pageLimit = 51; // Для сетки 3xN (3 карточки в ряд)
+const pageLimit = 24; // Кратно 2, 3, 4 колонкам — подходит для всех размеров экрана
 let currentOffset = 0;
 let currentQuery = '';
 let totalPages = 1;
