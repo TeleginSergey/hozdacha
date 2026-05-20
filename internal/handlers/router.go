@@ -25,6 +25,7 @@ func SetupRouter(
 	adminOrdersHandler *AdminOrdersHandler,
 	productQuery db.ProductQuery,
 	jwtSecret string,
+	corsOrigins []string,
 	healthCheckService *services.HealthCheckService,
 	logger *zap.Logger,
 ) *gin.Engine {
@@ -38,7 +39,7 @@ func SetupRouter(
 
 	// Глобальные middleware безопасности
 	router.Use(middleware.SecurityHeaders())
-	router.Use(middleware.CORS())
+	router.Use(middleware.CORS(corsOrigins))
 	router.Use(middleware.RateLimit())
 
 	// Статические файлы
@@ -226,10 +227,11 @@ func SetupRouter(
 		api.POST("/admin/login", middleware.StrictRateLimit(), authHandler.Login)
 	}
 
-	// Админ API (требуют авторизации)
+	// Админ API (требуют авторизации + роль admin)
 	admin := router.Group("/api/admin")
-	admin.Use(middleware.StrictRateLimit()) // Строгий лимит для админки
+	admin.Use(middleware.StrictRateLimit())
 	admin.Use(middleware.AuthMiddleware(jwtSecret))
+	admin.Use(middleware.RequireAdmin())
 	{
 		// Акции
 		admin.GET("/promotions", promotionHandler.GetAllPromotions)
@@ -242,10 +244,10 @@ func SetupRouter(
 		admin.POST("/products/sync", moyskladSyncHandler.SyncProducts)
 		admin.POST("/products/sync/full", moyskladSyncHandler.SyncProductsFull)
 
-		// Управление заказами в магазине (требует роль admin).
+		// Управление заказами в магазине
 		// /ship  — клиент пришёл и выкупил → status=completed
 		// /expire — ручное истечение брони → возврат стока + удаление в МойСклад
-		adminOrders := admin.Group("/orders", middleware.RequireAdmin())
+		adminOrders := admin.Group("/orders")
 		{
 			// Списки и аналитика. Lookup объявляется до /:id, чтобы gin не путал
 			// "lookup" / "today" / "stats" с параметром :id.
@@ -261,7 +263,7 @@ func SetupRouter(
 		}
 
 		// Клиенты — поиск и статистика.
-		adminUsers := admin.Group("/users", middleware.RequireAdmin())
+		adminUsers := admin.Group("/users")
 		{
 			adminUsers.GET("", adminOrdersHandler.SearchUsers)
 			adminUsers.GET("/:id/stats", adminOrdersHandler.UserStats)

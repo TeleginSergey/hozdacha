@@ -111,6 +111,13 @@ func ProductRateLimit() gin.HandlerFunc {
 		limit:    600, // 600 запросов в минуту для API товаров
 	}
 
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			productLimiter.cleanup()
+		}
+	}()
+
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
 
