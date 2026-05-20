@@ -29,24 +29,10 @@ CREATE TABLE IF NOT EXISTS users (
     users_updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Вставка администратора (пароль: admin123)
-INSERT INTO users (
-    users_username, 
-    users_email, 
-    users_password_hash, 
-    users_roles_id_fk,
-    users_access_token_secret,
-    users_refresh_token_secret,
-    users_email_verified
-) VALUES (
-    'admin', 
-    'admin@hozdacha.ru', 
-    '$2a$10$YourHashedPasswordHere', 
-    1, 
-    'access-secret', 
-    'refresh-secret', 
-    true
-) ON CONFLICT (users_email) DO NOTHING;
+-- Администратор создаётся после деплоя через CLI:
+--   ./scripts/create_admin.sh <username> <email> <password>
+-- или напрямую:
+--   docker compose exec app ./create_admin admin admin@hozdacha.ru <password>
 
 -- Создание таблицы категорий
 CREATE TABLE IF NOT EXISTS categories (
