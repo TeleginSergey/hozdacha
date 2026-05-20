@@ -794,9 +794,10 @@ func (c *Client) GetBaseURL() string {
 	return c.baseURL
 }
 
-// GetProductFirstImageHref возвращает meta.href первого изображения товара из коллекции
-// /entity/product/{id}/images. Возвращает пустую строку если у товара нет изображений.
-func (c *Client) GetProductFirstImageHref(ctx context.Context, moyskladProductID string) (string, error) {
+// GetProductFirstDownloadURL возвращает meta.downloadHref (ссылку на оригинал изображения)
+// первого фото товара из /entity/product/{id}/images.
+// Возвращает пустую строку если у товара нет изображений.
+func (c *Client) GetProductFirstDownloadURL(ctx context.Context, moyskladProductID string) (string, error) {
 	endpoint := fmt.Sprintf("%s/entity/product/%s/images?limit=1", c.baseURL, moyskladProductID)
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
@@ -822,7 +823,8 @@ func (c *Client) GetProductFirstImageHref(ctx context.Context, moyskladProductID
 	var result struct {
 		Rows []struct {
 			Meta struct {
-				Href string `json:"href"`
+				DownloadHref string `json:"downloadHref"`
+				Href         string `json:"href"`
 			} `json:"meta"`
 		} `json:"rows"`
 	}
@@ -832,7 +834,42 @@ func (c *Client) GetProductFirstImageHref(ctx context.Context, moyskladProductID
 	if len(result.Rows) == 0 {
 		return "", nil
 	}
+	// Предпочитаем downloadHref (оригинал), fallback на href если downloadHref пуст.
+	if result.Rows[0].Meta.DownloadHref != "" {
+		return result.Rows[0].Meta.DownloadHref, nil
+	}
 	return result.Rows[0].Meta.Href, nil
+}
+
+// DownloadRawFile скачивает файл по URL с авторизацией.
+// Возвращает байты и Content-Type.
+func (c *Client) DownloadRawFile(ctx context.Context, downloadURL string) ([]byte, string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+
+	resp, err := c.doRequestWithRetry(ctx, req)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to download file: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, "", fmt.Errorf("download error %s: %s", resp.Status, string(body))
+	}
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, "", fmt.Errorf("failed to read file data: %w", err)
+	}
+	contentType := resp.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "image/jpeg"
+	}
+	return data, contentType, nil
 }
 
 // DownloadImage скачивает изображение товара из МойСклад по href изображения.
