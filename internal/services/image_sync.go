@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,9 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
 	"go.uber.org/zap"
 )
+
+// errNoImage возвращается когда у товара нет изображений в МойСклад (не ошибка, просто пропуск).
+var errNoImage = errors.New("product has no images in MoySklad")
 
 // ImageSyncService скачивает изображения товаров из МойСклад и сохраняет локально.
 // Рассчитан на слабый сервер: батчи по 5 товаров, паузы 500ms между батчами,
@@ -57,17 +61,15 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 		return fmt.Errorf("failed to get products: %w", err)
 	}
 
-	// Фильтруем: нужны товары с Moysklad ID и image_url, указывающим на МойСклад
+	// Фильтруем: нужны товары с Moysklad ID, у которых ещё нет локального изображения.
+	// image_sync работает независимо от product_sync — не требует image_url с MoySklad URL.
 	var toDownload []*db.Product
 	for _, p := range products {
 		if p.MoyskladID == nil || *p.MoyskladID == "" {
 			continue
 		}
-		if p.ImageURL == nil || *p.ImageURL == "" {
-			continue
-		}
-		// Если image_url уже локальный — пропускаем
-		if !strings.Contains(*p.ImageURL, "moysklad") {
+		// Если уже есть локальное изображение — пропускаем
+		if p.ImageURL != nil && strings.HasPrefix(*p.ImageURL, "/static") {
 			continue
 		}
 		toDownload = append(toDownload, p)
@@ -83,7 +85,7 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 
 	const batchSize = 5
 	const pauseBetweenBatches = 500 * time.Millisecond
-	var downloaded, skipped, errors int
+	var downloaded, skipped, failed int
 
 	for i := 0; i < len(toDownload); i += batchSize {
 		end := i + batchSize
@@ -101,11 +103,15 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 			}
 
 			if err := s.downloadProductImage(ctx, product); err != nil {
-				s.logger.Warn("Failed to download image",
-					zap.Int64("product_id", product.ID),
-					zap.String("name", product.Name),
-					zap.Error(err))
-				errors++
+				if errors.Is(err, errNoImage) {
+					skipped++
+				} else {
+					s.logger.Warn("Failed to download image",
+						zap.Int64("product_id", product.ID),
+						zap.String("name", product.Name),
+						zap.Error(err))
+					failed++
+				}
 			} else {
 				downloaded++
 			}
@@ -114,7 +120,7 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 		s.logger.Info("Image batch completed",
 			zap.Int("batch_start", i),
 			zap.Int("downloaded", downloaded),
-			zap.Int("errors", errors))
+			zap.Int("errors", failed))
 
 		if i+batchSize < len(toDownload) {
 			time.Sleep(pauseBetweenBatches)
@@ -124,12 +130,19 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 	s.logger.Info("Image sync finished",
 		zap.Int("downloaded", downloaded),
 		zap.Int("skipped", skipped),
-		zap.Int("errors", errors))
+		zap.Int("errors", failed))
 	return nil
 }
 
 func (s *ImageSyncService) downloadProductImage(ctx context.Context, product *db.Product) error {
-	imageHref := *product.ImageURL
+	// Получаем href первого изображения товара из МойСклад по его moysklad_id.
+	imageHref, err := s.moyskladClient.GetProductFirstImageHref(ctx, *product.MoyskladID)
+	if err != nil {
+		return fmt.Errorf("get image href failed: %w", err)
+	}
+	if imageHref == "" {
+		return errNoImage
+	}
 
 	data, contentType, err := s.moyskladClient.DownloadImage(ctx, imageHref)
 	if err != nil {
