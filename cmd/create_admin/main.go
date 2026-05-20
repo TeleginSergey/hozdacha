@@ -62,12 +62,13 @@ func main() {
 
 	// Insert admin user
 	query := `
-		INSERT INTO users (users_username, users_email, users_password_hash, users_roles_id_fk, users_email_verified, users_created_at, users_updated_at)
-		VALUES ($1, $2, $3, 1, true, NOW(), NOW())
+		INSERT INTO users (users_username, users_email, users_password_hash, users_roles_id_fk, users_full_name, users_phone, users_email_verified, users_created_at, users_updated_at)
+		VALUES ($1, $2, $3, 1, $1, '', true, NOW(), NOW())
 		ON CONFLICT (users_username) DO UPDATE SET
 		users_email = EXCLUDED.users_email,
 		users_password_hash = EXCLUDED.users_password_hash,
 		users_roles_id_fk = EXCLUDED.users_roles_id_fk,
+		users_full_name = EXCLUDED.users_full_name,
 		users_email_verified = EXCLUDED.users_email_verified,
 		users_updated_at = NOW()
 		RETURNING users_id_pk, users_username, users_email, users_roles_id_fk`
