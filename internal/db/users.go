@@ -42,8 +42,8 @@ type User struct {
 	Password               string     `db:"users_password_hash" insert:"users_password_hash" update:"users_password_hash" json:"-"`
 	Email                  string     `db:"users_email" insert:"users_email" json:"email"`
 	RoleID                 int64      `db:"users_roles_id_fk" insert:"users_roles_id_fk" json:"role_id"`
-	AccessTokenSecret      string     `db:"users_access_token_secret" insert:"users_access_token_secret" json:"-"`
-	RefreshTokenSecret     string     `db:"users_refresh_token_secret" insert:"users_refresh_token_secret" json:"-"`
+	AccessTokenSecret      *string    `db:"users_access_token_secret" insert:"users_access_token_secret" json:"-"`
+	RefreshTokenSecret     *string    `db:"users_refresh_token_secret" insert:"users_refresh_token_secret" json:"-"`
 	AccessTokenJTI         *string    `db:"users_access_token_jti" updateAuth:"users_access_token_jti" json:"-"`
 	RefreshTokenJTI        *string    `db:"users_refresh_token_jti" updateAuth:"users_refresh_token_jti" json:"-"`
 	AuthTime               *time.Time `db:"users_auth_time" insert:"users_auth_time" json:"-"`
