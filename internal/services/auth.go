@@ -73,9 +73,14 @@ func (s *AuthService) Login(ctx context.Context, req LoginRequest) (*LoginRespon
 }
 
 func (s *AuthService) generateToken(userID, roleID int64) (string, error) {
+	role := "user"
+	if roleID == 1 {
+		role = "admin"
+	}
 	claims := jwt.MapClaims{
 		"user_id": userID,
 		"role_id": roleID,
+		"role":    role,
 		"exp":     time.Now().Add(24 * time.Hour).Unix(),
 		"iat":     time.Now().Unix(),
 	}
