@@ -195,7 +195,11 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 					}
 				}
 
-				if msProduct.Images != nil && len(msProduct.Images.Rows) > 0 {
+				// Сохраняем существующий image_url (локальные скачанные изображения).
+				// ImageSyncService отвечает за загрузку и обновление изображений независимо.
+				if existing != nil && existing.ImageURL != nil {
+					product.ImageURL = existing.ImageURL
+				} else if msProduct.Images != nil && len(msProduct.Images.Rows) > 0 {
 					imageURL := msProduct.Images.Rows[0].Meta.Href
 					product.ImageURL = &imageURL
 				}
@@ -331,9 +335,10 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 			Description: product.Description,
 			Price:       getPrice(product),
 			Stock:       stock,
-			Status:      status, // Добавляем статус
+			Status:      status,
 			Active:      true,
 			UpdatedAt:   time.Now(),
+			ImageURL:    existingProduct.ImageURL, // Сохраняем существующий image_url
 		}
 
 		if _, err := s.productQuery.Update(ctx, updated, existingProduct.ID); err != nil {

@@ -794,6 +794,47 @@ func (c *Client) GetBaseURL() string {
 	return c.baseURL
 }
 
+// GetProductFirstImageHref возвращает meta.href первого изображения товара из коллекции
+// /entity/product/{id}/images. Возвращает пустую строку если у товара нет изображений.
+func (c *Client) GetProductFirstImageHref(ctx context.Context, moyskladProductID string) (string, error) {
+	endpoint := fmt.Sprintf("%s/entity/product/%s/images?limit=1", c.baseURL, moyskladProductID)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.token)
+	req.Header.Set("Accept", "application/json;charset=utf-8")
+
+	resp, err := c.doRequestWithRetry(ctx, req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get product images: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == http.StatusNotFound {
+		return "", nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return "", fmt.Errorf("moysklad images API error: %s, body: %s", resp.Status, string(body))
+	}
+
+	var result struct {
+		Rows []struct {
+			Meta struct {
+				Href string `json:"href"`
+			} `json:"meta"`
+		} `json:"rows"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("failed to decode images response: %w", err)
+	}
+	if len(result.Rows) == 0 {
+		return "", nil
+	}
+	return result.Rows[0].Meta.Href, nil
+}
+
 // DownloadImage скачивает изображение товара из МойСклад по href изображения.
 // Возвращает байты изображения и его формат (из Content-Type).
 func (c *Client) DownloadImage(ctx context.Context, imageHref string) ([]byte, string, error) {
