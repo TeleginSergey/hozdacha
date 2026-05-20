@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -28,8 +29,9 @@ type DBConfig struct {
 }
 
 type ServerConfig struct {
-	Port string
-	Host string
+	Port        string
+	Host        string
+	CORSOrigins []string
 }
 
 type JWTConfig struct {
@@ -90,32 +92,52 @@ func Load() (*Config, error) {
 		// Не критично, если .env не найден
 	}
 
+	dbPassword, err := requireEnv("DB_PASSWORD")
+	if err != nil {
+		return nil, err
+	}
+	jwtSecret, err := requireEnv("JWT_SECRET")
+	if err != nil {
+		return nil, err
+	}
+
 	port, _ := strconv.Atoi(getEnv("DB_PORT", "5432"))
 	expiration, _ := time.ParseDuration(getEnv("JWT_EXPIRATION", "24h"))
+
+	// CORS: читаем список разрешённых origins из переменной (через запятую)
+	var corsOrigins []string
+	if raw := os.Getenv("CORS_ALLOWED_ORIGINS"); raw != "" {
+		for _, o := range strings.Split(raw, ",") {
+			if o = strings.TrimSpace(o); o != "" {
+				corsOrigins = append(corsOrigins, o)
+			}
+		}
+	}
 
 	return &Config{
 		DB: DBConfig{
 			Host:     getEnv("DB_HOST", "postgres"),
 			Port:     port,
 			User:     getEnv("DB_USER", "postgres"),
-			Password: getEnv("DB_PASSWORD", "wT+wh1D3wm13EbzKdbnLo0iLQUrDAbuqsJAtrdJSroo="),
+			Password: dbPassword,
 			Name:     getEnv("DB_NAME", "hozdacha"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
 		Server: ServerConfig{
-			Port: getEnv("SERVER_PORT", "8080"),
-			Host: getEnv("SERVER_HOST", "localhost"),
+			Port:        getEnv("SERVER_PORT", "8080"),
+			Host:        getEnv("SERVER_HOST", "0.0.0.0"),
+			CORSOrigins: corsOrigins,
 		},
 		JWT: JWTConfig{
-			Secret:     getEnv("JWT_SECRET", "cb86c5a5cd3f79c0dce45edbc29046858fda85cc02a206112ca76b6cfba8d812"),
+			Secret:     jwtSecret,
 			Expiration: expiration,
 		},
 		Moysklad: MoyskladConfig{
-			Token:                 getEnv("MOYSKLAD_TOKEN", "47ce83c983ae81c9da6caaf2d7a28a5bf4124775"),
+			Token:                 os.Getenv("MOYSKLAD_TOKEN"),
 			BaseURL:               getEnv("MOYSKLAD_BASE_URL", "https://api.moysklad.ru/api/remap/1.2"),
 			AutoSync:              getEnv("MOYSKLAD_AUTO_SYNC", "true") == "true",
 			SyncInterval:          parseDuration(getEnv("MOYSKLAD_SYNC_INTERVAL", "1h")), // Резервная синхронизация каждые 1 час
-			WebhookSecret:         getEnv("MOYSKLAD_WEBHOOK_SECRET", "a15b3006e171f232b232acbb230c397a6e5368c40317f4a3e528b81768936e4c"),
+			WebhookSecret:         os.Getenv("MOYSKLAD_WEBHOOK_SECRET"),
 			StockBuffer:           parseFloat(getEnv("MOYSKLAD_STOCK_BUFFER", "3.0")),         // Уменьшили буфер до 3%
 			RequestsPerSecond:     parseFloat(getEnv("MOYSKLAD_REQUESTS_PER_SECOND", "10.0")), // 10/сек = 600/минуту (75% от 800 лимита)
 			MaxRetries:            parseInt(getEnv("MOYSKLAD_MAX_RETRIES", "5")),              // в т.ч. повторы при 503
@@ -129,20 +151,20 @@ func Load() (*Config, error) {
 			CircuitFailThreshold:  parseInt(getEnv("MOYSKLAD_CIRCUIT_FAIL_THRESHOLD", "5")),
 			CircuitOpenTimeout:    parseDuration(getEnv("MOYSKLAD_CIRCUIT_OPEN_TIMEOUT", "60s")),
 			MaxConcurrentRequests: parseInt(getEnv("MOYSKLAD_MAX_CONCURRENT_REQUESTS", "8")),
-			OrganizationID:        getEnv("MOYSKLAD_ORGANIZATION_ID", ""),
-			AgentID:               getEnv("MOYSKLAD_AGENT_ID", ""),
+			OrganizationID:        os.Getenv("MOYSKLAD_ORGANIZATION_ID"),
+			AgentID:               os.Getenv("MOYSKLAD_AGENT_ID"),
 		},
 		Redis: RedisConfig{
 			Host:     getEnv("REDIS_HOST", "redis"),
 			Port:     getEnv("REDIS_PORT", "6379"),
-			Password: getEnv("REDIS_PASSWORD", "flpWSUaPsbHZ3A"),
+			Password: os.Getenv("REDIS_PASSWORD"),
 			DB:       parseInt(getEnv("REDIS_DB", "0")),
 		},
 		SMTP: SMTPConfig{
 			Host:     getEnv("SMTP_HOST", "smtp.gmail.com"),
 			Port:     parseInt(getEnv("SMTP_PORT", "587")),
-			Username: getEnv("SMTP_USERNAME", ""),
-			Password: getEnv("SMTP_PASSWORD", ""),
+			Username: os.Getenv("SMTP_USERNAME"),
+			Password: os.Getenv("SMTP_PASSWORD"),
 			From:     getEnv("SMTP_FROM", "noreply@hozdacha.ru"),
 			UseTLS:   getEnv("SMTP_USE_TLS", "true") == "true",
 		},
@@ -159,6 +181,13 @@ func getEnv(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+func requireEnv(key string) (string, error) {
+	if value := os.Getenv(key); value != "" {
+		return value, nil
+	}
+	return "", fmt.Errorf("required environment variable %s is not set", key)
 }
 
 func parseDuration(s string) time.Duration {

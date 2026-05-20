@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -28,9 +29,12 @@ func NewUserHandler(userUC *usecase.UserUsecase, emailService *services.EmailSer
 	}
 }
 
-// Промежуточное хранилище для временных данных регистрации
-var registrationAttempts = make(map[string]int)
-var lastRegistrationTime = make(map[string]time.Time)
+// Тайминг регистрации / входа по IP (защищен mutex от data race)
+var (
+	registrationMu       sync.RWMutex
+	registrationAttempts = make(map[string]int)
+	lastRegistrationTime = make(map[string]time.Time)
+)
 
 func (h *UserHandler) Register(c *gin.Context) {
 	var req usecase.RegisterRequest
@@ -48,15 +52,21 @@ func (h *UserHandler) Register(c *gin.Context) {
 	const minRegistrationInterval = 1 * time.Minute
 
 	// Ограничение по времени (не чаще 1 раза в минуту)
-	if lastTime, exists := lastRegistrationTime[clientIP]; exists {
+	registrationMu.RLock()
+	lastTime, exists := lastRegistrationTime[clientIP]
+	registrationMu.RUnlock()
+
+	if exists {
 		if time.Since(lastTime) < minRegistrationInterval {
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Please wait before trying again"})
 			return
 		}
 
 		if time.Since(lastTime) < blockDuration {
-			attempts := registrationAttempts[clientIP] + 1
-			registrationAttempts[clientIP] = attempts
+			registrationMu.Lock()
+			registrationAttempts[clientIP]++
+			attempts := registrationAttempts[clientIP]
+			registrationMu.Unlock()
 
 			if attempts > maxAttemptsPerHour {
 				h.logger.Warn("Too many registration attempts",
@@ -146,12 +156,6 @@ func (h *UserHandler) Register(c *gin.Context) {
 				}
 			}()
 
-			// Логируем код для тестирования
-			h.logger.Info("VERIFICATION CODE (for testing)",
-				zap.Int64("user_id", existingUser.ID),
-				zap.String("email", existingUser.Email),
-				zap.String("code", code))
-
 			c.JSON(http.StatusAccepted, gin.H{
 				"message":               "User with this email already exists but is not verified. A new verification code has been sent to your email.",
 				"requires_verification": true,
@@ -189,12 +193,6 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Логируем код в консоль для тестирования (если email не настроен)
-	h.logger.Info("VERIFICATION CODE (for testing)",
-		zap.Int64("user_id", user.ID),
-		zap.String("email", user.Email),
-		zap.String("code", code))
-
 	// Отправляем email асинхронно в горутине
 	go func() {
 		name := user.Username
@@ -216,8 +214,10 @@ func (h *UserHandler) Register(c *gin.Context) {
 	}()
 
 	// Обновляем время регистрации
+	registrationMu.Lock()
 	lastRegistrationTime[clientIP] = time.Now()
 	registrationAttempts[clientIP] = 0
+	registrationMu.Unlock()
 
 	h.logger.Info("User registered, verification code sent",
 		zap.Int64("user_id", user.ID),
@@ -245,27 +245,26 @@ func (h *UserHandler) Login(c *gin.Context) {
 
 	// Защита от брутфорса - проверяем IP
 	clientIP := c.ClientIP()
-	if lastTime, exists := lastRegistrationTime[clientIP]; exists {
-		if time.Since(lastTime) < 5*time.Second {
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many login attempts. Please wait."})
-			return
-		}
+	registrationMu.RLock()
+	lastLogin, loginExists := lastRegistrationTime[clientIP]
+	registrationMu.RUnlock()
+	if loginExists && time.Since(lastLogin) < 5*time.Second {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many login attempts. Please wait."})
+		return
 	}
 
 	authResp, err := h.userUC.Login(c.Request.Context(), req)
+	registrationMu.Lock()
+	lastRegistrationTime[clientIP] = time.Now()
+	registrationMu.Unlock()
 	if err != nil {
 		h.logger.Warn("Login failed",
 			zap.String("username", req.Username),
 			zap.String("ip", clientIP),
 			zap.Error(err))
-
-		lastRegistrationTime[clientIP] = time.Now()
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
 		return
 	}
-
-	// Обновляем время последней попытки
-	lastRegistrationTime[clientIP] = time.Now()
 
 	h.logger.Info("User logged in successfully",
 		zap.Int64("user_id", authResp.User.ID),

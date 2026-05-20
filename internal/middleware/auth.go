@@ -85,7 +85,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 					return
 				}
 				if isBlacklisted {
-					// Токен отозван - логируем и продолжаем
+					// Токен отозван — не устанавливаем user_id, продолжаем без аутентификации
 					c.Next()
 					return
 				}
@@ -99,7 +99,7 @@ func AuthMiddleware(jwtSecret string) gin.HandlerFunc {
 					return
 				}
 				if isUserBlacklisted {
-					// Все токены пользователя отозваны
+					// Все токены пользователя отозваны — не устанавливаем user_id
 					c.Next()
 					return
 				}

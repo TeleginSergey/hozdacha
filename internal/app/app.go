@@ -44,13 +44,13 @@ func NewApp() (*App, error) {
 
 	cfg, err := config.Load()
 	if err != nil {
-		logger.Fatal("Failed to load config", zap.Error(err))
+		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
 	// DB
 	database, err := db.New(&cfg.DB, logger)
 	if err != nil {
-		logger.Fatal("Failed to initialize database", zap.Error(err))
+		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
 
 	// Redis
@@ -232,14 +232,19 @@ func NewApp() (*App, error) {
 		adminOrdersHandler,
 		productRepo,
 		cfg.JWT.Secret,
+		cfg.Server.CORSOrigins,
 		healthCheckService,
 		logger,
 	)
 
 	addr := fmt.Sprintf("%s:%s", cfg.Server.Host, cfg.Server.Port)
 	srv := &http.Server{
-		Addr:    addr,
-		Handler: router,
+		Addr:              addr,
+		Handler:           router,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	return &App{
@@ -318,7 +323,7 @@ func (a *App) Run() {
 	<-quit
 
 	a.Logger.Info("Shutting down server...")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 
 	if err := a.Server.Shutdown(ctx); err != nil {

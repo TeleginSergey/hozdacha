@@ -6,7 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	mathrand "math/rand"
+	"math/big"
 	"strings"
 	"time"
 
@@ -83,7 +83,8 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 		parts := strings.Split(req.Email, "@")
 		username = parts[0]
 		// Добавляем случайные цифры для уникальности
-		username = fmt.Sprintf("%s%d", username, mathrand.Intn(10000))
+		n, _ := rand.Int(rand.Reader, big.NewInt(10000))
+		username = fmt.Sprintf("%s%d", username, n.Int64())
 	}
 
 	// Проверяем существует ли пользователь
@@ -127,11 +128,14 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 	return user, nil
 }
 
-// GenerateVerificationCode генерирует 6-значный код верификации
+// GenerateVerificationCode генерирует криптографически стойкий 6-значный код верификации
 func (u *UserUsecase) GenerateVerificationCode() string {
-	// Генерируем случайное число от 100000 до 999999
-	code := 100000 + mathrand.Intn(900000)
-	return fmt.Sprintf("%06d", code)
+	n, err := rand.Int(rand.Reader, big.NewInt(900000))
+	if err != nil {
+		// Криптогенератор недоступен — падаем, чтобы не выдавать предсказуемые коды
+		panic(fmt.Sprintf("crypto/rand unavailable: %v", err))
+	}
+	return fmt.Sprintf("%06d", 100000+n.Int64())
 }
 
 // SaveVerificationCode сохраняет код верификации в БД
@@ -190,7 +194,8 @@ func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterR
 		parts := strings.Split(req.Email, "@")
 		username = parts[0]
 		// Добавляем случайные цифры для уникальности
-		username = fmt.Sprintf("%s%d", username, mathrand.Intn(10000))
+		n, _ := rand.Int(rand.Reader, big.NewInt(10000))
+		username = fmt.Sprintf("%s%d", username, n.Int64())
 	}
 
 	// Проверяем существует ли пользователь (в транзакции)

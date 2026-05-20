@@ -45,10 +45,7 @@ func SecurityHeaders() gin.HandlerFunc {
 
 // SanitizeInput санитизирует строковые входные данные от XSS
 func SanitizeInput(input string) string {
-	// Экранируем HTML теги
-	sanitized := html.EscapeString(input)
-
-	// Удаляем опасные паттерны
+	// Удаляем опасные паттерны ДО html-экранирования (case-insensitive)
 	dangerous := []string{
 		"<script",
 		"</script>",
@@ -59,14 +56,17 @@ func SanitizeInput(input string) string {
 		"onmouseover=",
 	}
 
-	lower := strings.ToLower(sanitized)
+	lower := strings.ToLower(input)
 	for _, pattern := range dangerous {
-		if strings.Contains(lower, pattern) {
-			sanitized = strings.ReplaceAll(sanitized, pattern, "")
+		for strings.Contains(lower, pattern) {
+			idx := strings.Index(lower, pattern)
+			input = input[:idx] + input[idx+len(pattern):]
+			lower = strings.ToLower(input)
 		}
 	}
 
-	return sanitized
+	// Экранируем оставшиеся HTML-спецсимволы
+	return html.EscapeString(input)
 }
 
 // SanitizeString санитизирует строку, сохраняя базовые символы
@@ -90,28 +90,20 @@ func ValidateEmail(email string) bool {
 	return emailRegex.MatchString(email)
 }
 
-// CORS настройки для API
-func CORS() gin.HandlerFunc {
+// CORS настройки для API. allowedOrigins читается из CORS_ALLOWED_ORIGINS (через config).
+func CORS(allowedOrigins []string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := c.GetHeader("Origin")
 
-		// Разрешаем только определенные источники (можно настроить)
-		allowedOrigins := []string{
-			"http://localhost:8081",
-			"http://localhost:8080",
-			"http://127.0.0.1:8081",
-			"http://127.0.0.1:8080",
-		}
-
-		allowed := false
-		for _, allowedOrigin := range allowedOrigins {
-			if origin == allowedOrigin {
+		allowed := origin == ""
+		for _, o := range allowedOrigins {
+			if origin == o {
 				allowed = true
 				break
 			}
 		}
 
-		if allowed || origin == "" {
+		if allowed {
 			c.Header("Access-Control-Allow-Origin", origin)
 		}
 
