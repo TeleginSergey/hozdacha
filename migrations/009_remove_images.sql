@@ -1,1 +1,1 @@
-UPDATE products SET products_moysklad_id = NULL WHERE image_url LIKE '/static%';
+UPDATE products SET products_image_url = NULL WHERE products_image_url LIKE '/static%';
