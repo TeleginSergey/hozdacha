@@ -10,8 +10,9 @@ RUN go mod download
 # Копируем исходный код
 COPY . .
 
-# Собираем приложение
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/main.go
+# Собираем приложение и утилиту create_admin
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/main.go && \
+    CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o create_admin ./cmd/create_admin/main.go
 
 # Final stage
 FROM alpine:latest
@@ -21,6 +22,7 @@ WORKDIR /root/
 
 # Копируем бинарники из builder
 COPY --from=builder /app/main .
+COPY --from=builder /app/create_admin .
 COPY --from=builder /app/web ./web
 COPY --from=builder /app/migrations ./migrations
 

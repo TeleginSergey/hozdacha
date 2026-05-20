@@ -62,15 +62,15 @@ func main() {
 
 	// Insert admin user
 	query := `
-		INSERT INTO users (username, email, password, role_id, email_verified, created_at, updated_at)
-		VALUES ($1, $2, $3, 2, true, NOW(), NOW())
-		ON CONFLICT (username) DO UPDATE SET
-		email = EXCLUDED.email,
-		password = EXCLUDED.password,
-		role_id = EXCLUDED.role_id,
-		email_verified = EXCLUDED.email_verified,
-		updated_at = NOW()
-		RETURNING id, username, email, role_id`
+		INSERT INTO users (users_username, users_email, users_password_hash, users_roles_id_fk, users_email_verified, users_created_at, users_updated_at)
+		VALUES ($1, $2, $3, 1, true, NOW(), NOW())
+		ON CONFLICT (users_username) DO UPDATE SET
+		users_email = EXCLUDED.users_email,
+		users_password_hash = EXCLUDED.users_password_hash,
+		users_roles_id_fk = EXCLUDED.users_roles_id_fk,
+		users_email_verified = EXCLUDED.users_email_verified,
+		users_updated_at = NOW()
+		RETURNING users_id_pk, users_username, users_email, users_roles_id_fk`
 
 	var id int64
 	var returnedUsername, returnedEmail string
