@@ -348,6 +348,7 @@ function updateCartCount() {
     const countEl = document.getElementById('cartCount');
     if (countEl) {
         countEl.textContent = count;
+        countEl.style.display = count > 0 ? 'flex' : 'none';
     }
 }
 

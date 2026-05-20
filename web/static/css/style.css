@@ -318,6 +318,7 @@ section h2 {
 }
 
 .cart-btn {
+    position: relative;
     background-color: #e74c3c;
     color: white;
     padding: 1rem 2rem;
@@ -734,13 +735,19 @@ footer {
 
     /* Корзина — кнопка меньше */
     .cart-btn {
-        padding: 0.7rem 1.2rem;
-        font-size: 0.85rem;
+        width: 48px;
+        height: 48px;
+        padding: 0;
+        border-radius: 50%;
+        font-size: 1.3rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
     .cart-section {
-        bottom: 12px;
-        right: 12px;
+        bottom: 16px;
+        right: 16px;
     }
 
     /* Пагинация */
@@ -783,23 +790,41 @@ footer {
 
 /* Телефоны (≤480px) */
 @media (max-width: 480px) {
-    /* Сетка товаров: 1 колонка (широкие карточки) */
+    /* Сетка товаров: 2 колонки как в Ozon/WB */
     .promotions-grid,
     .products-grid {
-        grid-template-columns: 1fr;
-        gap: 12px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
     }
 
     .product-card img {
-        height: 220px;
+        height: 140px;
+    }
+
+    .product-card-content {
+        padding: 8px;
     }
 
     .product-card h3 {
-        font-size: 1rem;
+        font-size: 0.82rem;
+        -webkit-line-clamp: 2;
+        line-clamp: 2;
+        min-height: auto;
     }
 
     .product-card .price {
-        font-size: 1.2rem;
+        font-size: 0.95rem;
+        margin: 4px 0;
+    }
+
+    .product-card .stock {
+        font-size: 0.7rem;
+        margin-bottom: 6px;
+    }
+
+    .product-card .btn {
+        padding: 6px 8px;
+        font-size: 0.75rem;
     }
 
     /* Header ещё компактнее */
