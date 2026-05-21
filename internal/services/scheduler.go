@@ -141,8 +141,8 @@ func (s *Scheduler) runImageSyncAtTime(ctx context.Context) {
 		}
 
 		rctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-		s.logger.Info("Starting daily image sync")
-		if err := s.imageSync.SyncImages(rctx); err != nil {
+		s.logger.Info("Starting daily image sync with cleanup")
+		if err := s.imageSync.SyncImagesWithCleanup(rctx); err != nil {
 			s.logger.Error("Image sync failed", zap.Error(err))
 		}
 		cancel()
@@ -162,8 +162,8 @@ func (s *Scheduler) runImageSyncByInterval(ctx context.Context) {
 			return
 		case <-t.C:
 			rctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-			s.logger.Info("Starting periodic image sync")
-			if err := s.imageSync.SyncImages(rctx); err != nil {
+			s.logger.Info("Starting periodic image sync with cleanup")
+			if err := s.imageSync.SyncImagesWithCleanup(rctx); err != nil {
 				s.logger.Error("Image sync failed", zap.Error(err))
 			}
 			cancel()

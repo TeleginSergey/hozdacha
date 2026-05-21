@@ -148,6 +148,68 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 	return nil
 }
 
+// SyncImagesWithCleanup скачивает отсутствующие изображения И удаляет осиротевшие файлы
+// (для товаров, удалённых из МойСклад). Предназначен для ночного запуска.
+func (s *ImageSyncService) SyncImagesWithCleanup(ctx context.Context) error {
+	// Сначала скачиваем недостающие
+	if err := s.SyncImages(ctx); err != nil {
+		return err
+	}
+
+	// Затем чистим осиротевшие файлы
+	return s.cleanupOrphanedFiles(ctx)
+}
+
+// cleanupOrphanedFiles удаляет файлы изображений, которым нет соответствующего товара в БД.
+func (s *ImageSyncService) cleanupOrphanedFiles(ctx context.Context) error {
+	// Получаем все image_url из БД
+	products, err := s.productQuery.GetAll(ctx, 100000, 0)
+	if err != nil {
+		return fmt.Errorf("failed to get products for cleanup: %w", err)
+	}
+
+	// Строим множество файлов, на которые есть ссылки из БД
+	known := make(map[string]struct{}, len(products))
+	for _, p := range products {
+		if p.ImageURL != nil && strings.HasPrefix(*p.ImageURL, "/static") {
+			known[filepath.Base(*p.ImageURL)] = struct{}{}
+		}
+	}
+
+	// Читаем все файлы в директории
+	entries, err := os.ReadDir(s.imagesDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil // папки нет — нечего чистить
+		}
+		return fmt.Errorf("failed to read images dir: %w", err)
+	}
+
+	var deleted int
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if _, ok := known[name]; !ok {
+			path := filepath.Join(s.imagesDir, name)
+			if err := os.Remove(path); err != nil {
+				s.logger.Warn("Failed to remove orphaned image", zap.String("file", path), zap.Error(err))
+			} else {
+				deleted++
+				s.logger.Debug("Removed orphaned image", zap.String("file", name))
+			}
+		}
+	}
+
+	if deleted > 0 {
+		s.logger.Info("Cleaned up orphaned images", zap.Int("deleted", deleted))
+	} else {
+		s.logger.Info("No orphaned images to clean up")
+	}
+	return nil
+}
+
 func (s *ImageSyncService) downloadProductImage(ctx context.Context, product *db.Product) error {
 	// Получаем URL оригинального изображения (meta.downloadHref) из коллекции МойСклад.
 	// Это 1 запрос вместо 2 (старый подход через JSON-метаданные изображения).
