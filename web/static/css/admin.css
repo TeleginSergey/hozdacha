@@ -97,12 +97,12 @@
 }
 
 .tab-btn:hover {
-    color: #2c3e50;
+    color: #2C2C2C;
     background: rgba(0, 0, 0, 0.03);
 }
 
 .tab-btn.active {
-    color: #2c3e50;
+    color: #2C2C2C;
     border-bottom-color: #3498db;
     background: white;
 }
@@ -162,7 +162,7 @@
 .stat-card .stat-value {
     font-size: 2rem;
     font-weight: 700;
-    color: #2c3e50;
+    color: #2C2C2C;
 }
 
 .stat-card .stat-sub {
@@ -210,7 +210,7 @@
 }
 
 .admin-table thead th {
-    background: #2c3e50;
+    background: #2C2C2C;
     color: white;
     text-align: left;
     padding: 0.75rem;
@@ -293,7 +293,7 @@
 
 .order-info-block .info-value {
     font-size: 1rem;
-    color: #2c3e50;
+    color: #2C2C2C;
     word-break: break-word;
 }
 
@@ -312,7 +312,7 @@
 .order-item-row:last-child {
     border-bottom: none;
     font-weight: 600;
-    border-top: 2px solid #2c3e50;
+    border-top: 2px solid #2C2C2C;
     padding-top: 1rem;
 }
 
