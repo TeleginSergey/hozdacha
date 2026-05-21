@@ -96,14 +96,12 @@ func (h *UserHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
 		return
 	}
-	if len(req.Password) < 6 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 6 characters"})
+	if len(req.Password) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters"})
 		return
 	}
-
-	// Проверяем на простые пароли
-	if isWeakPassword(req.Password) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password is too weak. Use a combination of letters, numbers and symbols."})
+	if !strings.ContainsAny(req.Password, "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must contain at least one uppercase letter"})
 		return
 	}
 
@@ -513,30 +511,6 @@ func (h *UserHandler) VerifyTOTP(c *gin.Context) {
 	})
 }
 
-// Проверка на слабые пароли
-func isWeakPassword(password string) bool {
-	weakPasswords := []string{
-		"password", "123456", "123456789", "qwerty", "abc123",
-		"password123", "admin", "letmein", "welcome", "monkey",
-	}
-
-	passwordLower := strings.ToLower(password)
-	for _, weak := range weakPasswords {
-		if passwordLower == weak {
-			return true
-		}
-	}
-
-	// Проверяем на простые паттерны
-	if strings.Contains(passwordLower, "123") ||
-		strings.Contains(passwordLower, "qwerty") ||
-		strings.Contains(passwordLower, "abc") {
-		return true
-	}
-
-	return false
-}
-
 // LogoutRequest - запрос на выход
 // Logout добавляет текущий токен в чёрный список
 func (h *UserHandler) Logout(c *gin.Context) {
@@ -675,6 +649,11 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 			zap.String("email", req.Email),
 			zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired code"})
+		return
+	}
+
+	if !strings.ContainsAny(req.NewPassword, "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must contain at least one uppercase letter"})
 		return
 	}
 
