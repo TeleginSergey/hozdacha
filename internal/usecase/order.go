@@ -12,10 +12,12 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
 )
 
-// DefaultReservationTTL — на сколько товар бронируется для пользователя
-// после создания заказа. Если клиент не выкупил в магазине за это время,
-// бронь автоматически снимается, сток возвращается, и CustomerOrder в МойСклад удаляется.
-const DefaultReservationTTL = 48 * time.Hour
+// reservedUntilFor возвращает момент истечения брони — 03:00 через 3 календарных дня.
+// Пример: заказ создан 21 мая в 22:30 → бронь до 24 мая 03:00.
+func reservedUntilFor(now time.Time) time.Time {
+	d := now.AddDate(0, 0, 3)
+	return time.Date(d.Year(), d.Month(), d.Day(), 3, 0, 0, 0, now.Location())
+}
 
 // OrderRepository — контракт работы с заказами.
 type OrderRepository interface {
@@ -126,7 +128,7 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		})
 	}
 
-	reservedUntil := time.Now().Add(DefaultReservationTTL)
+	reservedUntil := reservedUntilFor(time.Now())
 
 	// Валидация желаемого времени визита.
 	if req.PickupAt != nil {
