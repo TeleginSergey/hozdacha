@@ -371,14 +371,14 @@ function updateCartUI() {
                 <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eee;align-items:center">
                     <div style="flex:1;min-width:0">
                         <div style="font-weight:600;font-size:0.92rem;margin-bottom:2px">${name}</div>
-                        <div style="color:#5D4037;font-weight:700;font-size:0.9rem">${price.toFixed(0)} ₽</div>
+                        <div style="color:#8B6F47;font-weight:700;font-size:0.9rem">${price.toFixed(0)} ₽</div>
                     </div>
                     <div style="display:inline-flex;align-items:center;border:1px solid #ddd;border-radius:5px;overflow:hidden">
                         <button onclick="changeCartQty(${index}, -1)" style="width:30px;height:30px;border:none;background:white;cursor:pointer;font-size:1rem;color:#555">−</button>
                         <span style="min-width:32px;text-align:center;font-weight:600;border-left:1px solid #ddd;border-right:1px solid #ddd;padding:5px 0;font-size:0.9rem">${quantity}</span>
                         <button onclick="changeCartQty(${index}, 1)" style="width:30px;height:30px;border:none;background:white;cursor:pointer;font-size:1rem;color:#555">+</button>
                     </div>
-                    <span style="font-weight:700;color:#5D4037;min-width:70px;text-align:right;font-size:0.9rem">${subtotal.toFixed(0)} ₽</span>
+                    <span style="font-weight:700;color:#8B6F47;min-width:70px;text-align:right;font-size:0.9rem">${subtotal.toFixed(0)} ₽</span>
                     <button onclick="removeFromCart(${index})" style="background:none;border:none;color:#ccc;cursor:pointer;font-size:1rem;padding:4px" title="Удалить">✕</button>
                 </div>`;
             }).join('');
