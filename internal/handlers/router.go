@@ -85,6 +85,12 @@ func SetupRouter(
 		})
 	})
 
+	router.GET("/forgot-password", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "forgot-password.html", gin.H{
+			"title": "Сброс пароля - ХозДача",
+		})
+	})
+
 	// Verify email page removed
 
 	// Профиль (требует авторизации)
