@@ -82,19 +82,19 @@ func (h *AdminOrdersHandler) ListOrders(c *gin.Context) {
 }
 
 // ListToday — GET /api/admin/orders/today
-// Pending брони с дедлайном сегодня. Удобно показать "что должно прийти сегодня".
+// Заказы с указанным временем самовывоза сегодня (orders_pickup_at в пределах текущего дня).
 func (h *AdminOrdersHandler) ListToday(c *gin.Context) {
 	now := time.Now()
 	startOfDay := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	endOfDay := startOfDay.Add(24 * time.Hour)
 
 	f := db.OrderListFilter{
-		Statuses:  []string{"pending"},
-		DateFrom:  &startOfDay,
-		DateTo:    &endOfDay,
-		Limit:     500,
-		SortBy:    "reserved_until",
-		SortOrder: "asc",
+		Statuses:       []string{"pending"},
+		PickupDateFrom: &startOfDay,
+		PickupDateTo:   &endOfDay,
+		Limit:          500,
+		SortBy:         "pickup_at",
+		SortOrder:      "asc",
 	}
 	orders, total, err := h.orders.ListOrders(c.Request.Context(), f)
 	if err != nil {

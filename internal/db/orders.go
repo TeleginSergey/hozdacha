@@ -38,6 +38,7 @@ const (
 	OrdersCreatedAt     = "orders_created_at"
 	OrdersUpdatedAt     = "orders_updated_at"
 	OrdersReservedUntil = "orders_reserved_until"
+	OrdersPickupAt      = "orders_pickup_at"
 )
 
 const (
@@ -61,6 +62,7 @@ type Order struct {
 	CreatedAt     time.Time   `db:"orders_created_at" json:"created_at"`
 	UpdatedAt     time.Time   `db:"orders_updated_at" update:"orders_updated_at" json:"updated_at"`
 	ReservedUntil *time.Time  `db:"orders_reserved_until" insert:"orders_reserved_until" update:"orders_reserved_until" json:"reserved_until"`
+	PickupAt      *time.Time  `db:"orders_pickup_at" insert:"orders_pickup_at" update:"orders_pickup_at" json:"pickup_at"`
 	Items         []OrderItem `db:"-" json:"items,omitempty"`
 }
 
