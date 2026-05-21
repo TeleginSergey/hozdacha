@@ -419,6 +419,56 @@ function closeCart() {
     document.getElementById('cartModal').style.display = 'none';
 }
 
+// ======= Выбор времени самовывоза =======
+const PICKUP_MONTHS = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+
+function initPickupPicker() {
+    const now = new Date();
+    const max = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    const dateEl = document.getElementById('pickupDate');
+    const timeEl = document.getElementById('pickupTime');
+    if (!dateEl || !timeEl) return;
+
+    // Генерируем даты от сегодня до max включительно
+    dateEl.innerHTML = '<option value="">— дата —</option>';
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const maxDay = new Date(max.getFullYear(), max.getMonth(), max.getDate());
+    const tomorrow = new Date(today.getTime() + 86400000);
+    for (let d = new Date(today); d <= maxDay; d = new Date(d.getTime() + 86400000)) {
+        const opt = document.createElement('option');
+        opt.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+        const prefix = d.toDateString() === today.toDateString() ? 'Сегодня, '
+            : d.toDateString() === tomorrow.toDateString() ? 'Завтра, ' : '';
+        opt.textContent = prefix + d.getDate() + ' ' + PICKUP_MONTHS[d.getMonth()];
+        dateEl.appendChild(opt);
+    }
+
+    dateEl.onchange = () => updatePickupTimes(now, max);
+    timeEl.innerHTML = '<option value="">— время —</option>';
+}
+
+function updatePickupTimes(now, max) {
+    const dateEl = document.getElementById('pickupDate');
+    const timeEl = document.getElementById('pickupTime');
+    if (!dateEl || !timeEl) return;
+    timeEl.innerHTML = '<option value="">— время —</option>';
+    const dateVal = dateEl.value;
+    if (!dateVal) return;
+    const minAllowed = new Date(now.getTime() + 10 * 60 * 1000); // +10 мин
+    for (let h = 0; h < 24; h++) {
+        for (let m = 0; m < 60; m += 30) {
+            const hh = String(h).padStart(2,'0'), mm = String(m).padStart(2,'0');
+            const slot = new Date(dateVal + 'T' + hh + ':' + mm + ':00');
+            if (slot <= minAllowed || slot > max) continue;
+            const opt = document.createElement('option');
+            opt.value = slot.toISOString();
+            opt.textContent = hh + ':' + mm;
+            timeEl.appendChild(opt);
+        }
+    }
+}
+// ======= Конец пикера =======
+
 // Оформить заказ
 function checkout() {
     if (cart.length === 0) {
@@ -427,6 +477,7 @@ function checkout() {
     }
     closeCart();
     document.getElementById('checkoutModal').style.display = 'block';
+    initPickupPicker();
 }
 
 // Закрыть форму заказа
@@ -455,8 +506,11 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
         return;
     }
     
+    const pickupAt = document.getElementById('pickupTime')?.value || null;
+
     const order = {
         comment: comment,
+        pickup_at: pickupAt,
         items: validItems.map(item => ({
             product_id: parseInt(item.id),
             quantity: parseInt(item.quantity)
