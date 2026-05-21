@@ -623,27 +623,28 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
-	// Отправляем email асинхронно
-	go func() {
-		name := user.Username
-		if name == "" {
-			name = user.Email
-		}
+	// Отправляем email синхронно — чтобы видеть ошибки
+	name := user.Username
+	if name == "" {
+		name = user.Email
+	}
 
-		err := h.emailService.SendPasswordResetCode(user.Email, name, code)
-		if err != nil {
-			h.logger.Error("Failed to send reset email",
-				zap.Int64("user_id", user.ID),
-				zap.String("email", user.Email),
-				zap.Error(err))
-		} else {
-			h.logger.Info("Reset email sent",
-				zap.Int64("user_id", user.ID),
-				zap.String("email", user.Email))
-		}
-	}()
+	h.logger.Info("Password reset requested — sending email",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email),
+		zap.String("code", code))
 
-	h.logger.Info("Password reset requested",
+	err = h.emailService.SendPasswordResetCode(user.Email, name, code)
+	if err != nil {
+		h.logger.Error("Failed to send reset email",
+			zap.Int64("user_id", user.ID),
+			zap.String("email", user.Email),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send reset email: " + err.Error()})
+		return
+	}
+
+	h.logger.Info("Reset email sent successfully",
 		zap.Int64("user_id", user.ID),
 		zap.String("email", user.Email))
 
