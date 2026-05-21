@@ -87,18 +87,20 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 		return nil // Не возвращаем ошибку, чтобы не блокировать регистрацию
 	}
 
-	s.logger.Info("Sending email",
-		zap.String("to", to),
-		zap.String("subject", subject),
-		zap.String("smtp_host", s.cfg.Host),
-		zap.Int("smtp_port", s.cfg.Port))
-
-	// Формируем сообщение
 	from := s.cfg.From
 	if from == "" {
 		from = s.cfg.Username
 	}
 
+	s.logger.Info("Sending email",
+		zap.String("to", to),
+		zap.String("from", from),
+		zap.String("subject", subject),
+		zap.String("smtp_host", s.cfg.Host),
+		zap.Int("smtp_port", s.cfg.Port),
+		zap.Bool("use_tls", s.cfg.UseTLS))
+
+	// Формируем сообщение
 	msg := []byte(fmt.Sprintf("To: %s\r\n"+
 		"From: %s\r\n"+
 		"Subject: %s\r\n"+
