@@ -75,6 +75,19 @@
             <h2>Оформление заказа</h2>
             <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Бронь действует 48 часов, затем автоматически отменится.</p>
             <form id="checkoutForm">
+                <div style="margin-bottom:4px">
+                    <label style="font-size:0.9rem;font-weight:600;color:#555;display:block;margin-bottom:6px">
+                        Когда придёте забрать? <span style="font-weight:400;color:#888">(необязательно)</span>
+                    </label>
+                    <div style="display:flex;gap:8px">
+                        <select id="pickupDate" style="flex:1;padding:9px 10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem;color:#333;background:#fff">
+                            <option value="">— дата —</option>
+                        </select>
+                        <select id="pickupTime" style="flex:1;padding:9px 10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem;color:#333;background:#fff">
+                            <option value="">— время —</option>
+                        </select>
+                    </div>
+                </div>
                 <textarea name="comment" placeholder="Комментарий к заказу (необязательно)"></textarea>
                 <button type="submit" class="btn">Подтвердить заказ</button>
             </form>

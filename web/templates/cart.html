@@ -131,6 +131,45 @@
         updateCartCount();
     }
 
+    // ======= Пикер времени самовывоза =======
+    const _PM = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+    function _initPicker(dateId, timeId) {
+        const now = new Date(), max = new Date(now.getTime() + 48*60*60*1000);
+        const dEl = document.getElementById(dateId), tEl = document.getElementById(timeId);
+        if (!dEl || !tEl) return;
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const maxDay = new Date(max.getFullYear(), max.getMonth(), max.getDate());
+        const tomorrow = new Date(today.getTime() + 86400000);
+        dEl.innerHTML = '<option value="">— дата —</option>';
+        for (let d = new Date(today); d <= maxDay; d = new Date(d.getTime()+86400000)) {
+            const o = document.createElement('option');
+            o.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+            const pre = d.toDateString()===today.toDateString() ? 'Сегодня, '
+                : d.toDateString()===tomorrow.toDateString() ? 'Завтра, ' : '';
+            o.textContent = pre + d.getDate() + ' ' + _PM[d.getMonth()];
+            dEl.appendChild(o);
+        }
+        dEl.onchange = () => _fillTimes(dateId, timeId, now, max);
+        tEl.innerHTML = '<option value="">— время —</option>';
+    }
+    function _fillTimes(dateId, timeId, now, max) {
+        const dEl = document.getElementById(dateId), tEl = document.getElementById(timeId);
+        if (!dEl || !tEl) return;
+        tEl.innerHTML = '<option value="">— время —</option>';
+        const v = dEl.value; if (!v) return;
+        const minOk = new Date(now.getTime()+10*60*1000);
+        for (let h=0; h<24; h++) for (let m=0; m<60; m+=30) {
+            const hh=String(h).padStart(2,'0'), mm=String(m).padStart(2,'0');
+            const slot = new Date(v+'T'+hh+':'+mm+':00');
+            if (slot<=minOk || slot>max) continue;
+            const o = document.createElement('option');
+            o.value = slot.toISOString();
+            o.textContent = hh+':'+mm;
+            tEl.appendChild(o);
+        }
+    }
+    // ======= Конец пикера =======
+
     function checkout() {
         const token = localStorage.getItem('auth_token');
         if (!token) { alert('Войдите, чтобы оформить заказ'); location.href = '/login?redirect=/cart'; return; }
@@ -139,21 +178,24 @@
 
         const modal = document.createElement('div');
         modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center';
-        const now = new Date();
-        const maxPickup = new Date(now.getTime() + 48 * 60 * 60 * 1000);
-        const toLocalDT = d => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
-        const minDT = toLocalDT(new Date(now.getTime() + 60 * 1000)); // +1 мин от сейчас
-        const maxDT = toLocalDT(maxPickup);
 
         modal.innerHTML = `<div style="background:white;padding:24px;border-radius:10px;width:90%;max-width:440px;max-height:90vh;overflow-y:auto">
             <h3 style="margin-bottom:8px">Оформление заказа</h3>
             <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Бронь действует 48 часов, затем автоматически отменится.</p>
             <form id="coForm" style="display:flex;flex-direction:column;gap:10px">
-                <label style="font-size:0.9rem;font-weight:600;color:#555">Когда придёте забрать?
-                    <span style="font-weight:400;color:#888">(необязательно)</span>
-                </label>
-                <input name="pickup_at" type="datetime-local" min="${minDT}" max="${maxDT}"
-                    style="padding:10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem">
+                <div>
+                    <label style="font-size:0.9rem;font-weight:600;color:#555;display:block;margin-bottom:6px">
+                        Когда придёте забрать? <span style="font-weight:400;color:#888">(необязательно)</span>
+                    </label>
+                    <div style="display:flex;gap:8px">
+                        <select id="coPickupDate" style="flex:1;padding:9px 10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem;color:#333;background:#fff">
+                            <option value="">— дата —</option>
+                        </select>
+                        <select id="coPickupTime" style="flex:1;padding:9px 10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem;color:#333;background:#fff">
+                            <option value="">— время —</option>
+                        </select>
+                    </div>
+                </div>
                 <textarea name="comment" placeholder="Комментарий к заказу (необязательно)" style="padding:10px;border:1px solid #ddd;border-radius:5px;min-height:70px;resize:vertical"></textarea>
                 <button type="submit" class="btn btn-accent">Подтвердить заказ</button>
                 <button type="button" class="btn" style="background:#888" onclick="this.closest('[style*=fixed]').remove()">Отмена</button>
@@ -161,6 +203,7 @@
         </div>`;
         document.body.appendChild(modal);
         modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+        _initPicker('coPickupDate', 'coPickupTime');
 
         modal.querySelector('#coForm').onsubmit = async (e) => {
             e.preventDefault();
@@ -168,8 +211,7 @@
             const items = cart.map(i => ({ product_id: i.id, quantity: i.quantity }));
             const btn = e.target.querySelector('button[type=submit]');
             btn.disabled = true; btn.textContent = 'Отправка...';
-            const pickupRaw = fd.get('pickup_at');
-            const pickupAt = pickupRaw ? new Date(pickupRaw).toISOString() : null;
+            const pickupAt = document.getElementById('coPickupTime')?.value || null;
             try {
                 const r = await fetch('/api/orders', {
                     method: 'POST',
