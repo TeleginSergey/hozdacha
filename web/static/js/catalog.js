@@ -279,6 +279,7 @@ function scrollToTop() {
 // Показать/скрыть индикатор загрузки
 function showLoading(show) {
     const grid = document.getElementById('productsGrid');
+    if (!grid) return;
     if (show) {
         grid.style.opacity = '0.6';
         grid.style.pointerEvents = 'none';
@@ -510,6 +511,7 @@ window.onclick = function(event) {
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
+    if (!document.getElementById('productsGrid')) return;
     loadProducts(currentQuery);
     updateCartCount();
     
