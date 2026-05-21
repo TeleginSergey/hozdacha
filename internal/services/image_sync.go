@@ -69,9 +69,15 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 		if p.MoyskladID == nil || *p.MoyskladID == "" {
 			continue
 		}
-		// Если уже есть локальное изображение — пропускаем
+		// Если уже есть локальное изображение — проверяем что файл реально существует на диске.
+		// После редеплоя DB хранит старый путь, но файл может отсутствовать.
 		if p.ImageURL != nil && strings.HasPrefix(*p.ImageURL, "/static") {
-			continue
+			filename := filepath.Base(*p.ImageURL)
+			filePath := filepath.Join(s.imagesDir, filename)
+			if _, err := os.Stat(filePath); err == nil {
+				continue // файл есть — пропускаем
+			}
+			// файл исчез (редеплой/смена тома) — скачиваем заново
 		}
 		toDownload = append(toDownload, p)
 	}
