@@ -118,13 +118,14 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 
 	var err error
 	if s.cfg.UseTLS && s.cfg.Port == 465 {
-		// SMTPS (SSL/TLS сразу)
+		// SMTPS (SSL/TLS сразу) — Yandex/Gmail port 465
 		err = s.sendSMTPS(addr, tlsConfig, from, to, msg)
 	} else if s.cfg.UseTLS && s.cfg.Port == 587 {
-		// SMTP с STARTTLS (порт 587) - отключаем TLS для Postfix
-		err = s.sendPlain(addr, from, to, msg)
+		// SMTP с STARTTLS (порт 587) — Yandex/Gmail/Mail.ru port 587
+		// sendPlain не работает: smtp.PlainAuth отказывает без TLS
+		err = s.sendSTARTTLS(addr, tlsConfig, from, to, msg)
 	} else {
-		// Plain SMTP (порт 25)
+		// Plain SMTP (порт 25, локальный Postfix)
 		err = s.sendPlain(addr, from, to, msg)
 	}
 
@@ -196,8 +197,8 @@ func (s *EmailService) sendSTARTTLS(addr string, tlsConfig *tls.Config, from, to
 	}
 	defer client.Close()
 
-	// Приветствие
-	if err := client.Hello(s.cfg.Host); err != nil {
+	// Приветствие (EHLO от имени клиента, не сервера)
+	if err := client.Hello("localhost"); err != nil {
 		return fmt.Errorf("failed to send hello: %w", err)
 	}
 
