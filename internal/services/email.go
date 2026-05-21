@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/smtp"
 	"strconv"
+	"strings"
 
 	"github.com/TeleginSergey/hozdacha/internal/config"
 	"go.uber.org/zap"
@@ -22,64 +23,80 @@ func NewEmailService(cfg config.SMTPConfig, logger *zap.Logger) *EmailService {
 	}
 }
 
+// emailWrap оборачивает содержимое в красивый HTML-шаблон письма.
+func emailWrap(title, bodyHTML string) string {
+	return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"></head>` +
+		`<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">` +
+		`<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:30px 0"><tr><td align="center">` +
+		`<table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;max-width:480px;width:100%%">` +
+		`<tr><td style="background:#4A7C59;padding:24px 30px;text-align:center">` +
+		`<span style="color:#fff;font-size:20px;font-weight:700;letter-spacing:0.5px">` + title + `</span></td></tr>` +
+		`<tr><td style="padding:30px">` + bodyHTML + `</td></tr>` +
+		`<tr><td style="padding:0 30px 24px;color:#999;font-size:12px;text-align:center;line-height:1.5">` +
+		`Если вы не совершали это действие, просто проигнорируйте письмо.<br>© Хозяйкин Дом, hozdacha.ru</td></tr>` +
+		`</table></td></tr></table></body></html>`
+}
+
+// codeDigits рендерит 6-значный код крупными цифрами в отдельных блоках.
+func codeDigits(code string) string {
+	var b strings.Builder
+	for _, ch := range code {
+		b.WriteString(`<td style="width:48px;height:60px;background:#f7f9fc;border-radius:8px;text-align:center;vertical-align:middle;font-size:28px;font-weight:800;color:#2d3a2c;font-family:'Courier New',monospace;letter-spacing:2px">`)
+		b.WriteRune(ch)
+		b.WriteString(`</td>`)
+	}
+	return `<table cellpadding="0" cellspacing="0" style="margin:20px auto"><tr>` + b.String() + `</tr></table>`
+}
+
 // SendVerificationCode отправляет код верификации на email
 func (s *EmailService) SendVerificationCode(to, name, code string) error {
-	subject := "Код подтверждения регистрации - ХозДача"
-	body := fmt.Sprintf(`Здравствуйте, %s!
-
-Код подтверждения: %s
-
-Введите этот код в поле подтверждения на сайте для завершения регистрации.
-Код действителен в течение 30 минут.
-
-Если вы не регистрировались на сайте hozdacha.ru, проигнорируйте это письмо.
-
-С уважением,
-Команда Хозяйкин Дом
-`, name, code)
-
-	return s.sendEmail(to, subject, body)
+	greeting := name
+	if greeting == "" {
+		greeting = "здравствуйте"
+	} else {
+		greeting = "здравствуйте, " + name
+	}
+	body := `<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 8px">` + greeting + `!</p>` +
+		`<p style="color:#555;font-size:14px;line-height:1.6;margin:0 0 20px">Для завершения регистрации введите этот код на сайте:</p>` +
+		codeDigits(code) +
+		`<p style="color:#888;font-size:13px;text-align:center;margin:0">Код действителен 30 минут</p>`
+	return s.sendEmail(to, "Код подтверждения — ХозДача", body, true)
 }
 
 // SendPasswordResetCode отправляет код для сброса пароля
 func (s *EmailService) SendPasswordResetCode(to, name, code string) error {
-	subject := "Сброс пароля - hozdacha.ru"
-	body := fmt.Sprintf(`Здравствуйте, %s!
-
-Код для сброса пароля: %s
-
-Введите этот код на странице сброса пароля.
-Код действителен в течение 30 минут.
-
-Если вы не запрашивали сброс пароля, проигнорируйте это письмо.
-
-С уважением,
-Команда hozdacha.ru
-`, name, code)
-
-	return s.sendEmail(to, subject, body)
+	greeting := name
+	if greeting == "" {
+		greeting = "здравствуйте"
+	} else {
+		greeting = "здравствуйте, " + name
+	}
+	body := `<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 8px">` + greeting + `!</p>` +
+		`<p style="color:#555;font-size:14px;line-height:1.6;margin:0 0 20px">Для сброса пароля введите этот код на сайте:</p>` +
+		codeDigits(code) +
+		`<p style="color:#888;font-size:13px;text-align:center;margin:0">Код действителен 30 минут</p>`
+	return s.sendEmail(to, "Сброс пароля — ХозДача", body, true)
 }
 
 // SendOrderConfirmation отправляет подтверждение заказа
 func (s *EmailService) SendOrderConfirmation(to, name string, orderID int64, total float64) error {
-	subject := "Подтверждение заказа - Хозяйкин Дом"
-	body := fmt.Sprintf(`Здравствуйте, %s!
-
-Ваш заказ №%d успешно оформлен.
-
-Сумма заказа: %.2f руб.
-
-В ближайшее время с вами свяжется менеджер для подтверждения заказа.
-
-С уважением,
-Команда Хозяйкин Дом
-`, name, orderID, total)
-
-	return s.sendEmail(to, subject, body)
+	greeting := name
+	if greeting == "" {
+		greeting = "здравствуйте"
+	} else {
+		greeting = "здравствуйте, " + name
+	}
+	body := `<p style="color:#444;font-size:15px;line-height:1.6;margin:0 0 16px">` + greeting + `!</p>` +
+		`<p style="color:#555;font-size:14px;line-height:1.6;margin:0 0 8px">Ваш заказ оформлен:</p>` +
+		`<table cellpadding="0" cellspacing="0" style="background:#f7f9fc;border-radius:8px;padding:16px;width:100%%;margin-bottom:16px"><tr><td style="padding:8px 0;font-size:14px;color:#333">` +
+		`<b>№ заказа:</b> ` + strconv.FormatInt(orderID, 10) + `</td></tr><tr><td style="padding:8px 0;font-size:14px;color:#333">` +
+		`<b>Сумма:</b> ` + strconv.FormatFloat(total, 'f', 2, 64) + ` руб.</td></tr></table>` +
+		`<p style="color:#888;font-size:13px;margin:0">Менеджер свяжется с вами для подтверждения.</p>`
+	return s.sendEmail(to, "Заказ оформлен — ХозДача", body, true)
 }
 
-// sendEmail отправляет email через SMTPS
-func (s *EmailService) sendEmail(to, subject, body string) error {
+// sendEmail отправляет email через SMTPS. Если html=true, body интерпретируется как HTML.
+func (s *EmailService) sendEmail(to, subject, body string, html bool) error {
 	if s.cfg.Host == "" {
 		s.logger.Warn("SMTP host not configured, email not sent",
 			zap.String("to", to),
@@ -101,12 +118,18 @@ func (s *EmailService) sendEmail(to, subject, body string) error {
 		zap.Bool("use_tls", s.cfg.UseTLS))
 
 	// Формируем сообщение
+	contentType := "text/plain"
+	finalBody := body
+	if html {
+		contentType = "text/html"
+		finalBody = emailWrap(subject, body)
+	}
 	msg := []byte(fmt.Sprintf("To: %s\r\n"+
 		"From: %s\r\n"+
 		"Subject: %s\r\n"+
-		"Content-Type: text/plain; charset=UTF-8\r\n"+
+		"Content-Type: "+contentType+"; charset=UTF-8\r\n"+
 		"\r\n"+
-		"%s\r\n", to, from, subject, body))
+		"%s\r\n", to, from, subject, finalBody))
 
 	// Настройка TLS
 	tlsConfig := &tls.Config{
