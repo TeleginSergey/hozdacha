@@ -2,7 +2,9 @@ package services
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
+	"mime"
 	"net/smtp"
 	"strconv"
 	"strings"
@@ -28,13 +30,33 @@ func emailWrap(title, bodyHTML string) string {
 	return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"></head>` +
 		`<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">` +
 		`<table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f2f5;padding:30px 0"><tr><td align="center">` +
-		`<table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;max-width:480px;width:100%%">` +
+		`<table width="480" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;max-width:480px;width:100%">` +
 		`<tr><td style="background:#4A7C59;padding:24px 30px;text-align:center">` +
 		`<span style="color:#fff;font-size:20px;font-weight:700;letter-spacing:0.5px">` + title + `</span></td></tr>` +
 		`<tr><td style="padding:30px">` + bodyHTML + `</td></tr>` +
 		`<tr><td style="padding:0 30px 24px;color:#999;font-size:12px;text-align:center;line-height:1.5">` +
 		`Если вы не совершали это действие, просто проигнорируйте письмо.<br>© Хозяйкин Дом, hozdacha.ru</td></tr>` +
 		`</table></td></tr></table></body></html>`
+}
+
+// buildMsg собирает разряд письма с правильными MIME-заголовками и base64-телом.
+func buildMsg(from, to, subject, body string, html bool) []byte {
+	contentType := "text/plain; charset=UTF-8"
+	if html {
+		contentType = "text/html; charset=UTF-8"
+	}
+	encodedSubject := mime.QEncoding.Encode("UTF-8", subject)
+	encodedBody := base64.StdEncoding.EncodeToString([]byte(body))
+	var b strings.Builder
+	b.WriteString("To: " + to + "\r\n")
+	b.WriteString("From: " + from + "\r\n")
+	b.WriteString("Subject: " + encodedSubject + "\r\n")
+	b.WriteString("MIME-Version: 1.0\r\n")
+	b.WriteString("Content-Type: " + contentType + "\r\n")
+	b.WriteString("Content-Transfer-Encoding: base64\r\n")
+	b.WriteString("\r\n")
+	b.WriteString(encodedBody)
+	return []byte(b.String())
 }
 
 // codeDigits рендерит 6-значный код крупными цифрами в отдельных блоках.
@@ -118,18 +140,11 @@ func (s *EmailService) sendEmail(to, subject, body string, html bool) error {
 		zap.Bool("use_tls", s.cfg.UseTLS))
 
 	// Формируем сообщение
-	contentType := "text/plain"
 	finalBody := body
 	if html {
-		contentType = "text/html"
 		finalBody = emailWrap(subject, body)
 	}
-	msg := []byte(fmt.Sprintf("To: %s\r\n"+
-		"From: %s\r\n"+
-		"Subject: %s\r\n"+
-		"Content-Type: "+contentType+"; charset=UTF-8\r\n"+
-		"\r\n"+
-		"%s\r\n", to, from, subject, finalBody))
+	msg := buildMsg(from, to, subject, finalBody, html)
 
 	// Настройка TLS
 	tlsConfig := &tls.Config{
