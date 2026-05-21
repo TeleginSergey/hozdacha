@@ -6,419 +6,345 @@
     <title>Регистрация - ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        .auth-container {
-            max-width: 400px;
-            margin: 100px auto;
-            padding: 20px;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #e8f0e3 0%, #d4e8c5 50%, #c8dfb8 100%);
+            min-height: 100vh; display: flex; align-items: center; justify-content: center;
         }
-        .auth-form {
-            display: flex;
-            flex-direction: column;
-            gap: 15px;
+        .reg-card {
+            background: #fff; border-radius: 16px;
+            box-shadow: 0 8px 40px rgba(0,0,0,0.10);
+            width: 440px; max-width: 94vw; padding: 36px 32px 28px;
+            position: relative; overflow: hidden;
         }
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
+        .reg-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0;
+            height: 4px; background: linear-gradient(90deg, #4A7C59, #8B6F47);
         }
-        .form-group label {
-            font-weight: 600;
-            color: #333;
+        .reg-title { font-size: 1.5rem; font-weight: 700; color: #2d3a2c; text-align: center; margin-bottom: 6px; }
+        .reg-subtitle { text-align: center; color: #888; font-size: 0.9rem; margin-bottom: 24px; }
+        .steps { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 28px; }
+        .step-dot {
+            width: 36px; height: 36px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.95rem; transition: all 0.3s;
+            border: 2px solid #ddd; color: #aaa; background: #fff; flex-shrink: 0;
         }
-        .form-group input {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 16px;
+        .step-dot.active { border-color: #4A7C59; background: #4A7C59; color: #fff; }
+        .step-dot.done { border-color: #4A7C59; background: #e8f0e3; color: #4A7C59; }
+        .step-line { width: 48px; height: 2px; background: #ddd; flex-shrink: 0; transition: background 0.3s; }
+        .step-line.done { background: #4A7C59; }
+        .step-panel { display: none; }
+        .step-panel.active { display: block; }
+        .field { margin-bottom: 16px; }
+        .field label { display: block; font-size: 0.85rem; font-weight: 600; color: #444; margin-bottom: 5px; }
+        .field input {
+            width: 100%; padding: 11px 14px; border: 1.5px solid #e0e0e0;
+            border-radius: 8px; font-size: 0.95rem; color: #333;
+            transition: border-color 0.2s; background: #fafafa;
         }
+        .field input:focus { outline: none; border-color: #4A7C59; background: #fff; }
+        .pw-hints { font-size: 0.78rem; color: #999; margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
+        .pw-hints span { display: flex; align-items: center; gap: 4px; }
+        .pw-hints .ok { color: #4A7C59; }
+        .pw-hints .bad { color: #c0392b; }
         .btn {
-            background: #28a745;
-            color: white;
-            padding: 12px 24px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: 600;
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
+            font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
+            background: #4A7C59; color: #fff;
         }
-        .btn:hover {
-            background: #218838;
+        .btn:hover { background: #3d6a4b; }
+        .btn:disabled { background: #b0b0b0; cursor: not-allowed; }
+        .btn-outline {
+            background: transparent; color: #4A7C59;
+            border: 1.5px solid #4A7C59; margin-top: 10px;
         }
-        .btn:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
+        .btn-outline:hover { background: #e8f0e3; }
+        .btn-outline:disabled { border-color: #ccc; color: #ccc; background: transparent; }
+        .msg { padding: 10px 14px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 14px; display: none; }
+        .msg-error { background: #fdecea; color: #b71c1c; }
+        .msg-success { background: #e8f5e9; color: #2e7d32; }
+        .code-box { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+        .code-box input {
+            width: 44px; height: 52px; text-align: center; font-size: 1.3rem; font-weight: 700;
+            border: 1.5px solid #e0e0e0; border-radius: 8px; background: #fafafa;
         }
-        .btn-secondary {
-            background: #6c757d;
-            color: white;
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            margin-top: 10px;
-        }
-        .btn-secondary:hover {
-            background: #5a6268;
-        }
-        .btn-secondary:disabled {
-            background: #868e96;
-            cursor: not-allowed;
-        }
-        .error-message {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-        .success-message {
-            background: #d4edda;
-            color: #155724;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-        .password-strength {
-            font-size: 12px;
-            color: #666;
-            margin-top: 5px;
-        }
-        .login-link {
-            text-align: center;
-            margin-top: 20px;
-        }
-        .login-link a {
-            color: #007bff;
-            text-decoration: none;
-        }
-        .login-link a:hover {
-            text-decoration: underline;
-        }
+        .code-box input:focus { outline: none; border-color: #4A7C59; background: #fff; }
+        .footer-link { text-align: center; margin-top: 20px; font-size: 0.9rem; color: #888; }
+        .footer-link a { color: #4A7C59; text-decoration: none; font-weight: 600; }
+        .footer-link a:hover { text-decoration: underline; }
+        .back-link { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; color: #888; cursor: pointer; margin-bottom: 12px; background: none; border: none; }
+        .back-link:hover { color: #4A7C59; }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="auth-container">
-            <h2>Регистрация</h2>
-            
-            <div id="error-message" class="error-message" style="display: none;"></div>
-            <div id="success-message" class="success-message" style="display: none;"></div>
-            
-            <form id="register-form" class="auth-form">
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="name">Полное имя *</label>
-                    <input type="text" id="name" name="name" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="phone">Телефон *</label>
-                    <input type="tel" id="phone" name="phone" required placeholder="+7 XXX XXX-XX-XX">
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">Пароль</label>
-                    <input type="password" id="password" name="password" required>
-                    <div id="password-strength" class="password-strength"></div>
-                </div>
-                
-                <div class="form-group" style="display: none;">
-                    <label for="website">Сайт (необязательно)</label>
-                    <input type="text" id="website" name="website" autocomplete="off">
-                </div>
-                
-                <div class="form-group" id="verification-group" style="display: none;">
-                    <label for="verification_code">Код подтверждения</label>
-                    <input type="text" id="verification_code" name="verification_code" placeholder="Введите код из письма">
-                    <button type="button" id="resend-code" class="btn-secondary">Отправить код повторно</button>
-                </div>
-                
-                <button type="submit" class="btn" id="register-btn">Зарегистрироваться</button>
-            </form>
-            
-            <div class="login-link">
-                <p>Уже есть аккаунт? <a href="/login">Войдите</a></p>
-            </div>
-        </div>
+<div class="reg-card">
+    <div class="reg-title">Регистрация</div>
+    <div class="reg-subtitle">Создайте аккаунт за пару шагов</div>
+
+    <div class="steps">
+        <div class="step-dot active" id="dot1">1</div>
+        <div class="step-line" id="line"></div>
+        <div class="step-dot" id="dot2">2</div>
     </div>
 
+    <div id="msgError" class="msg msg-error"></div>
+    <div id="msgSuccess" class="msg msg-success"></div>
+
+    <!-- Шаг 1: заполнение данных -->
+    <div class="step-panel active" id="panel1">
+        <div class="field">
+            <label for="email">Email</label>
+            <input type="email" id="email" placeholder="you@example.com" autocomplete="email">
+        </div>
+        <div class="field">
+            <label for="name">Имя</label>
+            <input type="text" id="name" placeholder="Иван Петров" autocomplete="name">
+        </div>
+        <div class="field">
+            <label for="phone">Телефон</label>
+            <input type="tel" id="phone" placeholder="+7 999 123-45-67" autocomplete="tel">
+        </div>
+        <div class="field">
+            <label for="password">Пароль</label>
+            <input type="password" id="password" placeholder="Минимум 8 символов" autocomplete="new-password">
+            <div class="pw-hints">
+                <span id="hintLen" class="bad">◌ 8+ символов</span>
+                <span id="hintUpper" class="bad">◌ заглавная буква</span>
+            </div>
+        </div>
+        <!-- honeypot -->
+        <div style="position:absolute;left:-9999px" aria-hidden="true">
+            <input type="text" id="website" autocomplete="off" tabindex="-1">
+        </div>
+        <button class="btn" id="btnStep1">Продолжить</button>
+    </div>
+
+    <!-- Шаг 2: код подтверждения -->
+    <div class="step-panel" id="panel2">
+        <button class="back-link" id="btnBack">← Назад</button>
+        <p style="text-align:center;color:#555;font-size:0.9rem;margin-bottom:16px">
+            Мы отправили 6-значный код на <strong id="emailDisplay"></strong>
+        </p>
+        <div class="code-box" id="codeBox">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="0">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="1">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="2">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="3">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="4">
+            <input type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" data-idx="5">
+        </div>
+        <button class="btn" id="btnStep2">Подтвердить</button>
+        <button class="btn btn-outline" id="btnResend">Отправить код повторно</button>
+    </div>
+
+    <div class="footer-link">
+        Уже есть аккаунт? <a href="/login">Войти</a>
+    </div>
+</div>
+
     <script>
-        document.getElementById('password').addEventListener('input', function(e) {
-            const password = e.target.value;
-            const strengthDiv = document.getElementById('password-strength');
-            
-            if (password.length < 6) {
-                strengthDiv.textContent = 'Слишком короткий пароль (минимум 6 символов)';
-                strengthDiv.style.color = '#dc3545';
-            } else if (isWeakPassword(password)) {
-                strengthDiv.textContent = 'Слабый пароль. Используйте комбинацию букв, цифр и символов.';
-                strengthDiv.style.color = '#ffc107';
-            } else {
-                strengthDiv.textContent = 'Хороший пароль';
-                strengthDiv.style.color = '#28a745';
-            }
+        let pendingEmail = null;
+        let formStartTime = null;
+
+        // --- Password hints ---
+        const pw = document.getElementById('password');
+        const hintLen = document.getElementById('hintLen');
+        const hintUpper = document.getElementById('hintUpper');
+        pw.addEventListener('input', function() {
+            const v = pw.value;
+            hintLen.className = v.length >= 8 ? 'ok' : 'bad';
+            hintLen.textContent = (v.length >= 8 ? '●' : '◌') + ' 8+ символов';
+            hintUpper.className = /[A-ZА-ЯЁ]/.test(v) ? 'ok' : 'bad';
+            hintUpper.textContent = (/[A-ZА-ЯЁ]/.test(v) ? '●' : '◌') + ' заглавная буква';
         });
 
-        function isWeakPassword(password) {
-            const weakPasswords = ['password', '123456', '123456789', 'qwerty', 'abc123', 'password123', 'admin', 'letmein'];
-            const passwordLower = password.toLowerCase();
-            
-            for (let weak of weakPasswords) {
-                if (passwordLower === weak) return true;
-            }
-            
-            if (passwordLower.includes('123') || passwordLower.includes('qwerty') || passwordLower.includes('abc')) {
-                return true;
-            }
-            
-            return false;
+        // --- Timer ---
+        ['email','password'].forEach(function(id) {
+            document.getElementById(id).addEventListener('focus', function() {
+                if (!formStartTime) formStartTime = Date.now();
+            });
+        });
+
+        // --- Show message ---
+        function showMsg(type, text) {
+            var el = document.getElementById(type === 'error' ? 'msgError' : 'msgSuccess');
+            el.textContent = text; el.style.display = 'block';
+        }
+        function hideMsgs() {
+            document.getElementById('msgError').style.display = 'none';
+            document.getElementById('msgSuccess').style.display = 'none';
         }
 
-        let registrationStep = 1; // 1: ввод email/пароль, 2: ввод кода
-        let pendingRegistration = null;
-
-        // Запускаем таймер когда пользователь начинает заполнять форму
-        document.getElementById('email').addEventListener('focus', function() {
-            if (!window.formStartTime) {
-                window.formStartTime = Date.now();
-            }
-        });
-
-        document.getElementById('password').addEventListener('focus', function() {
-            if (!window.formStartTime) {
-                window.formStartTime = Date.now();
-            }
-        });
-
-        document.getElementById('register-form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const btn = document.getElementById('register-btn');
-            const errorDiv = document.getElementById('error-message');
-            const successDiv = document.getElementById('success-message');
-            
-            // Если таймер не запущен (пользователь сразу нажал submit), запускаем его
-            if (!window.formStartTime) {
-                window.formStartTime = Date.now();
-            }
-            
-            // Скрываем предыдущие сообщения
-            errorDiv.style.display = 'none';
-            successDiv.style.display = 'none';
-            
-            if (registrationStep === 1) {
-                // Шаг 1: Регистрация с отправкой кода
-                await handleFirstStep(btn, errorDiv, successDiv);
+        // --- Switch panels ---
+        function goStep(n) {
+            var p1 = document.getElementById('panel1'), p2 = document.getElementById('panel2');
+            var d1 = document.getElementById('dot1'), d2 = document.getElementById('dot2');
+            var line = document.getElementById('line');
+            if (n === 1) {
+                p1.classList.add('active'); p2.classList.remove('active');
+                d1.className = 'step-dot active'; d2.className = 'step-dot';
+                line.classList.remove('done');
             } else {
-                // Шаг 2: Подтверждение кода
-                await handleSecondStep(btn, errorDiv, successDiv);
+                p1.classList.remove('active'); p2.classList.add('active');
+                d1.className = 'step-dot done'; d2.className = 'step-dot active';
+                line.classList.add('done');
             }
-        });
+        }
 
-        async function handleFirstStep(btn, errorDiv, successDiv) {
-            // Проверяем honeypot поле (боты часто заполняют все поля)
-            const websiteField = document.getElementById('website');
-            if (websiteField && websiteField.value.trim() !== '') {
-                errorDiv.textContent = 'Bot detected. Please leave the website field empty.';
-                errorDiv.style.display = 'block';
+        // --- Step 1: submit registration ---
+        document.getElementById('btnStep1').addEventListener('click', async function() {
+            var btn = this;
+            hideMsgs();
+
+            // honeypot
+            if (document.getElementById('website').value.trim() !== '') {
+                showMsg('error', 'Обнаружен бот. Попробуйте ещё раз.');
                 return;
             }
-            
-            // Проверяем скорость заполнения формы
-            const formFillTime = Date.now() - window.formStartTime;
-            if (formFillTime < 1000) { // Меньше 1 секунды - подозрительно быстро
-                errorDiv.textContent = 'Please slow down. This helps prevent automated registrations.';
-                errorDiv.style.display = 'block';
+            // speed check
+            if (!formStartTime) formStartTime = Date.now();
+            if (Date.now() - formStartTime < 1000) {
+                showMsg('error', 'Пожалуйста, не торопитесь. Это помогает защитить от ботов.');
                 return;
             }
-            
-            // Блокируем кнопку
-            btn.disabled = true;
-            btn.textContent = 'Регистрация...';
-            
-            const formData = {
-                email: document.getElementById('email').value,
-                name: document.getElementById('name').value,
-                phone: document.getElementById('phone').value,
-                password: document.getElementById('password').value
-            };
-            
+
+            var email = document.getElementById('email').value.trim();
+            var name = document.getElementById('name').value.trim();
+            var phone = document.getElementById('phone').value.trim();
+            var password = pw.value;
+
+            if (!email || !name || !phone || !password) {
+                showMsg('error', 'Заполните все поля');
+                return;
+            }
+            if (password.length < 8) {
+                showMsg('error', 'Пароль должен быть не менее 8 символов');
+                return;
+            }
+            if (!/[A-ZА-ЯЁ]/.test(password)) {
+                showMsg('error', 'Пароль должен содержать хотя бы одну заглавную букву');
+                return;
+            }
+
+            btn.disabled = true; btn.textContent = 'Отправка...';
+
             try {
-                const response = await fetch('/api/auth/register', {
+                var r = await fetch('/api/auth/register', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(formData)
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: email, name: name, phone: phone, password: password})
                 });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    // Сохраняем данные регистрации для второго шага
-                    pendingRegistration = formData;
-                    
-                    // Показываем поле для ввода кода
-                    document.getElementById('verification-group').style.display = 'block';
-                    btn.textContent = 'Подтвердить регистрацию';
-                    registrationStep = 2;
-                    
-                    // Проверяем специальный случай - существующий пользователь
-                    if (data.requires_verification) {
-                        successDiv.textContent = data.message || 'Пользователь с таким email уже существует, но не подтвержден. Новый код отправлен на вашу почту!';
-                    } else {
-                        successDiv.textContent = 'Код подтверждения отправлен на вашу почту! Проверьте email и введите код ниже.';
-                    }
-                    successDiv.style.display = 'block';
-                    
-                    // Очищаем только поле пароля для безопасности
-                    document.getElementById('password').value = '';
-                    document.getElementById('password-strength').textContent = '';
-                } else if (response.status === 202) {
-                    // Специальный случай: пользователь существует но не подтвержден
-                    const data = await response.json();
-                    
-                    // Сохраняем email для верификации
-                    pendingRegistration = { email: formData.email };
-                    
-                    // Показываем поле для ввода кода
-                    document.getElementById('verification-group').style.display = 'block';
-                    btn.textContent = 'Подтвердить регистрацию';
-                    registrationStep = 2;
-                    
-                    successDiv.textContent = data.message || 'Пользователь с таким email уже существует, но не подтвержден. Новый код отправлен на вашу почту!';
-                    successDiv.style.display = 'block';
-                    
-                    // Очищаем только поле пароля для безопасности
-                    document.getElementById('password').value = '';
-                    document.getElementById('password-strength').textContent = '';
+                var d = await r.json();
+
+                if (r.ok || r.status === 202) {
+                    pendingEmail = email;
+                    document.getElementById('emailDisplay').textContent = email;
+                    goStep(2);
+                    document.querySelectorAll('#codeBox input').forEach(function(inp) { inp.value = ''; });
+                    document.getElementById('codeBox').querySelector('input').focus();
+                    showMsg('success', d.message || 'Код отправлен на вашу почту!');
+                    pw.value = '';
+                    hintLen.className = 'bad'; hintLen.textContent = '◌ 8+ символов';
+                    hintUpper.className = 'bad'; hintUpper.textContent = '◌ заглавная буква';
                 } else {
-                    errorDiv.textContent = data.error || 'Ошибка регистрации';
-                    errorDiv.style.display = 'block';
-                    
-                    // Если слишком много попыток, показываем когда можно повторить
-                    if (data.retry_after) {
-                        setTimeout(() => {
-                            btn.disabled = false;
-                            btn.textContent = 'Зарегистрироваться';
-                        }, data.retry_after * 1000);
+                    showMsg('error', d.error || 'Ошибка регистрации');
+                    if (d.retry_after) {
+                        btn.disabled = true;
+                        setTimeout(function() { btn.disabled = false; btn.textContent = 'Продолжить'; }, d.retry_after * 1000);
                         return;
                     }
                 }
-            } catch (error) {
-                errorDiv.textContent = 'Ошибка сети. Попробуйте еще раз.';
-                errorDiv.style.display = 'block';
+            } catch(e) {
+                showMsg('error', 'Ошибка сети. Попробуйте ещё раз.');
             } finally {
-                // Всегда разблокируем кнопку
-                btn.disabled = false;
-                if (registrationStep === 1) {
-                    btn.textContent = 'Зарегистрироваться';
-                } else {
-                    btn.textContent = 'Подтвердить регистрацию';
-                }
-            }
-        }
-
-        async function handleSecondStep(btn, errorDiv, successDiv) {
-            const verificationCode = document.getElementById('verification_code').value;
-            
-            if (!verificationCode) {
-                errorDiv.textContent = 'Пожалуйста, введите код подтверждения';
-                errorDiv.style.display = 'block';
-                return;
-            }
-            
-            btn.disabled = true;
-            btn.textContent = 'Подтверждение...';
-            
-            try {
-                const response = await fetch('/api/auth/verify-email', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: pendingRegistration.email,
-                        code: verificationCode
-                    })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    successDiv.textContent = 'Email успешно подтвержден! Регистрация завершена. Теперь вы можете войти.';
-                    successDiv.style.display = 'block';
-                    
-                    // Очищаем форму
-                    document.getElementById('register-form').reset();
-                    document.getElementById('verification-group').style.display = 'none';
-                    
-                    // Перенаправляем на страницу входа через 3 секунды с сохранением redirect
-                    setTimeout(() => {
-                        const urlParams = new URLSearchParams(window.location.search);
-                        const redirectUrl = urlParams.get('redirect');
-                        const loginUrl = redirectUrl ? `/login?redirect=${redirectUrl}` : '/login';
-                        window.location.href = loginUrl;
-                    }, 3000);
-                } else {
-                    errorDiv.textContent = data.error || 'Неверный код подтверждения';
-                    errorDiv.style.display = 'block';
-                }
-            } catch (error) {
-                errorDiv.textContent = 'Ошибка сети. Попробуйте еще раз.';
-                errorDiv.style.display = 'block';
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Подтвердить регистрацию';
-            }
-        }
-
-        // Обработчик для кнопки "Отправить код повторно"
-        document.getElementById('resend-code').addEventListener('click', async function() {
-            if (!pendingRegistration) return;
-            
-            const btn = this;
-            const errorDiv = document.getElementById('error-message');
-            const successDiv = document.getElementById('success-message');
-            
-            btn.disabled = true;
-            btn.textContent = 'Отправка...';
-            
-            try {
-                const response = await fetch('/api/auth/send-verification', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ email: pendingRegistration.email })
-                });
-                
-                const data = await response.json();
-                
-                if (response.ok) {
-                    successDiv.textContent = 'Код отправлен повторно! Проверьте почту.';
-                    successDiv.style.display = 'block';
-                } else {
-                    errorDiv.textContent = data.error || 'Ошибка отправки кода';
-                    errorDiv.style.display = 'block';
-                }
-            } catch (error) {
-                errorDiv.textContent = 'Ошибка сети. Попробуйте еще раз.';
-                errorDiv.style.display = 'block';
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Отправить код повторно';
+                btn.disabled = false; btn.textContent = 'Продолжить';
             }
         });
+
+        // --- Code inputs: auto-focus ---
+        var codeInputs = document.querySelectorAll('#codeBox input');
+        codeInputs.forEach(function(inp, i) {
+            inp.addEventListener('input', function() {
+                if (this.value && i < 5) codeInputs[i+1].focus();
+            });
+            inp.addEventListener('keydown', function(e) {
+                if (e.key === 'Backspace' && !this.value && i > 0) codeInputs[i-1].focus();
+            });
+            inp.addEventListener('paste', function(e) {
+                e.preventDefault();
+                var paste = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '').slice(0, 6);
+                paste.split('').forEach(function(ch, j) { if (codeInputs[j]) codeInputs[j].value = ch; });
+                var next = Math.min(paste.length, 5);
+                if (codeInputs[next]) codeInputs[next].focus();
+            });
+        });
+
+        // --- Step 2: verify ---
+        document.getElementById('btnStep2').addEventListener('click', async function() {
+            var btn = this;
+            hideMsgs();
+            var code = '';
+            codeInputs.forEach(function(inp) { code += inp.value; });
+            if (code.length !== 6) {
+                showMsg('error', 'Введите 6-значный код');
+                return;
+            }
+            btn.disabled = true; btn.textContent = 'Проверка...';
+            try {
+                var r = await fetch('/api/auth/verify-email', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: pendingEmail, code: code})
+                });
+                var d = await r.json();
+                if (r.ok) {
+                    showMsg('success', 'Email подтверждён! Сейчас перенаправим на вход...');
+                    setTimeout(function() {
+                        var p = new URLSearchParams(window.location.search);
+                        var redir = p.get('redirect');
+                        window.location.href = redir ? '/login?redirect=' + redir : '/login';
+                    }, 2000);
+                } else {
+                    showMsg('error', d.error || 'Неверный код');
+                }
+            } catch(e) {
+                showMsg('error', 'Ошибка сети');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Подтвердить';
+            }
+        });
+
+        // --- Resend ---
+        document.getElementById('btnResend').addEventListener('click', async function() {
+            var btn = this;
+            hideMsgs();
+            btn.disabled = true; btn.textContent = 'Отправка...';
+            try {
+                var r = await fetch('/api/auth/send-verification', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({email: pendingEmail})
+                });
+                var d = await r.json();
+                if (r.ok) {
+                    showMsg('success', 'Код отправлен повторно!');
+                } else {
+                    showMsg('error', d.error || 'Ошибка');
+                }
+            } catch(e) {
+                showMsg('error', 'Ошибка сети');
+            } finally {
+                btn.disabled = false; btn.textContent = 'Отправить код повторно';
+            }
+        });
+
+        // --- Back ---
+        document.getElementById('btnBack').addEventListener('click', function() {
+            goStep(1);
+            hideMsgs();
+        });
     </script>
-<script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
