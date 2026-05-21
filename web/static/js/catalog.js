@@ -422,19 +422,27 @@ function closeCart() {
 // ======= Выбор времени самовывоза =======
 const PICKUP_MONTHS = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
 
+// -1 = закрыто; иначе час закрытия (18 или 16)
+function pickupClosingHour(d) {
+    if (d.getMonth() === 0 && (d.getDate() === 1 || d.getDate() === 2)) return -1;
+    return (d.getDay() === 0 || d.getDay() === 6) ? 16 : 18;
+}
+
 function initPickupPicker() {
     const now = new Date();
-    const max = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+    // Бронь истекает в 03:00 через 3 календарных дня
+    const expDay = new Date(now); expDay.setDate(expDay.getDate() + 3);
+    const max = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate(), 3, 0, 0);
     const dateEl = document.getElementById('pickupDate');
     const timeEl = document.getElementById('pickupTime');
     if (!dateEl || !timeEl) return;
 
-    // Генерируем даты от сегодня до max включительно
     dateEl.innerHTML = '<option value="">— дата —</option>';
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const maxDay = new Date(max.getFullYear(), max.getMonth(), max.getDate());
+    const maxDay = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate());
     const tomorrow = new Date(today.getTime() + 86400000);
     for (let d = new Date(today); d <= maxDay; d = new Date(d.getTime() + 86400000)) {
+        if (pickupClosingHour(d) < 0) continue; // 1 и 2 января
         const opt = document.createElement('option');
         opt.value = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
         const prefix = d.toDateString() === today.toDateString() ? 'Сегодня, '
@@ -454,9 +462,16 @@ function updatePickupTimes(now, max) {
     timeEl.innerHTML = '<option value="">— время —</option>';
     const dateVal = dateEl.value;
     if (!dateVal) return;
-    const minAllowed = new Date(now.getTime() + 10 * 60 * 1000); // +10 мин
-    for (let h = 0; h < 24; h++) {
+    const dayDate = new Date(dateVal + 'T00:00:00');
+    const closeH = pickupClosingHour(dayDate);
+    if (closeH < 0) { // не рабочий день
+        const o = document.createElement('option'); o.textContent = 'выходной — закрыто'; o.disabled = true;
+        timeEl.appendChild(o); return;
+    }
+    const minAllowed = new Date(now.getTime() + 10 * 60 * 1000);
+    for (let h = 9; h < 24; h++) {
         for (let m = 0; m < 60; m += 30) {
+            if (h * 60 + m > closeH * 60) break;
             const hh = String(h).padStart(2,'0'), mm = String(m).padStart(2,'0');
             const slot = new Date(dateVal + 'T' + hh + ':' + mm + ':00');
             if (slot <= minAllowed || slot > max) continue;

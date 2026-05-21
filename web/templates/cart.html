@@ -133,15 +133,22 @@
 
     // ======= Пикер времени самовывоза =======
     const _PM = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+    function _closeH(d) {
+        if (d.getMonth()===0 && (d.getDate()===1 || d.getDate()===2)) return -1;
+        return (d.getDay()===0 || d.getDay()===6) ? 16 : 18;
+    }
     function _initPicker(dateId, timeId) {
-        const now = new Date(), max = new Date(now.getTime() + 48*60*60*1000);
+        const now = new Date();
+        const expDay = new Date(now); expDay.setDate(expDay.getDate()+3);
+        const max = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate(), 3, 0, 0);
         const dEl = document.getElementById(dateId), tEl = document.getElementById(timeId);
         if (!dEl || !tEl) return;
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const maxDay = new Date(max.getFullYear(), max.getMonth(), max.getDate());
+        const maxDay = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate());
         const tomorrow = new Date(today.getTime() + 86400000);
         dEl.innerHTML = '<option value="">— дата —</option>';
         for (let d = new Date(today); d <= maxDay; d = new Date(d.getTime()+86400000)) {
+            if (_closeH(d) < 0) continue;
             const o = document.createElement('option');
             o.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
             const pre = d.toDateString()===today.toDateString() ? 'Сегодня, '
@@ -157,8 +164,14 @@
         if (!dEl || !tEl) return;
         tEl.innerHTML = '<option value="">— время —</option>';
         const v = dEl.value; if (!v) return;
+        const dayDate = new Date(v+'T00:00:00');
+        const closeH = _closeH(dayDate);
+        if (closeH < 0) {
+            const o=document.createElement('option'); o.textContent='закрыто'; o.disabled=true; tEl.appendChild(o); return;
+        }
         const minOk = new Date(now.getTime()+10*60*1000);
-        for (let h=0; h<24; h++) for (let m=0; m<60; m+=30) {
+        for (let h=9; h<24; h++) for (let m=0; m<60; m+=30) {
+            if (h*60+m > closeH*60) { m=60; continue; }
             const hh=String(h).padStart(2,'0'), mm=String(m).padStart(2,'0');
             const slot = new Date(v+'T'+hh+':'+mm+':00');
             if (slot<=minOk || slot>max) continue;
@@ -181,7 +194,7 @@
 
         modal.innerHTML = `<div style="background:white;padding:24px;border-radius:10px;width:90%;max-width:440px;max-height:90vh;overflow-y:auto">
             <h3 style="margin-bottom:8px">Оформление заказа</h3>
-            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Бронь действует 48 часов, затем автоматически отменится.</p>
+            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Бронь действует 3 дня, затем автоматически отменится.</p>
             <form id="coForm" style="display:flex;flex-direction:column;gap:10px">
                 <div>
                     <label style="font-size:0.9rem;font-weight:600;color:#555;display:block;margin-bottom:6px">
