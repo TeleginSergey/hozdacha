@@ -59,15 +59,15 @@ func buildMsg(from, to, subject, body string, html bool) []byte {
 	return []byte(b.String())
 }
 
-// codeDigits рендерит 6-значный код крупными цифрами в отдельных блоках.
+// codeDigits рендерит 6-значный код одним крупным текстовым блоком — копируется без пробелов.
 func codeDigits(code string) string {
-	var b strings.Builder
-	for _, ch := range code {
-		b.WriteString(`<td style="width:48px;height:60px;background:#f7f9fc;border-radius:8px;text-align:center;vertical-align:middle;font-size:28px;font-weight:800;color:#2d3a2c;font-family:'Courier New',monospace;letter-spacing:2px">`)
-		b.WriteRune(ch)
-		b.WriteString(`</td>`)
-	}
-	return `<table cellpadding="0" cellspacing="0" style="margin:20px auto"><tr>` + b.String() + `</tr></table>`
+	return `<div style="text-align:center;margin:24px 0">` +
+		`<span style="display:inline-block;font-size:44px;font-weight:800;color:#1a2e1f;` +
+		`font-family:'Courier New',Courier,monospace;letter-spacing:14px;` +
+		`background:#f4f8f5;border-radius:10px;padding:14px 28px 14px 42px;` +
+		`border:2px solid #d0e8d8">` +
+		code +
+		`</span></div>`
 }
 
 // SendVerificationCode отправляет код верификации на email
