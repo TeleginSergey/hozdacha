@@ -58,7 +58,7 @@
                     <!-- Карточки статистики заполняются JS -->
                 </div>
 
-                <h3 style="margin-top: 2rem;">⏰ Брони на сегодня</h3>
+                <h3 style="margin-top: 2rem;">🕐 Самовывоз сегодня</h3>
                 <div id="todayOrders" class="orders-table-wrap">
                     <p class="text-muted">Загрузка...</p>
                 </div>
@@ -84,6 +84,7 @@
                         <option value="created_at">По дате создания</option>
                         <option value="total_price">По сумме</option>
                         <option value="reserved_until">По дедлайну брони</option>
+                        <option value="pickup_at">По времени самовывоза</option>
                     </select>
                     <button class="btn" onclick="loadOrders()">Применить</button>
                     <button class="btn btn-secondary" onclick="resetOrderFilters()">Сбросить</button>

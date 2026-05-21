@@ -572,6 +572,7 @@ function renderOrdersTable(items) {
         const id = parseInt(o.orders_id_pk || o.id || 0);
         const created = fmtDate(o.orders_created_at || o.created_at);
         const reservedUntil = fmtDate(o.orders_reserved_until || o.reserved_until);
+        const pickupAt = fmtDate(o.orders_pickup_at || o.pickup_at);
         const customerName = escapeHtml(o.orders_customer_name || o.customer_name || '—');
         const phone = escapeHtml(o.orders_phone || o.phone || '—');
         const total = fmtMoney(o.orders_total_price || o.total_price);
@@ -585,6 +586,7 @@ function renderOrdersTable(items) {
                 <td>${total}</td>
                 <td>${statusBadge(status)}</td>
                 <td>${reservedUntil}</td>
+                <td>${pickupAt}</td>
             </tr>`;
     }).join('');
     return `
@@ -598,6 +600,7 @@ function renderOrdersTable(items) {
                     <th>Сумма</th>
                     <th>Статус</th>
                     <th>Бронь до</th>
+                    <th>Заберёт в</th>
                 </tr>
             </thead>
             <tbody>${rows}</tbody>
@@ -712,6 +715,10 @@ function renderOrderDetails(data) {
             <div class="order-info-block">
                 <h4>МойСклад ID</h4>
                 <div class="info-value">${escapeHtml(o.orders_moysklad_id || o.moysklad_id || '—')}</div>
+            </div>
+            <div class="order-info-block">
+                <h4>🕐 Заберёт в</h4>
+                <div class="info-value" style="font-weight:700;color:#4A7C59">${fmtDate(o.orders_pickup_at || o.pickup_at)}</div>
             </div>
         </div>
 

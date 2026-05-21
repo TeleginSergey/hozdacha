@@ -74,6 +74,7 @@ type CreateOrderRequest struct {
 	Phone        string            `json:"phone"`
 	Address      *string           `json:"address"`
 	Comment      *string           `json:"comment"`
+	PickupAt     *time.Time        `json:"pickup_at"`
 	Items        []CreateOrderItem `json:"items"`
 }
 
@@ -126,6 +127,17 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 	}
 
 	reservedUntil := time.Now().Add(DefaultReservationTTL)
+
+	// Валидация желаемого времени визита.
+	if req.PickupAt != nil {
+		if !req.PickupAt.After(time.Now()) {
+			return nil, fmt.Errorf("pickup time must be in the future")
+		}
+		if req.PickupAt.After(reservedUntil) {
+			return nil, fmt.Errorf("pickup time must be before reservation expires (%s)", reservedUntil.Format(time.RFC3339))
+		}
+	}
+
 	order := &db.Order{
 		UserID:        &req.UserID,
 		Status:        "pending",
@@ -135,6 +147,7 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		Address:       req.Address,
 		Comment:       req.Comment,
 		ReservedUntil: &reservedUntil,
+		PickupAt:      req.PickupAt,
 	}
 
 	// Сначала создаём заказ в МойСклад. Если не получилось — не сохраняем локально ничего.

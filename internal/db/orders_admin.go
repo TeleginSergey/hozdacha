@@ -13,15 +13,17 @@ import (
 // OrderListFilter — параметры выборки заказов в админке.
 // Все поля опциональны: пустой фильтр возвращает все заказы.
 type OrderListFilter struct {
-	Statuses  []string   // если задан, фильтруем по списку статусов
-	UserID    *int64     // конкретный пользователь
-	DateFrom  *time.Time // orders_created_at >= DateFrom
-	DateTo    *time.Time // orders_created_at <= DateTo
-	Search    string     // ILIKE по customer_name, phone и точное по orders_id_pk если число
-	Limit     int
-	Offset    int
-	SortBy    string // "created_at" (default), "total_price", "reserved_until"
-	SortOrder string // "asc" / "desc" (default desc)
+	Statuses       []string   // если задан, фильтруем по списку статусов
+	UserID         *int64     // конкретный пользователь
+	DateFrom       *time.Time // orders_created_at >= DateFrom
+	DateTo         *time.Time // orders_created_at <= DateTo
+	PickupDateFrom *time.Time // orders_pickup_at >= PickupDateFrom
+	PickupDateTo   *time.Time // orders_pickup_at <= PickupDateTo
+	Search         string     // ILIKE по customer_name, phone и точное по orders_id_pk если число
+	Limit          int
+	Offset         int
+	SortBy         string // "created_at" (default), "total_price", "reserved_until", "pickup_at"
+	SortOrder      string // "asc" / "desc" (default desc)
 }
 
 // ListOrders возвращает заказы по фильтру + общее количество (для пагинации).
@@ -48,6 +50,12 @@ func (o *orderQuery) ListOrders(ctx context.Context, f OrderListFilter) ([]*Orde
 	}
 	if f.DateTo != nil {
 		where = append(where, squirrel.LtOrEq{OrdersCreatedAt: *f.DateTo})
+	}
+	if f.PickupDateFrom != nil {
+		where = append(where, squirrel.GtOrEq{OrdersPickupAt: *f.PickupDateFrom})
+	}
+	if f.PickupDateTo != nil {
+		where = append(where, squirrel.Lt{OrdersPickupAt: *f.PickupDateTo})
 	}
 	if s := strings.TrimSpace(f.Search); s != "" {
 		// ILIKE по имени и телефону + точный матч по ID если поиск это число.
@@ -274,6 +282,8 @@ func orderBySafe(by, order string) string {
 		col = OrdersTotalPrice
 	case "reserved_until":
 		col = OrdersReservedUntil
+	case "pickup_at":
+		col = OrdersPickupAt
 	}
 	dir := "DESC"
 	if strings.EqualFold(order, "asc") {

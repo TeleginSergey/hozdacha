@@ -87,6 +87,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		Phone:        req.Phone,
 		Address:      req.Address,
 		Comment:      req.Comment,
+		PickupAt:     req.PickupAt,
 		Items:        req.Items,
 	})
 	if err != nil {
