@@ -170,6 +170,26 @@ func (h *OrderHandler) ShipOrder(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": "completed"})
 }
 
+// CancelOrderByAdmin — админ отменяет любой pending-заказ: товары возвращаются,
+// заказ удаляется в МойСклад, статус становится 'cancelled'.
+// POST /api/admin/orders/:id/cancel
+func (h *OrderHandler) CancelOrderByAdmin(c *gin.Context) {
+	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || orderID <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order id"})
+		return
+	}
+
+	if err := h.orderUC.CancelOrderByAdmin(c.Request.Context(), orderID, actorUserID(c)); err != nil {
+		h.logger.Error("Failed to cancel order by admin",
+			zap.Int64("order_id", orderID),
+			zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"status": "cancelled"})
+}
+
 // ExpireOrder — админ форсирует истечение брони (то же что делает cron автоматически).
 // POST /api/admin/orders/:id/expire
 func (h *OrderHandler) ExpireOrder(c *gin.Context) {

@@ -686,7 +686,8 @@ function renderOrderDetails(data) {
     const actionsHtml = isPending ? `
         <div class="action-bar">
             <button class="btn btn-edit" onclick="shipOrder(${id})">✅ Клиент пришёл (выкуплен)</button>
-            <button class="btn btn-danger" onclick="expireOrder(${id})">⌛ Истечь бронь</button>
+            <button class="btn btn-danger" onclick="cancelOrderAdmin(${id})">❌ Отменить заказ</button>
+            <button class="btn" style="background:#888;color:#fff" onclick="expireOrder(${id})">⌛ Истечь бронь</button>
         </div>` : '';
 
     return `
@@ -755,6 +756,21 @@ async function shipOrder(orderID) {
     try {
         const resp = await adminFetch(`/api/admin/orders/${orderID}/ship`, { method: 'POST' });
         if (!resp.ok) { alert('Ошибка'); return; }
+        closeOrderModal();
+        loadOrders();
+        loadDashboard();
+    } catch (e) { /* 401 уже обработан */ }
+}
+
+async function cancelOrderAdmin(orderID) {
+    if (!confirm('Отменить заказ? Товары вернутся на склад, заказ удалится в МойСклад.')) return;
+    try {
+        const resp = await adminFetch(`/api/admin/orders/${orderID}/cancel`, { method: 'POST' });
+        if (!resp.ok) {
+            const err = await resp.json().catch(() => ({}));
+            alert('Ошибка отмены: ' + (err.error || resp.status));
+            return;
+        }
         closeOrderModal();
         loadOrders();
         loadDashboard();

@@ -92,6 +92,7 @@
             }
             el.innerHTML = orders.map(o => {
                 const [statusText, statusClass] = labels[o.status] || [o.status, ''];
+                const isPending = o.status === 'pending';
                 const itemsHTML = (o.items || []).map(i => `
                     <div class="item-row">
                         <span class="item-name">${esc(i.product_name || 'Товар #'+i.product_id)}</span>
@@ -100,13 +101,24 @@
                         <span class="item-subtotal">${(i.price * i.quantity).toFixed(0)} ₽</span>
                     </div>
                 `).join('');
-                return `<div class="order-card">
+                const reservedUntil = o.reserved_until
+                    ? '<div style="font-size:0.82rem;color:#F57F17;margin-top:6px">⏳ Бронь до: ' + fmtDt(o.reserved_until) + '</div>'
+                    : '';
+                const pickupAt = o.pickup_at
+                    ? '<div style="font-size:0.82rem;color:#2E7D32;margin-top:4px">🕐 Заберу: ' + fmtDt(o.pickup_at) + '</div>'
+                    : '';
+                const cancelBtn = isPending
+                    ? `<button onclick="cancelOrder(${o.id}, this)" style="margin-top:12px;padding:7px 16px;background:#C62828;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.88rem;font-weight:600">Отменить заказ</button>`
+                    : '';
+                return `<div class="order-card" id="order-${o.id}">
                     <div class="order-header">
                         <span class="order-header-left">Заказ #${o.id} <span class="badge ${statusClass}">${statusText}</span></span>
                         <span class="order-header-right">${(o.created_at || '').slice(0,10)}</span>
                     </div>
                     ${itemsHTML}
                     <div class="order-total">Итого: ${o.total_price.toFixed(0)} ₽</div>
+                    ${reservedUntil}${pickupAt}
+                    ${cancelBtn}
                 </div>`;
             }).join('');
         } catch {
@@ -115,6 +127,41 @@
     }
 
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    function fmtDt(s) {
+        if (!s) return '—';
+        try { return new Date(s).toLocaleString('ru-RU', { dateStyle: 'short', timeStyle: 'short' }); }
+        catch (e) { return '—'; }
+    }
+
+    async function cancelOrder(id, btn) {
+        if (!confirm('Отменить заказ #' + id + '? Товары вернутся на склад.')) return;
+        btn.disabled = true;
+        btn.textContent = 'Отмена...';
+        try {
+            const r = await fetch('/api/orders/' + id + '/cancel', {
+                method: 'POST',
+                headers: { Authorization: 'Bearer ' + token }
+            });
+            if (r.ok) {
+                const card = document.getElementById('order-' + id);
+                if (card) {
+                    card.querySelector('.badge').className = 'badge badge-cancelled';
+                    card.querySelector('.badge').textContent = 'Отменён';
+                    btn.remove();
+                }
+            } else {
+                const err = await r.json().catch(() => ({}));
+                alert('Ошибка: ' + (err.error || r.status));
+                btn.disabled = false;
+                btn.textContent = 'Отменить заказ';
+            }
+        } catch {
+            alert('Ошибка соединения');
+            btn.disabled = false;
+            btn.textContent = 'Отменить заказ';
+        }
+    }
 
     loadOrders();
     </script>

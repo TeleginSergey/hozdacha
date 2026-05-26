@@ -265,6 +265,7 @@ func SetupRouter(
 
 			// Изменение статусов.
 			adminOrders.POST("/:id/ship", orderHandler.ShipOrder)
+			adminOrders.POST("/:id/cancel", orderHandler.CancelOrderByAdmin)
 			adminOrders.POST("/:id/expire", orderHandler.ExpireOrder)
 		}
 
