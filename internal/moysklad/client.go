@@ -371,7 +371,6 @@ func (c *Client) GetProducts(ctx context.Context) ([]MoyskladProduct, error) {
 		q := req.URL.Query()
 		q.Set("limit", fmt.Sprintf("%d", limit))
 		q.Set("offset", fmt.Sprintf("%d", offset))
-		q.Set("expand", "productFolder")
 		req.URL.RawQuery = q.Encode()
 
 		resp, err := c.doRequestWithRetry(ctx, req)
@@ -473,7 +472,6 @@ func (c *Client) GetProductsDelta(ctx context.Context, since time.Time) ([]Moysk
 		q.Set("filter", fmt.Sprintf("updated>%s", updatedFilter))
 		q.Set("limit", fmt.Sprintf("%d", limit))
 		q.Set("offset", fmt.Sprintf("%d", offset))
-		q.Set("expand", "productFolder")
 		req.URL.RawQuery = q.Encode()
 
 		resp, err := c.doRequestWithRetry(ctx, req)
@@ -947,4 +945,71 @@ func (c *Client) DownloadImage(ctx context.Context, imageHref string) ([]byte, s
 	}
 
 	return data, contentType, nil
+}
+
+// ProductFolderItem — группа товаров (категория) из /entity/productfolder.
+type ProductFolderItem struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	PathName string `json:"pathName"` // полный путь, например "Группа/Подгруппа"
+}
+
+// GetProductFolders возвращает все группы товаров из МойСклад.
+// Использует отдельный endpoint /entity/productfolder — надёжнее expand.
+func (c *Client) GetProductFolders(ctx context.Context) ([]ProductFolderItem, error) {
+	type folderResponse struct {
+		Rows []ProductFolderItem `json:"rows"`
+		Meta struct {
+			Size   int `json:"size"`
+			Limit  int `json:"limit"`
+			Offset int `json:"offset"`
+		} `json:"meta"`
+	}
+
+	var all []ProductFolderItem
+	limit := 100
+	offset := 0
+
+	for {
+		endpoint := fmt.Sprintf("%s/entity/productfolder", c.baseURL)
+		req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create productfolder request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Accept", "application/json;charset=utf-8")
+
+		q := req.URL.Query()
+		q.Set("limit", fmt.Sprintf("%d", limit))
+		q.Set("offset", fmt.Sprintf("%d", offset))
+		req.URL.RawQuery = q.Encode()
+
+		resp, err := c.doRequestWithRetry(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch product folders: %w", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			return nil, fmt.Errorf("moysklad productfolder API error: %s, body: %s", resp.Status, string(body))
+		}
+
+		var result folderResponse
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			return nil, fmt.Errorf("failed to decode productfolder response: %w", err)
+		}
+
+		all = append(all, result.Rows...)
+		if len(result.Rows) < limit {
+			break
+		}
+		offset += limit
+		if offset > 10000 {
+			break
+		}
+	}
+
+	c.logger.Info("Fetched product folders from Moysklad", zap.Int("total", len(all)))
+	return all, nil
 }

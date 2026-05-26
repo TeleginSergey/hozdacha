@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"go.uber.org/zap"
@@ -127,6 +128,22 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 	}
 
 	s.logger.Info("Products retrieved from Moysklad", zap.Int("total", len(moyskladProducts)))
+
+	// Загружаем группы товаров (категории) из отдельного endpoint /entity/productfolder.
+	// Строим карту UUID→name для быстрого поиска при обработке каждого товара.
+	folderNameByID := make(map[string]string)
+	if s.categoryQuery != nil {
+		folders, fErr := s.moyskladClient.GetProductFolders(ctx)
+		if fErr != nil {
+			s.logger.Warn("Failed to fetch product folders, categories will not be synced", zap.Error(fErr))
+		} else {
+			for _, f := range folders {
+				folderNameByID[f.ID] = f.Name
+			}
+			s.logger.Info("Product folders loaded", zap.Int("count", len(folderNameByID)))
+		}
+	}
+
 	result := &SyncResult{}
 
 	// Разумные батчи: 20 товаров за раз, пауза 100ms между батчами.
@@ -192,17 +209,24 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 					product.Status = "out_of_stock"
 				}
 
-				// Синхронизируем группу товара (productFolder) → categories.
-				if s.categoryQuery != nil && msProduct.ProductFolder != nil && msProduct.ProductFolder.Name != "" {
-					catID, catErr := s.categoryQuery.UpsertByName(ctx, msProduct.ProductFolder.Name)
-					if catErr != nil {
-						s.logger.Warn("Failed to upsert category",
-							zap.String("folder", msProduct.ProductFolder.Name),
-							zap.Error(catErr))
-					} else {
-						product.CategoryID = &catID
+				// Синхронизируем группу товара → categories через folderNameByID.
+				if s.categoryQuery != nil && msProduct.ProductFolder != nil && msProduct.ProductFolder.Meta.Href != "" {
+					// href вида https://.../entity/productfolder/UUID — берём последний сегмент.
+					href := strings.TrimSuffix(msProduct.ProductFolder.Meta.Href, "/")
+					parts := strings.Split(href, "/")
+					folderUUID := parts[len(parts)-1]
+					if folderName, ok := folderNameByID[folderUUID]; ok && folderName != "" {
+						catID, catErr := s.categoryQuery.UpsertByName(ctx, folderName)
+						if catErr != nil {
+							s.logger.Warn("Failed to upsert category",
+								zap.String("folder", folderName),
+								zap.Error(catErr))
+						} else {
+							product.CategoryID = &catID
+						}
 					}
-				} else if existing != nil {
+				}
+				if product.CategoryID == nil && existing != nil {
 					product.CategoryID = existing.CategoryID
 				}
 
