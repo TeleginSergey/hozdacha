@@ -108,9 +108,11 @@ func NewApp() (*App, error) {
 	userUC := usecase.NewUserUsecase(userRepo, logger, cfg.JWT.Secret)
 	productUC := usecase.NewProductUsecase(productRepo, stockCache, cfg.Moysklad.StockBuffer, logger)
 	orderUC := usecase.NewOrderUsecase(orderRepo, productRepo, stockCache, moyskladClient, orderEventRepo, logger)
+	categoryRepo := &db.CategoryQuery{DB: database}
 	moyskladSyncService := services.NewMoyskladSyncService(
 		moyskladClient,
 		productRepo, // реализует ProductRepository
+		categoryRepo,
 		stockCache,
 		cfg.Moysklad.StockBuffer,
 		logger,

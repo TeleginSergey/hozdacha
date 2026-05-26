@@ -117,16 +117,25 @@ func (c *Client) releaseOutbound() {
 	<-c.outboundSem
 }
 
+type MoyskladProductFolder struct {
+	Meta struct {
+		Href string `json:"href"`
+	} `json:"meta"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
 type MoyskladProduct struct {
-	ID          string              `json:"id"`
-	Name        string              `json:"name"`
-	Description *string             `json:"description"`
-	SalePrices  []MoyskladSalePrice `json:"salePrices,omitempty"`
-	Stock       *MoyskladStock      `json:"stock,omitempty"` // Остатки как вложенный объект (при expand=stock)
-	Images      *MoyskladImages     `json:"images,omitempty"`
-	Updated     string              `json:"updated,omitempty"` // Дата обновления
-	Created     string              `json:"created,omitempty"` // Дата создания
-	Href        string              `json:"href,omitempty"`
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	Description   *string                `json:"description"`
+	SalePrices    []MoyskladSalePrice    `json:"salePrices,omitempty"`
+	Stock         *MoyskladStock         `json:"stock,omitempty"` // Остатки как вложенный объект (при expand=stock)
+	Images        *MoyskladImages        `json:"images,omitempty"`
+	ProductFolder *MoyskladProductFolder `json:"productFolder,omitempty"` // Группа/категория товара
+	Updated       string                 `json:"updated,omitempty"`       // Дата обновления
+	Created       string                 `json:"created,omitempty"`       // Дата создания
+	Href          string                 `json:"href,omitempty"`
 }
 
 type MoyskladStock struct {
@@ -362,6 +371,7 @@ func (c *Client) GetProducts(ctx context.Context) ([]MoyskladProduct, error) {
 		q := req.URL.Query()
 		q.Set("limit", fmt.Sprintf("%d", limit))
 		q.Set("offset", fmt.Sprintf("%d", offset))
+		q.Set("expand", "productFolder")
 		req.URL.RawQuery = q.Encode()
 
 		resp, err := c.doRequestWithRetry(ctx, req)
@@ -463,6 +473,7 @@ func (c *Client) GetProductsDelta(ctx context.Context, since time.Time) ([]Moysk
 		q.Set("filter", fmt.Sprintf("updated>%s", updatedFilter))
 		q.Set("limit", fmt.Sprintf("%d", limit))
 		q.Set("offset", fmt.Sprintf("%d", offset))
+		q.Set("expand", "productFolder")
 		req.URL.RawQuery = q.Encode()
 
 		resp, err := c.doRequestWithRetry(ctx, req)

@@ -241,8 +241,8 @@ function searchProducts() {
     currentOffset = 0;
     // Сбрасываем фильтр категории при поиске
     currentCategoryId = '';
-    document.querySelectorAll('.category-link').forEach(link => {
-        link.classList.toggle('active', link.dataset.categoryId === '');
+    document.querySelectorAll('.chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.categoryId === '');
     });
     loadProducts(currentQuery);
 }
@@ -643,14 +643,14 @@ async function loadCategories() {
     try {
         const resp = await fetch('/api/categories');
         const data = await resp.json();
-        const list = document.getElementById('categoryList');
-        if (!list || !data.categories || !data.categories.length) return;
+        const bar = document.getElementById('categoryList');
+        if (!bar || !data.categories || !data.categories.length) return;
 
-        let html = '<li><a href="#" class="category-link active" data-category-id="" onclick="selectCategory(event, \'\')">Все товары</a></li>';
+        let html = '<button class="chip active" data-category-id="" onclick="selectCategory(event, \'\')">Все товары</button>';
         data.categories.forEach(cat => {
-            html += `<li><a href="#" class="category-link" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}</a></li>`;
+            html += `<button class="chip" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}</button>`;
         });
-        list.innerHTML = html;
+        bar.innerHTML = html;
     } catch (e) {
         console.error('Failed to load categories:', e);
     }
@@ -664,8 +664,8 @@ function selectCategory(event, categoryId) {
     document.getElementById('searchInput').value = '';
 
     // Обновляем активный класс
-    document.querySelectorAll('.category-link').forEach(link => {
-        link.classList.toggle('active', link.dataset.categoryId === categoryId);
+    document.querySelectorAll('.chip').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.categoryId === String(categoryId));
     });
 
     loadProducts();

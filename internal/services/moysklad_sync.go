@@ -16,6 +16,7 @@ import (
 type MoyskladSyncService struct {
 	moyskladClient *moysklad.Client
 	productQuery   db.ProductQuery
+	categoryQuery  *db.CategoryQuery
 	stockCache     *cache.StockCache
 	stockBuffer    float64
 	logger         *zap.Logger
@@ -24,6 +25,7 @@ type MoyskladSyncService struct {
 func NewMoyskladSyncService(
 	moyskladClient *moysklad.Client,
 	productQuery db.ProductQuery,
+	categoryQuery *db.CategoryQuery,
 	stockCache *cache.StockCache,
 	stockBuffer float64,
 	logger *zap.Logger,
@@ -31,6 +33,7 @@ func NewMoyskladSyncService(
 	return &MoyskladSyncService{
 		moyskladClient: moyskladClient,
 		productQuery:   productQuery,
+		categoryQuery:  categoryQuery,
 		stockCache:     stockCache,
 		stockBuffer:    stockBuffer,
 		logger:         logger,
@@ -187,6 +190,20 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 					product.Status = "active"
 				} else {
 					product.Status = "out_of_stock"
+				}
+
+				// Синхронизируем группу товара (productFolder) → categories.
+				if s.categoryQuery != nil && msProduct.ProductFolder != nil && msProduct.ProductFolder.Name != "" {
+					catID, catErr := s.categoryQuery.UpsertByName(ctx, msProduct.ProductFolder.Name)
+					if catErr != nil {
+						s.logger.Warn("Failed to upsert category",
+							zap.String("folder", msProduct.ProductFolder.Name),
+							zap.Error(catErr))
+					} else {
+						product.CategoryID = &catID
+					}
+				} else if existing != nil {
+					product.CategoryID = existing.CategoryID
 				}
 
 				if msProduct.Updated != "" {
@@ -430,6 +447,7 @@ func (s *MoyskladSyncService) SyncStockOnly(ctx context.Context) error {
 			} else {
 				product.Status = "out_of_stock"
 			}
+
 			_, err = s.productQuery.Update(ctx, product, product.ID)
 			if err != nil {
 				s.logger.Warn("Failed to update product stock",
