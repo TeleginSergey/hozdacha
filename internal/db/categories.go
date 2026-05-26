@@ -28,6 +28,22 @@ type CategoryQuery struct {
 	*DB
 }
 
+// UpsertByName создаёт категорию если не существует (по имени) и возвращает её ID.
+func (q *CategoryQuery) UpsertByName(ctx context.Context, name string) (int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	var id int64
+	sql := `INSERT INTO ` + CategoriesTable + ` (` + CategoriesName + `)
+		VALUES ($1)
+		ON CONFLICT (` + CategoriesName + `) DO UPDATE SET ` + CategoriesName + ` = EXCLUDED.` + CategoriesName + `
+		RETURNING ` + CategoriesID
+	if err := q.Pool.QueryRow(ctx, sql, name).Scan(&id); err != nil {
+		return 0, fmt.Errorf("failed to upsert category %q: %w", name, err)
+	}
+	return id, nil
+}
+
 func (q *CategoryQuery) ListAll(ctx context.Context) ([]*Category, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
