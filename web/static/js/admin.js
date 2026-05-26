@@ -22,12 +22,6 @@ try {
     console.error('Failed to get auth token:', e);
 }
 
-// Проверка авторизации
-if (authToken) {
-    document.getElementById('loginSection').style.display = 'none';
-    document.getElementById('adminSection').style.display = 'block';
-    initAdminPanel();
-}
 
 // Инициализация админ-панели — выбираем активный таб и грузим его.
 function initAdminPanel() {
@@ -978,4 +972,11 @@ window.addEventListener('click', function(event) {
     if (event.target === orderModal) closeOrderModal();
     if (event.target === userModal) closeUserModal();
 });
+
+// Проверка авторизации — запускается после объявления всех переменных и функций.
+if (authToken) {
+    document.getElementById('loginSection').style.display = 'none';
+    document.getElementById('adminSection').style.display = 'block';
+    initAdminPanel();
+}
 
