@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -132,7 +133,9 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 	// Загружаем группы товаров (категории) из отдельного endpoint /entity/productfolder.
 	// Строим карту UUID→name для быстрого поиска при обработке каждого товара.
 	folderNameByID := make(map[string]string)
-	if s.categoryQuery != nil {
+	if s.categoryQuery == nil {
+		s.logger.Warn("categoryQuery is nil — categories will not be synced")
+	} else {
 		folders, fErr := s.moyskladClient.GetProductFolders(ctx)
 		if fErr != nil {
 			s.logger.Warn("Failed to fetch product folders, categories will not be synced", zap.Error(fErr))
@@ -140,9 +143,31 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 			for _, f := range folders {
 				folderNameByID[f.ID] = f.Name
 			}
-			s.logger.Info("Product folders loaded", zap.Int("count", len(folderNameByID)))
+			s.logger.Info("Product folders loaded from Moysklad",
+				zap.Int("count", len(folderNameByID)))
+			// Покажем первые несколько для отладки.
+			if len(folders) > 0 {
+				sample := folders
+				if len(sample) > 5 {
+					sample = sample[:5]
+				}
+				for _, f := range sample {
+					s.logger.Info("Folder sample",
+						zap.String("id", f.ID),
+						zap.String("name", f.Name),
+						zap.String("path", f.PathName))
+				}
+			}
 		}
 	}
+
+	// Счётчики для диагностики синхронизации категорий.
+	var (
+		productsWithFolder int32
+		folderLookupHits   int32
+		folderLookupMisses int32
+		categoriesUpserted int32
+	)
 
 	result := &SyncResult{}
 
@@ -211,11 +236,13 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 
 				// Синхронизируем группу товара → categories через folderNameByID.
 				if s.categoryQuery != nil && msProduct.ProductFolder != nil && msProduct.ProductFolder.Meta.Href != "" {
+					atomic.AddInt32(&productsWithFolder, 1)
 					// href вида https://.../entity/productfolder/UUID — берём последний сегмент.
 					href := strings.TrimSuffix(msProduct.ProductFolder.Meta.Href, "/")
 					parts := strings.Split(href, "/")
 					folderUUID := parts[len(parts)-1]
 					if folderName, ok := folderNameByID[folderUUID]; ok && folderName != "" {
+						atomic.AddInt32(&folderLookupHits, 1)
 						catID, catErr := s.categoryQuery.UpsertByName(ctx, folderName)
 						if catErr != nil {
 							s.logger.Warn("Failed to upsert category",
@@ -223,7 +250,13 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 								zap.Error(catErr))
 						} else {
 							product.CategoryID = &catID
+							atomic.AddInt32(&categoriesUpserted, 1)
 						}
+					} else {
+						atomic.AddInt32(&folderLookupMisses, 1)
+						s.logger.Debug("Folder UUID not found in map",
+							zap.String("uuid", folderUUID),
+							zap.String("href", msProduct.ProductFolder.Meta.Href))
 					}
 				}
 				if product.CategoryID == nil && existing != nil {
@@ -293,6 +326,13 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 		zap.Int("updated", result.Updated),
 		zap.Int("errors", result.Errors),
 		zap.Bool("delta", delta))
+
+	s.logger.Info("Category sync stats",
+		zap.Int("folders_loaded", len(folderNameByID)),
+		zap.Int32("products_with_folder", atomic.LoadInt32(&productsWithFolder)),
+		zap.Int32("folder_lookup_hits", atomic.LoadInt32(&folderLookupHits)),
+		zap.Int32("folder_lookup_misses", atomic.LoadInt32(&folderLookupMisses)),
+		zap.Int32("categories_upserted", atomic.LoadInt32(&categoriesUpserted)))
 
 	return result, nil
 }
