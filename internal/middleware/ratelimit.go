@@ -133,12 +133,12 @@ func ProductRateLimit() gin.HandlerFunc {
 	}
 }
 
-// StrictRateLimit для админ-панели (более строгий лимит)
+// StrictRateLimit для админ-панели
 func StrictRateLimit() gin.HandlerFunc {
 	adminLimiter := &rateLimiter{
 		visitors: make(map[string]*visitor),
 		rate:     time.Minute,
-		limit:    10, // 10 запросов в минуту для админки
+		limit:    300, // 300 запросов в минуту для админки (≈5 в секунду — достаточно для нормальной работы)
 	}
 
 	return func(c *gin.Context) {
