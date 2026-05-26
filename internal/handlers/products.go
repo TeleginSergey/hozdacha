@@ -7,12 +7,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"github.com/TeleginSergey/hozdacha/internal/db"
 	"github.com/TeleginSergey/hozdacha/internal/middleware"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
 )
 
 type ProductHandler struct {
 	uc     *usecase.ProductUsecase
+	db     *db.DB
 	logger *zap.Logger
 }
 
@@ -44,9 +46,10 @@ func (h *ProductHandler) RenderProductPage(c *gin.Context) {
 }
 
 // NewProductHandlerWithUsecase — конструктор поверх usecase-слоя.
-func NewProductHandlerWithUsecase(uc *usecase.ProductUsecase, logger *zap.Logger) *ProductHandler {
+func NewProductHandlerWithUsecase(uc *usecase.ProductUsecase, database *db.DB, logger *zap.Logger) *ProductHandler {
 	return &ProductHandler{
 		uc:     uc,
+		db:     database,
 		logger: logger,
 	}
 }
@@ -163,4 +166,18 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 		"total":    total,
 		"count":    len(products),
 	})
+}
+
+// ListCategories — GET /api/categories
+func (h *ProductHandler) ListCategories(c *gin.Context) {
+	categories, err := (&db.CategoryQuery{DB: h.db}).ListAll(c.Request.Context())
+	if err != nil {
+		h.logger.Error("Failed to list categories", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load categories"})
+		return
+	}
+	if categories == nil {
+		categories = []*db.Category{}
+	}
+	c.JSON(http.StatusOK, gin.H{"categories": categories})
 }

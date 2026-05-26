@@ -163,7 +163,7 @@ func NewApp() (*App, error) {
 	// Handlers поверх usecase // Handlers
 	authHandler := handlers.NewAuthHandler(authService, logger)
 	userHandler := handlers.NewUserHandler(userUC, emailService, blacklistService, logger)
-	productHandler := handlers.NewProductHandlerWithUsecase(productUC, logger)
+	productHandler := handlers.NewProductHandlerWithUsecase(productUC, database, logger)
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo, logger)
 	orderHandler := handlers.NewOrderHandlerWithUsecase(orderUC, cartUC, userRepo, logger)
 	moyskladSyncHandler := handlers.NewMoyskladSyncHandler(moyskladSyncService, logger)

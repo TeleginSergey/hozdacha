@@ -26,6 +26,7 @@ let cart = safeParseJSON(localStorage.getItem('cart'), []);
 const pageLimit = 24; // Кратно 2, 3, 4 колонкам — подходит для всех размеров экрана
 let currentOffset = 0;
 let currentQuery = '';
+let currentCategoryId = '';
 let totalPages = 1;
 let currentPage = 1;
 let totalProducts = 0;
@@ -149,9 +150,15 @@ async function loadProducts(query = '', append = false) {
     try {
         showLoading(!append);
         
-        const url = query
-            ? `/api/products/search?q=${encodeURIComponent(query)}&limit=${pageLimit}&offset=${currentOffset}`
-            : `/api/products?limit=${pageLimit}&offset=${currentOffset}`;
+        let url;
+        if (query) {
+            url = `/api/products/search?q=${encodeURIComponent(query)}&limit=${pageLimit}&offset=${currentOffset}`;
+        } else {
+            url = `/api/products?limit=${pageLimit}&offset=${currentOffset}`;
+            if (currentCategoryId) {
+                url += `&category_id=${encodeURIComponent(currentCategoryId)}`;
+            }
+        }
         const response = await fetch(url);
         const data = await response.json();
         const grid = document.getElementById('productsGrid');
@@ -232,7 +239,12 @@ function searchProducts() {
     const query = document.getElementById('searchInput').value;
     currentQuery = (query || '').trim();
     currentOffset = 0;
-    loadProducts(query);
+    // Сбрасываем фильтр категории при поиске
+    currentCategoryId = '';
+    document.querySelectorAll('.category-link').forEach(link => {
+        link.classList.toggle('active', link.dataset.categoryId === '');
+    });
+    loadProducts(currentQuery);
 }
 
 function nextPage() {
@@ -619,6 +631,44 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
+
+    // Загружаем категории
+    loadCategories();
 });
+
+// =============================================================================
+// КАТЕГОРИИ
+// =============================================================================
+async function loadCategories() {
+    try {
+        const resp = await fetch('/api/categories');
+        const data = await resp.json();
+        const list = document.getElementById('categoryList');
+        if (!list || !data.categories || !data.categories.length) return;
+
+        let html = '<li><a href="#" class="category-link active" data-category-id="" onclick="selectCategory(event, \'\')">Все товары</a></li>';
+        data.categories.forEach(cat => {
+            html += `<li><a href="#" class="category-link" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}</a></li>`;
+        });
+        list.innerHTML = html;
+    } catch (e) {
+        console.error('Failed to load categories:', e);
+    }
+}
+
+function selectCategory(event, categoryId) {
+    event.preventDefault();
+    currentCategoryId = categoryId;
+    currentOffset = 0;
+    currentQuery = '';
+    document.getElementById('searchInput').value = '';
+
+    // Обновляем активный класс
+    document.querySelectorAll('.category-link').forEach(link => {
+        link.classList.toggle('active', link.dataset.categoryId === categoryId);
+    });
+
+    loadProducts();
+}
 
 

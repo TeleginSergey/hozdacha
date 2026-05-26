@@ -196,6 +196,9 @@ func SetupRouter(
 			products.GET("/:id", productHandler.GetProduct)
 		}
 
+		// Категории
+		api.GET("/categories", productHandler.ListCategories)
+
 		// Акции
 		api.GET("/promotions", promotionHandler.GetActivePromotions)
 
