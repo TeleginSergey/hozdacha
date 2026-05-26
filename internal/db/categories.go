@@ -2,10 +2,12 @@ package db
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/georgysavva/scany/v2/pgxscan"
+	"github.com/jackc/pgx/v5"
 )
 
 const CategoriesTable = "categories"
@@ -28,18 +30,32 @@ type CategoryQuery struct {
 	*DB
 }
 
-// UpsertByName создаёт категорию если не существует (по имени) и возвращает её ID.
+// UpsertByName возвращает ID категории по имени, создавая её если не существует.
+// Работает без уникального индекса: SELECT → INSERT с fallback SELECT на race condition.
 func (q *CategoryQuery) UpsertByName(ctx context.Context, name string) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
+	selectSQL := `SELECT ` + CategoriesID + ` FROM ` + CategoriesTable + ` WHERE ` + CategoriesName + ` = $1`
+	insertSQL := `INSERT INTO ` + CategoriesTable + ` (` + CategoriesName + `) VALUES ($1) RETURNING ` + CategoriesID
+
 	var id int64
-	sql := `INSERT INTO ` + CategoriesTable + ` (` + CategoriesName + `)
-		VALUES ($1)
-		ON CONFLICT (` + CategoriesName + `) DO UPDATE SET ` + CategoriesName + ` = EXCLUDED.` + CategoriesName + `
-		RETURNING ` + CategoriesID
-	if err := q.Pool.QueryRow(ctx, sql, name).Scan(&id); err != nil {
-		return 0, fmt.Errorf("failed to upsert category %q: %w", name, err)
+	err := q.Pool.QueryRow(ctx, selectSQL, name).Scan(&id)
+	if err == nil {
+		return id, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return 0, fmt.Errorf("failed to find category %q: %w", name, err)
+	}
+
+	// Категория не найдена — создаём.
+	err = q.Pool.QueryRow(ctx, insertSQL, name).Scan(&id)
+	if err != nil {
+		// Race condition: другой процесс вставил раньше — повторяем SELECT.
+		if err2 := q.Pool.QueryRow(ctx, selectSQL, name).Scan(&id); err2 == nil {
+			return id, nil
+		}
+		return 0, fmt.Errorf("failed to insert category %q: %w", name, err)
 	}
 	return id, nil
 }
