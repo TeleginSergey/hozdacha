@@ -226,6 +226,12 @@ func (u *OrderUsecase) CancelOrderByUser(ctx context.Context, userID, orderID in
 	return u.cancelOrder(ctx, orderID, "cancelled", &userID, &userID)
 }
 
+// CancelOrderByAdmin отменяет заказ от имени администратора: возвращает товары,
+// удаляет CustomerOrder в МойСклад, ставит статус 'cancelled'.
+func (u *OrderUsecase) CancelOrderByAdmin(ctx context.Context, orderID int64, adminUserID *int64) error {
+	return u.cancelOrder(ctx, orderID, "cancelled", nil, adminUserID)
+}
+
 // ExpireOrderByAdmin — ручной триггер истечения брони (форсирует то, что обычно делает cron).
 // adminUserID опционально — если задан, фиксируется в audit log как actor.
 func (u *OrderUsecase) ExpireOrderByAdmin(ctx context.Context, orderID int64, adminUserID *int64) error {
