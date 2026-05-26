@@ -315,29 +315,31 @@ async function syncProducts() {
 async function syncProductsFull() {
     const btn = document.getElementById('syncFullBtn');
     const resultDiv = document.getElementById('syncResult');
-    if (!confirm('Полная пересинхронизация с МойСклад. Это операция тяжёлая (30+ сек). Продолжить?')) return;
+    if (!confirm('Полная пересинхронизация с МойСклад. Синхронизация запустится в фоне (2-5 мин). Продолжить?')) return;
     btn.disabled = true;
-    btn.textContent = '⏳ Полная синхронизация...';
-    resultDiv.innerHTML = '<p>⏳ Идёт полная пересинхронизация всех товаров...</p>';
+    btn.textContent = '⏳ Запускаем...';
+    resultDiv.innerHTML = '<p>⏳ Отправляем запрос...</p>';
     try {
         const response = await adminFetch('/api/admin/products/sync/full', { method: 'POST' });
-        if (!response.ok) {
-            const error = await response.json();
-            resultDiv.innerHTML = `<p style="color: red;">❌ ${escapeHtml(error.error || error.message || 'Не удалось синхронизировать')}</p>`;
+        const data = await response.json();
+        if (response.status === 409) {
+            resultDiv.innerHTML = `<p style="color: orange;">⚠️ ${escapeHtml(data.message || 'Синхронизация уже запущена, подождите.')}</p>`;
             return;
         }
-        const data = await response.json();
+        if (!response.ok) {
+            resultDiv.innerHTML = `<p style="color: red;">❌ ${escapeHtml(data.error || data.message || 'Не удалось запустить синхронизацию')}</p>`;
+            return;
+        }
+        // 202 Accepted — sync идёт в фоне
         const now = new Date().toLocaleTimeString('ru-RU');
         resultDiv.innerHTML = `
-            <div style="background: #e8f5e9; padding: 1rem; border-radius: 5px; margin-top: 1rem;">
-                <p style="color: green; font-weight: bold;">✅ Полная синхронизация завершена! (${now})</p>
-                <p><strong>Создано:</strong> ${data.result.created} товаров</p>
-                <p><strong>Обновлено:</strong> ${data.result.updated} товаров</p>
-                ${data.result.errors > 0 ? `<p style="color: orange;"><strong>Ошибок:</strong> ${data.result.errors}</p>` : ''}
+            <div style="background:#e8f5e9;padding:1rem;border-radius:5px;margin-top:1rem;">
+                <p style="color:green;font-weight:bold;">✅ Синхронизация запущена в фоне (${now})</p>
+                <p>Товары обновятся в течение 2–5 минут. Результат появится в логах сервера.</p>
             </div>`;
     } catch (e) {
         if (e.message !== 'unauthorized') {
-            resultDiv.innerHTML = '<p style="color: red;">❌ Ошибка сети при синхронизации.</p>';
+            resultDiv.innerHTML = '<p style="color: red;">❌ Ошибка сети при запуске синхронизации.</p>';
         }
     } finally {
         btn.disabled = false;
