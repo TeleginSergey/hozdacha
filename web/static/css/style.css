@@ -879,3 +879,90 @@ footer {
     }
 }
 
+/* ========================================
+   КАТАЛОГ С САЙДБАРОМ
+   ======================================== */
+.catalog-layout {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+}
+
+.catalog-sidebar {
+    width: 220px;
+    flex-shrink: 0;
+    background: white;
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    position: sticky;
+    top: 16px;
+}
+
+.catalog-sidebar h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2A3B2D;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #A4BFA1;
+}
+
+.category-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.category-list li {
+    margin-bottom: 2px;
+}
+
+.category-link {
+    display: block;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: #555;
+    text-decoration: none;
+    font-size: 0.9rem;
+    transition: all 0.15s ease;
+}
+
+.category-link:hover {
+    background: #A4BFA1;
+    color: #2A3B2D;
+}
+
+.category-link.active {
+    background: #4A6E4D;
+    color: white;
+    font-weight: 600;
+}
+
+.catalog-main {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 768px) {
+    .catalog-layout {
+        flex-direction: column;
+    }
+    .catalog-sidebar {
+        width: 100%;
+        position: static;
+    }
+    .category-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+    }
+    .category-list li {
+        margin-bottom: 0;
+    }
+    .category-link {
+        padding: 6px 10px;
+        font-size: 0.82rem;
+    }
+}
+

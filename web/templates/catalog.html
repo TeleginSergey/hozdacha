@@ -38,15 +38,25 @@
             </div>
         </section>
 
-        <section class="products-grid" id="productsGrid">
-            <p>Загрузка товаров...</p>
-        </section>
+        <div class="catalog-layout">
+            <aside class="catalog-sidebar" id="catalogSidebar">
+                <h3>Категории</h3>
+                <ul class="category-list" id="categoryList">
+                    <li><a href="#" class="category-link active" data-category-id="">Все товары</a></li>
+                </ul>
+            </aside>
+            <div class="catalog-main">
+                <section class="products-grid" id="productsGrid">
+                    <p>Загрузка товаров...</p>
+                </section>
 
-        <div class="pagination" id="paginationContainer">
-            <div style="display:flex; gap:12px; align-items:center; justify-content:center; margin:16px 0;">
-                <button class="btn" id="prevPageBtn" onclick="prevPage()" disabled>Назад</button>
-                <span id="pageInfo">Страница 1</span>
-                <button class="btn" id="nextPageBtn" onclick="nextPage()">Далее</button>
+                <div class="pagination" id="paginationContainer">
+                    <div style="display:flex; gap:12px; align-items:center; justify-content:center; margin:16px 0;">
+                        <button class="btn" id="prevPageBtn" onclick="prevPage()" disabled>Назад</button>
+                        <span id="pageInfo">Страница 1</span>
+                        <button class="btn" id="nextPageBtn" onclick="nextPage()">Далее</button>
+                    </div>
+                </div>
             </div>
         </div>
 
