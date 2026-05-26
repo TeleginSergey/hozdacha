@@ -948,10 +948,12 @@ func (c *Client) DownloadImage(ctx context.Context, imageHref string) ([]byte, s
 }
 
 // ProductFolderItem — группа товаров (категория) из /entity/productfolder.
+// Поле ProductFolder содержит ссылку на родительскую группу (если есть).
 type ProductFolderItem struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	PathName string `json:"pathName"` // полный путь, например "Группа/Подгруппа"
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	PathName      string                 `json:"pathName"` // полный путь, например "Группа/Подгруппа"
+	ProductFolder *MoyskladProductFolder `json:"productFolder,omitempty"`
 }
 
 // GetProductFolders возвращает все группы товаров из МойСклад.

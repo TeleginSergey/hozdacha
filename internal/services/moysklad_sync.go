@@ -130,36 +130,9 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 
 	s.logger.Info("Products retrieved from Moysklad", zap.Int("total", len(moyskladProducts)))
 
-	// Загружаем группы товаров (категории) из отдельного endpoint /entity/productfolder.
-	// Строим карту UUID→name для быстрого поиска при обработке каждого товара.
-	folderNameByID := make(map[string]string)
-	if s.categoryQuery == nil {
-		s.logger.Warn("categoryQuery is nil — categories will not be synced")
-	} else {
-		folders, fErr := s.moyskladClient.GetProductFolders(ctx)
-		if fErr != nil {
-			s.logger.Warn("Failed to fetch product folders, categories will not be synced", zap.Error(fErr))
-		} else {
-			for _, f := range folders {
-				folderNameByID[f.ID] = f.Name
-			}
-			s.logger.Info("Product folders loaded from Moysklad",
-				zap.Int("count", len(folderNameByID)))
-			// Покажем первые несколько для отладки.
-			if len(folders) > 0 {
-				sample := folders
-				if len(sample) > 5 {
-					sample = sample[:5]
-				}
-				for _, f := range sample {
-					s.logger.Info("Folder sample",
-						zap.String("id", f.ID),
-						zap.String("name", f.Name),
-						zap.String("path", f.PathName))
-				}
-			}
-		}
-	}
+	// Синхронизируем категории из МойСклад в БД с учётом иерархии.
+	// folderDBIDByUUID: UUID папки в МойСклад → ID категории в нашей БД.
+	folderDBIDByUUID := s.syncCategoriesFromMoysklad(ctx)
 
 	// Счётчики для диагностики синхронизации категорий.
 	var (
@@ -234,29 +207,17 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 					product.Status = "out_of_stock"
 				}
 
-				// Синхронизируем группу товара → categories через folderNameByID.
-				if s.categoryQuery != nil && msProduct.ProductFolder != nil && msProduct.ProductFolder.Meta.Href != "" {
+				// Привязываем товар к категории через map[UUID]→DB id (категории уже синхронизированы выше).
+				if msProduct.ProductFolder != nil && msProduct.ProductFolder.Meta.Href != "" {
 					atomic.AddInt32(&productsWithFolder, 1)
-					// href вида https://.../entity/productfolder/UUID — берём последний сегмент.
-					href := strings.TrimSuffix(msProduct.ProductFolder.Meta.Href, "/")
-					parts := strings.Split(href, "/")
-					folderUUID := parts[len(parts)-1]
-					if folderName, ok := folderNameByID[folderUUID]; ok && folderName != "" {
+					folderUUID := extractMoyskladUUID(msProduct.ProductFolder.Meta.Href)
+					if dbID, ok := folderDBIDByUUID[folderUUID]; ok {
 						atomic.AddInt32(&folderLookupHits, 1)
-						catID, catErr := s.categoryQuery.UpsertByName(ctx, folderName)
-						if catErr != nil {
-							s.logger.Warn("Failed to upsert category",
-								zap.String("folder", folderName),
-								zap.Error(catErr))
-						} else {
-							product.CategoryID = &catID
-							atomic.AddInt32(&categoriesUpserted, 1)
-						}
+						idCopy := dbID
+						product.CategoryID = &idCopy
+						atomic.AddInt32(&categoriesUpserted, 1)
 					} else {
 						atomic.AddInt32(&folderLookupMisses, 1)
-						s.logger.Debug("Folder UUID not found in map",
-							zap.String("uuid", folderUUID),
-							zap.String("href", msProduct.ProductFolder.Meta.Href))
 					}
 				}
 				if product.CategoryID == nil && existing != nil {
@@ -328,11 +289,11 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 		zap.Bool("delta", delta))
 
 	s.logger.Info("Category sync stats",
-		zap.Int("folders_loaded", len(folderNameByID)),
+		zap.Int("folders_loaded", len(folderDBIDByUUID)),
 		zap.Int32("products_with_folder", atomic.LoadInt32(&productsWithFolder)),
 		zap.Int32("folder_lookup_hits", atomic.LoadInt32(&folderLookupHits)),
 		zap.Int32("folder_lookup_misses", atomic.LoadInt32(&folderLookupMisses)),
-		zap.Int32("categories_upserted", atomic.LoadInt32(&categoriesUpserted)))
+		zap.Int32("category_links_assigned", atomic.LoadInt32(&categoriesUpserted)))
 
 	return result, nil
 }
@@ -530,4 +491,82 @@ func (s *MoyskladSyncService) SyncStockOnly(ctx context.Context) error {
 
 	s.logger.Info("Stock sync completed", zap.Int("products_updated", len(stockMap)))
 	return nil
+}
+
+// extractMoyskladUUID берёт UUID из href вида ".../entity/productfolder/UUID" (последний сегмент).
+func extractMoyskladUUID(href string) string {
+	href = strings.TrimSuffix(href, "/")
+	idx := strings.LastIndex(href, "/")
+	if idx < 0 || idx == len(href)-1 {
+		return href
+	}
+	return href[idx+1:]
+}
+
+// syncCategoriesFromMoysklad загружает все группы товаров (productfolder) из МойСклад,
+// апсертит их в таблицу categories с учётом иерархии (parent_id) и возвращает
+// карту moysklad_uuid → categories.id (DB).
+//
+// Стратегия:
+//  1. Загружаем все папки одним списком через /entity/productfolder
+//  2. Pass 1: upsert каждой категории по name → получаем DB id
+//  3. Pass 2: для каждой папки с родителем — резолвим parent_uuid → parent DB id и записываем
+func (s *MoyskladSyncService) syncCategoriesFromMoysklad(ctx context.Context) map[string]int64 {
+	result := make(map[string]int64)
+	if s.categoryQuery == nil {
+		s.logger.Warn("categoryQuery is nil — categories will not be synced")
+		return result
+	}
+
+	folders, err := s.moyskladClient.GetProductFolders(ctx)
+	if err != nil {
+		s.logger.Warn("Failed to fetch product folders", zap.Error(err))
+		return result
+	}
+	s.logger.Info("Product folders loaded from Moysklad", zap.Int("count", len(folders)))
+
+	// Pass 1: upsert все категории, заполняем result[uuid] = dbID.
+	for _, f := range folders {
+		if f.Name == "" {
+			continue
+		}
+		dbID, upErr := s.categoryQuery.UpsertByName(ctx, f.Name)
+		if upErr != nil {
+			s.logger.Warn("Failed to upsert category",
+				zap.String("name", f.Name),
+				zap.Error(upErr))
+			continue
+		}
+		result[f.ID] = dbID
+	}
+
+	// Pass 2: проставляем parent_id где указан родитель.
+	parentsSet := 0
+	for _, f := range folders {
+		if f.ProductFolder == nil || f.ProductFolder.Meta.Href == "" {
+			continue
+		}
+		dbID, ok := result[f.ID]
+		if !ok {
+			continue
+		}
+		parentUUID := extractMoyskladUUID(f.ProductFolder.Meta.Href)
+		parentDBID, ok := result[parentUUID]
+		if !ok {
+			continue
+		}
+		if pErr := s.categoryQuery.SetParent(ctx, dbID, &parentDBID); pErr != nil {
+			s.logger.Warn("Failed to set category parent",
+				zap.Int64("category_id", dbID),
+				zap.Int64("parent_id", parentDBID),
+				zap.Error(pErr))
+			continue
+		}
+		parentsSet++
+	}
+
+	s.logger.Info("Categories synced from Moysklad",
+		zap.Int("total", len(result)),
+		zap.Int("parents_set", parentsSet))
+	return result
 }

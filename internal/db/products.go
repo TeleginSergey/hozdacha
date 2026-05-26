@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -253,30 +254,30 @@ func (p *productQuery) Search(ctx context.Context, query string, limit, offset i
 	return products, nil
 }
 
+// GetByCategory — выборка товаров из категории И всех её подкатегорий (рекурсивный CTE).
+// Это позволяет показывать все товары при клике на главную категорию (и из подкатегорий тоже).
 func (p *productQuery) GetByCategory(ctx context.Context, categoryID int64, limit, offset int) ([]*Product, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	var products []*Product
 	product := &Product{}
-	qb, args, err := p.sq.Select(product.columns("")...).
-		From(ProductsTable).
-		Where(squirrel.And{
-			squirrel.Eq{ProductsActive: true},
-			squirrel.Eq{ProductsStatus: "active"},
-			squirrel.Gt{ProductsStock: 0},
-			squirrel.Eq{ProductsCategoryID: categoryID},
-		}).
-		OrderBy(ProductsCreatedAt + " DESC").
-		Limit(uint64(limit)).
-		Offset(uint64(offset)).
-		ToSql()
-	if err != nil {
-		return nil, fmt.Errorf("failed to build query: %w", err)
-	}
+	cols := strings.Join(product.columns(""), ", ")
+	sql := `WITH RECURSIVE category_tree AS (
+		SELECT ` + CategoriesID + ` AS id FROM ` + CategoriesTable + ` WHERE ` + CategoriesID + ` = $1
+		UNION ALL
+		SELECT c.` + CategoriesID + ` FROM ` + CategoriesTable + ` c
+		JOIN category_tree ct ON c.` + CategoriesParentID + ` = ct.id
+	)
+	SELECT ` + cols + ` FROM ` + ProductsTable + `
+	WHERE ` + ProductsActive + ` = true
+	  AND ` + ProductsStatus + ` = 'active'
+	  AND ` + ProductsStock + ` > 0
+	  AND ` + ProductsCategoryID + ` IN (SELECT id FROM category_tree)
+	ORDER BY ` + ProductsCreatedAt + ` DESC
+	LIMIT $2 OFFSET $3`
 
-	err = pgxscan.Select(ctx, p.runner, &products, qb, args...)
-	if err != nil {
+	var products []*Product
+	if err := pgxscan.Select(ctx, p.runner, &products, sql, categoryID, limit, offset); err != nil {
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
 	return products, nil
@@ -393,27 +394,25 @@ func (p *productQuery) CountActive(ctx context.Context) (int, error) {
 	return count, nil
 }
 
-// CountByCategory возвращает количество товаров в категории
+// CountByCategory возвращает количество товаров в категории и всех её подкатегориях.
 func (p *productQuery) CountByCategory(ctx context.Context, categoryID int64) (int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	var count int
-	qb, args, err := p.sq.Select("COUNT(*)").
-		From(ProductsTable).
-		Where(squirrel.And{
-			squirrel.Eq{ProductsActive: true},
-			squirrel.Eq{ProductsStatus: "active"},
-			squirrel.Gt{ProductsStock: 0},
-			squirrel.Eq{ProductsCategoryID: categoryID},
-		}).
-		ToSql()
-	if err != nil {
-		return 0, fmt.Errorf("failed to build query: %w", err)
-	}
+	sql := `WITH RECURSIVE category_tree AS (
+		SELECT ` + CategoriesID + ` AS id FROM ` + CategoriesTable + ` WHERE ` + CategoriesID + ` = $1
+		UNION ALL
+		SELECT c.` + CategoriesID + ` FROM ` + CategoriesTable + ` c
+		JOIN category_tree ct ON c.` + CategoriesParentID + ` = ct.id
+	)
+	SELECT COUNT(*) FROM ` + ProductsTable + `
+	WHERE ` + ProductsActive + ` = true
+	  AND ` + ProductsStatus + ` = 'active'
+	  AND ` + ProductsStock + ` > 0
+	  AND ` + ProductsCategoryID + ` IN (SELECT id FROM category_tree)`
 
-	err = p.runner.QueryRow(ctx, qb, args...).Scan(&count)
-	if err != nil {
+	var count int
+	if err := p.runner.QueryRow(ctx, sql, categoryID).Scan(&count); err != nil {
 		return 0, fmt.Errorf("failed to execute query: %w", err)
 	}
 	return count, nil

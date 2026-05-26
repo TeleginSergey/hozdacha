@@ -241,7 +241,9 @@ function searchProducts() {
     currentOffset = 0;
     // Сбрасываем фильтр категории при поиске
     currentCategoryId = '';
-    document.querySelectorAll('.chip').forEach(btn => {
+    const sub = document.getElementById('subcategoryList');
+    if (sub) { sub.innerHTML = ''; sub.hidden = true; }
+    document.querySelectorAll('#categoryList .chip').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.categoryId === '');
     });
     loadProducts(currentQuery);
@@ -637,8 +639,11 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =============================================================================
-// КАТЕГОРИИ
+// КАТЕГОРИИ (двухуровневые: главные → подкатегории)
 // =============================================================================
+let allCategories = [];           // полный плоский список с parent_id
+let childrenByParent = new Map(); // parent_id (или 'root') → [children]
+
 async function loadCategories() {
     try {
         const resp = await fetch('/api/categories');
@@ -646,14 +651,47 @@ async function loadCategories() {
         const bar = document.getElementById('categoryList');
         if (!bar || !data.categories || !data.categories.length) return;
 
-        let html = '<button class="chip active" data-category-id="" onclick="selectCategory(event, \'\')">Все товары</button>';
-        data.categories.forEach(cat => {
-            html += `<button class="chip" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}</button>`;
+        allCategories = data.categories;
+        childrenByParent = new Map();
+        allCategories.forEach(cat => {
+            const key = cat.parent_id ? String(cat.parent_id) : 'root';
+            if (!childrenByParent.has(key)) childrenByParent.set(key, []);
+            childrenByParent.get(key).push(cat);
         });
-        bar.innerHTML = html;
+
+        renderMainCategories();
     } catch (e) {
         console.error('Failed to load categories:', e);
     }
+}
+
+function renderMainCategories() {
+    const bar = document.getElementById('categoryList');
+    const roots = childrenByParent.get('root') || [];
+    let html = '<button class="chip active" data-category-id="" onclick="selectCategory(event, \'\')">Все товары</button>';
+    roots.forEach(cat => {
+        const hasChildren = childrenByParent.has(String(cat.id));
+        const arrow = hasChildren ? ' <span class="chip-arrow">▾</span>' : '';
+        html += `<button class="chip" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}${arrow}</button>`;
+    });
+    bar.innerHTML = html;
+}
+
+function renderSubcategories(parentId) {
+    const sub = document.getElementById('subcategoryList');
+    if (!sub) return;
+    const children = childrenByParent.get(String(parentId)) || [];
+    if (children.length === 0) {
+        sub.innerHTML = '';
+        sub.hidden = true;
+        return;
+    }
+    let html = `<button class="chip chip-sub active" data-category-id="${parentId}" onclick="selectCategory(event, '${parentId}')">Все в категории</button>`;
+    children.forEach(cat => {
+        html += `<button class="chip chip-sub" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}</button>`;
+    });
+    sub.innerHTML = html;
+    sub.hidden = false;
 }
 
 function selectCategory(event, categoryId) {
@@ -661,12 +699,45 @@ function selectCategory(event, categoryId) {
     currentCategoryId = categoryId;
     currentOffset = 0;
     currentQuery = '';
-    document.getElementById('searchInput').value = '';
+    const input = document.getElementById('searchInput');
+    if (input) input.value = '';
 
-    // Обновляем активный класс
-    document.querySelectorAll('.chip').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.categoryId === String(categoryId));
-    });
+    // Определяем, является ли выбранная категория корневой/главной.
+    const idStr = String(categoryId);
+    const cat = allCategories.find(c => String(c.id) === idStr);
+    const isRoot = !cat || !cat.parent_id;
+
+    if (idStr === '') {
+        // "Все товары" — скрываем подкатегории, активируем главную плашку.
+        const sub = document.getElementById('subcategoryList');
+        if (sub) { sub.innerHTML = ''; sub.hidden = true; }
+        document.querySelectorAll('#categoryList .chip').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.categoryId === '');
+        });
+    } else if (isRoot) {
+        // Главная категория выбрана — рендерим её детей (если есть).
+        renderSubcategories(categoryId);
+        document.querySelectorAll('#categoryList .chip').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.categoryId === idStr);
+        });
+    } else {
+        // Подкатегория выбрана — оставляем её родителя активным сверху,
+        // обновляем активность среди подкатегорий.
+        const parentId = String(cat.parent_id);
+        // Если ряд подкатегорий пуст или не от того родителя — перерисовать.
+        const sub = document.getElementById('subcategoryList');
+        const firstSub = sub && sub.querySelector('.chip-sub');
+        const subParent = firstSub ? firstSub.dataset.categoryId : null;
+        if (!firstSub || subParent !== parentId) {
+            renderSubcategories(parentId);
+        }
+        document.querySelectorAll('#categoryList .chip').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.categoryId === parentId);
+        });
+        document.querySelectorAll('#subcategoryList .chip').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.categoryId === idStr);
+        });
+    }
 
     loadProducts();
 }
