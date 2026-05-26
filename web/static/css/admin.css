@@ -102,8 +102,8 @@
 }
 
 .tab-btn.active {
-    color: #2C2C2C;
-    border-bottom-color: #3498db;
+    color: #2A3B2D;
+    border-bottom-color: #4A6E4D;
     background: white;
 }
 
@@ -194,7 +194,7 @@
 
 .filter-input:focus {
     outline: none;
-    border-color: #3498db;
+    border-color: #4A6E4D;
 }
 
 /* ===== Таблицы ===== */
@@ -210,7 +210,7 @@
 }
 
 .admin-table thead th {
-    background: #2C2C2C;
+    background: #2A3B2D;
     color: white;
     text-align: left;
     padding: 0.75rem;
@@ -334,7 +334,7 @@
     top: 1rem;
     width: 12px;
     height: 12px;
-    background: #3498db;
+    background: #4A6E4D;
     border-radius: 50%;
     border: 2px solid white;
 }

@@ -9,7 +9,7 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
     line-height: 1.6;
     color: #2C2C2C;
-    background-color: #F5F1E8;
+    background-color: #F4EFEA;
     display: flex;
     flex-direction: column;
     min-height: 100vh;
@@ -22,7 +22,7 @@ body {
 }
 
 header {
-    background-color: #4A7C59;
+    background-color: #2A3B2D;
     color: white;
     padding: 1rem 0;
     box-shadow: 0 2px 5px rgba(0,0,0,0.1);
@@ -63,14 +63,14 @@ header .container {
 }
 
 .btn-primary {
-    background-color: #4A7C59;
+    background-color: #674422;
     color: white;
-    border-color: #4A7C59;
+    border-color: #674422;
 }
 
 .btn-primary:hover {
-    background-color: #3D6B4A;
-    border-color: #3D6B4A;
+    background-color: #4E3219;
+    border-color: #4E3219;
     color: white;
     text-decoration: none;
 }
@@ -83,7 +83,7 @@ header .container {
 
 .btn-outline:hover {
     background-color: white;
-    color: #4A7C59;
+    color: #4A6E4D;
     text-decoration: none;
 }
 
@@ -97,7 +97,7 @@ header .container {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background-color: #8B6F47;
+    background-color: #8B7D6B;
     color: white;
     display: flex;
     align-items: center;
@@ -110,7 +110,7 @@ header .container {
 }
 
 .user-avatar:hover {
-    background-color: #6B5537;
+    background-color: #4E3219;
 }
 
 .dropdown-menu {
@@ -172,7 +172,7 @@ main {
 .hero {
     text-align: center;
     padding: 3rem 0;
-    background: linear-gradient(135deg, #4A7C59 0%, #3D6B4A 100%);
+    background: linear-gradient(135deg, #4A6E4D 0%, #2A3B2D 100%);
     color: white;
     border-radius: 10px;
     margin-bottom: 2rem;
@@ -270,7 +270,7 @@ section h2 {
 .product-card .price {
     font-size: 1.5rem;
     font-weight: bold;
-    color: #8B6F47;
+    color: #674422;
     margin: 0.5rem 0;
 }
 
@@ -281,7 +281,7 @@ section h2 {
 }
 
 .btn {
-    background-color: #4A7C59;
+    background-color: #674422;
     color: white;
     padding: 0.75rem 1.5rem;
     border: none;
@@ -294,7 +294,7 @@ section h2 {
 }
 
 .btn:hover {
-    background-color: #3D6B4A;
+    background-color: #4E3219;
 }
 
 .search-box {
@@ -319,7 +319,7 @@ section h2 {
 
 .cart-btn {
     position: relative;
-    background-color: #4A7C59;
+    background-color: #674422;
     color: white;
     padding: 1rem 2rem;
     border: none;
@@ -330,7 +330,7 @@ section h2 {
 }
 
 .cart-btn:hover {
-    background-color: #3D6B4A;
+    background-color: #4E3219;
 }
 
 .modal {
@@ -387,7 +387,7 @@ section h2 {
 }
 
 footer {
-    background-color: #8B6F47;
+    background-color: #2A3B2D;
     color: white;
     text-align: center;
     padding: 2rem 0;
@@ -409,7 +409,7 @@ footer {
 .cart-total {
     margin-top: 1rem;
     padding-top: 1rem;
-    border-top: 2px solid #4A7C59;
+    border-top: 2px solid #8B7D6B;
     font-size: 1.2rem;
     font-weight: bold;
 }
@@ -491,11 +491,11 @@ footer {
 }
 
 .pagination-controls .btn:hover:not(:disabled) {
-    background: #4A7C59;
+    background: #4A6E4D;
     color: white;
-    border-color: #4A7C59;
+    border-color: #4A6E4D;
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(74, 124, 89, 0.3);
+    box-shadow: 0 4px 8px rgba(74, 110, 77, 0.3);
 }
 
 .pagination-controls .btn:active:not(:disabled) {
@@ -513,14 +513,14 @@ footer {
 }
 
 .pagination-controls .btn-primary {
-    background: #4A7C59;
+    background: #674422;
     color: white;
-    border-color: #4A7C59;
+    border-color: #674422;
 }
 
 .pagination-controls .btn-primary:hover:not(:disabled) {
-    background: #3D6B4A;
-    border-color: #3D6B4A;
+    background: #4E3219;
+    border-color: #4E3219;
 }
 
 .pagination-controls .btn-secondary {
