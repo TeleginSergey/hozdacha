@@ -921,6 +921,42 @@ footer {
     font-weight: 600;
 }
 
+/* Второй ряд — подкатегории */
+.subcategory-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: -10px 0 20px;
+    padding: 10px 16px;
+    background: #F4F8F4;
+    border-radius: 10px;
+    border: 1px dashed #C7D8C8;
+}
+
+.subcategory-chips[hidden] {
+    display: none;
+}
+
+.chip-sub {
+    padding: 5px 12px;
+    font-size: 0.82rem;
+    background: white;
+    border-color: #C7D8C8;
+    color: #2A3B2D;
+}
+
+.chip-sub.active {
+    background: #6FA374;
+    border-color: #6FA374;
+    color: white;
+}
+
+.chip-arrow {
+    font-size: 0.7em;
+    margin-left: 4px;
+    opacity: 0.7;
+}
+
 @media (max-width: 480px) {
     .category-chips {
         gap: 6px;
@@ -929,6 +965,14 @@ footer {
     .chip {
         padding: 6px 12px;
         font-size: 0.82rem;
+    }
+    .subcategory-chips {
+        gap: 5px;
+        padding: 8px 12px;
+    }
+    .chip-sub {
+        padding: 4px 10px;
+        font-size: 0.78rem;
     }
 }
 
