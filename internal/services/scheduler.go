@@ -258,6 +258,10 @@ func (s *Scheduler) FullSync(ctx context.Context) error {
 
 	s.logger.Info("Starting full product sync with worker pool")
 
+	// Сначала обновляем кэш категорий (moysklad_uuid → DB id) — worker pool
+	// будет читать его при сохранении каждого товара (SyncSingleProduct).
+	s.syncService.RefreshCategories(ctx)
+
 	stockMap, err := s.syncService.GetStockMapForSync(ctx)
 	if err != nil {
 		s.logger.Error("Failed to get stock report from Moysklad", zap.Error(err))
