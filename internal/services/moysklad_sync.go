@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -22,6 +23,12 @@ type MoyskladSyncService struct {
 	stockCache     *cache.StockCache
 	stockBuffer    float64
 	logger         *zap.Logger
+
+	// Кэш отображения moysklad_uuid папки → DB id категории.
+	// Используется обоими путями синхронизации (admin SyncProducts и worker pool).
+	// Обновляется в syncCategoriesFromMoysklad / RefreshCategories.
+	folderMu         sync.RWMutex
+	folderDBIDByUUID map[string]int64
 }
 
 func NewMoyskladSyncService(
@@ -370,6 +377,16 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 			status = "out_of_stock"
 		}
 
+		// Привязка к категории: сначала пробуем по folder href, при неудаче
+		// сохраняем существующее значение, чтобы не затирать category_id в NULL.
+		var categoryID *int64
+		if product.ProductFolder != nil {
+			categoryID = s.lookupCategoryIDByFolderHref(product.ProductFolder.Meta.Href)
+		}
+		if categoryID == nil {
+			categoryID = existingProduct.CategoryID
+		}
+
 		updated := &db.Product{
 			ID:          existingProduct.ID,
 			MoyskladID:  &product.ID,
@@ -381,6 +398,7 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 			Active:      true,
 			UpdatedAt:   time.Now(),
 			ImageURL:    existingProduct.ImageURL, // Сохраняем существующий image_url
+			CategoryID:  categoryID,
 		}
 
 		if _, err := s.productQuery.Update(ctx, updated, existingProduct.ID); err != nil {
@@ -407,6 +425,11 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 			status = "out_of_stock"
 		}
 
+		var categoryID *int64
+		if product.ProductFolder != nil {
+			categoryID = s.lookupCategoryIDByFolderHref(product.ProductFolder.Meta.Href)
+		}
+
 		newProduct := &db.Product{
 			MoyskladID:  &product.ID,
 			Name:        product.Name,
@@ -417,6 +440,7 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 			Active:      true,
 			CreatedAt:   time.Now(),
 			UpdatedAt:   time.Now(),
+			CategoryID:  categoryID,
 		}
 
 		if _, err := s.productQuery.Insert(ctx, newProduct); err != nil {
@@ -568,5 +592,34 @@ func (s *MoyskladSyncService) syncCategoriesFromMoysklad(ctx context.Context) ma
 	s.logger.Info("Categories synced from Moysklad",
 		zap.Int("total", len(result)),
 		zap.Int("parents_set", parentsSet))
+
+	// Сохраняем актуальный map в сервисе — используется параллельным путём
+	// синхронизации через worker pool (SyncSingleProduct).
+	s.folderMu.Lock()
+	s.folderDBIDByUUID = result
+	s.folderMu.Unlock()
+
 	return result
+}
+
+// RefreshCategories — публичная обёртка вокруг syncCategoriesFromMoysklad для scheduler.
+// Загружает группы товаров из МойСклад, апсертит их в БД с иерархией и обновляет кэш.
+func (s *MoyskladSyncService) RefreshCategories(ctx context.Context) {
+	s.syncCategoriesFromMoysklad(ctx)
+}
+
+// lookupCategoryIDByFolderHref берёт href папки из MoyskladProduct.ProductFolder.Meta.Href
+// и возвращает DB id категории, если он закэширован после RefreshCategories.
+func (s *MoyskladSyncService) lookupCategoryIDByFolderHref(href string) *int64 {
+	if href == "" {
+		return nil
+	}
+	uuid := extractMoyskladUUID(href)
+	s.folderMu.RLock()
+	defer s.folderMu.RUnlock()
+	if id, ok := s.folderDBIDByUUID[uuid]; ok {
+		idCopy := id
+		return &idCopy
+	}
+	return nil
 }
