@@ -66,11 +66,11 @@ type ProductQuery interface {
 	GetByMoyskladID(ctx context.Context, moyskladID string) (*Product, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*Product, error)
 	GetActive(ctx context.Context, limit, offset int) ([]*Product, error)
-	Search(ctx context.Context, query string, limit, offset int) ([]*Product, error)
+	Search(ctx context.Context, query string, categoryID *int64, limit, offset int) ([]*Product, error)
 	GetByCategory(ctx context.Context, categoryID int64, limit, offset int) ([]*Product, error)
 	CountActive(ctx context.Context) (int, error)
 	CountByCategory(ctx context.Context, categoryID int64) (int, error)
-	CountSearch(ctx context.Context, query string) (int, error)
+	CountSearch(ctx context.Context, query string, categoryID *int64) (int, error)
 	Insert(ctx context.Context, product *Product) (*Product, error)
 	Update(ctx context.Context, product *Product, id int64) (*Product, error)
 	Delete(ctx context.Context, id int64) error
@@ -224,13 +224,37 @@ func (p *productQuery) GetActive(ctx context.Context, limit, offset int) ([]*Pro
 	return products, nil
 }
 
-func (p *productQuery) Search(ctx context.Context, query string, limit, offset int) ([]*Product, error) {
+func (p *productQuery) Search(ctx context.Context, query string, categoryID *int64, limit, offset int) ([]*Product, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var products []*Product
 	product := &Product{}
 	searchPattern := "%" + query + "%"
+
+	if categoryID != nil {
+		// Поиск внутри категории + подкатегорий (рекурсивный CTE).
+		cols := strings.Join(product.columns(""), ", ")
+		sql := `WITH RECURSIVE category_tree AS (
+			SELECT ` + CategoriesID + ` AS id FROM ` + CategoriesTable + ` WHERE ` + CategoriesID + ` = $1
+			UNION ALL
+			SELECT c.` + CategoriesID + ` FROM ` + CategoriesTable + ` c
+			JOIN category_tree ct ON c.` + CategoriesParentID + ` = ct.id
+		)
+		SELECT ` + cols + ` FROM ` + ProductsTable + `
+		WHERE ` + ProductsActive + ` = true
+		  AND ` + ProductsStatus + ` = 'active'
+		  AND ` + ProductsStock + ` > 0
+		  AND ` + ProductsName + ` ILIKE $2
+		  AND ` + ProductsCategoryID + ` IN (SELECT id FROM category_tree)
+		ORDER BY ` + ProductsCreatedAt + ` DESC
+		LIMIT $3 OFFSET $4`
+		if err := pgxscan.Select(ctx, p.runner, &products, sql, *categoryID, searchPattern, limit, offset); err != nil {
+			return nil, fmt.Errorf("failed to execute search by category: %w", err)
+		}
+		return products, nil
+	}
+
 	qb, args, err := p.sq.Select(product.columns("")...).
 		From(ProductsTable).
 		Where(squirrel.And{
@@ -419,12 +443,32 @@ func (p *productQuery) CountByCategory(ctx context.Context, categoryID int64) (i
 }
 
 // CountSearch возвращает количество товаров по поисковому запросу
-func (p *productQuery) CountSearch(ctx context.Context, query string) (int, error) {
+func (p *productQuery) CountSearch(ctx context.Context, query string, categoryID *int64) (int, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
 	var count int
 	searchPattern := "%" + query + "%"
+
+	if categoryID != nil {
+		sql := `WITH RECURSIVE category_tree AS (
+			SELECT ` + CategoriesID + ` AS id FROM ` + CategoriesTable + ` WHERE ` + CategoriesID + ` = $1
+			UNION ALL
+			SELECT c.` + CategoriesID + ` FROM ` + CategoriesTable + ` c
+			JOIN category_tree ct ON c.` + CategoriesParentID + ` = ct.id
+		)
+		SELECT COUNT(*) FROM ` + ProductsTable + `
+		WHERE ` + ProductsActive + ` = true
+		  AND ` + ProductsStatus + ` = 'active'
+		  AND ` + ProductsStock + ` > 0
+		  AND ` + ProductsName + ` ILIKE $2
+		  AND ` + ProductsCategoryID + ` IN (SELECT id FROM category_tree)`
+		if err := p.runner.QueryRow(ctx, sql, *categoryID, searchPattern).Scan(&count); err != nil {
+			return 0, fmt.Errorf("failed to execute search count by category: %w", err)
+		}
+		return count, nil
+	}
+
 	qb, args, err := p.sq.Select("COUNT(*)").
 		From(ProductsTable).
 		Where(squirrel.And{
