@@ -239,11 +239,9 @@ function searchProducts() {
     const query = document.getElementById('searchInput').value;
     currentQuery = (query || '').trim();
     currentOffset = 0;
-    // Сбрасываем фильтр категории при поиске
     currentCategoryId = '';
-    activeCategoryId = '';
-    activeParentId = '';
-    renderCategoryTree();
+    document.getElementById('subcategoryBar').hidden = true;
+    renderCategoryBar();
     updateBreadcrumb();
     loadProducts(currentQuery);
 }
@@ -638,12 +636,10 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =============================================================================
-// КАТЕГОРИИ: дерево в sidebar
+// КАТЕГОРИИ: горизонтальная панель
 // =============================================================================
 let allCategories = [];
 let childrenByParent = new Map();
-let activeCategoryId = '';
-let activeParentId = '';
 
 async function loadCategories() {
     try {
@@ -659,129 +655,81 @@ async function loadCategories() {
             childrenByParent.get(key).push(cat);
         });
 
-        // Сортируем корневые и дочерние по имени
         for (const [key, list] of childrenByParent) {
             list.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
         }
 
-        renderCategoryTree();
+        renderCategoryBar();
     } catch (e) {
         console.error('Failed to load categories:', e);
     }
 }
 
-function renderCategoryTree(filterText) {
-    const tree = document.getElementById('categoryTree');
-    if (!tree) return;
+function renderCategoryBar() {
+    const bar = document.getElementById('categoryBar');
+    if (!bar) return;
 
     const roots = childrenByParent.get('root') || [];
-    const ft = (filterText || '').toLowerCase().trim();
-
-    let html = '';
-
-    // "Все товары"
-    const allMatch = !ft || 'все товары'.includes(ft);
-    html += `<div class="tree-item${activeCategoryId === '' ? ' active' : ''}${allMatch ? '' : ' hidden-by-filter'}" data-category-id="" onclick="selectTreeCategory(event, '')">
-        <span class="tree-icon leaf">▸</span>
-        <span class="tree-label">Все товары</span>
-    </div>`;
+    let html = `<button class="cat-pill${currentCategoryId === '' ? ' active' : ''}" data-category-id="" onclick="selectCategory(event, '')">Все</button>`;
 
     roots.forEach(cat => {
         const hasChildren = childrenByParent.has(String(cat.id));
-        const children = childrenByParent.get(String(cat.id)) || [];
-        const catMatch = !ft || cat.name.toLowerCase().includes(ft);
-        const childMatch = !ft || children.some(c => c.name.toLowerCase().includes(ft));
-        const visible = catMatch || childMatch;
-
-        if (!visible) return;
-
-        const isActive = activeCategoryId === String(cat.id);
-        const isParentActive = activeParentId === String(cat.id);
-        const expanded = isActive || isParentActive || (!!ft && childMatch);
-
-        html += `<div class="tree-item${isActive ? ' active' : ''}${expanded ? ' expanded' : ''}" data-category-id="${cat.id}" onclick="selectTreeCategory(event, '${cat.id}')">
-            <span class="tree-icon">▸</span>
-            <span class="tree-label">${escapeHtml(cat.name)}</span>
-        </div>`;
-
-        if (hasChildren) {
-            html += '<div class="tree-children' + (expanded ? '' : ' collapsed') + '" style="max-height:' + (expanded ? (children.length * 36) + 'px' : '0') + '">';
-            children.forEach(sub => {
-                const subMatch = !ft || sub.name.toLowerCase().includes(ft);
-                if (!subMatch && ft) return;
-                const subActive = activeCategoryId === String(sub.id);
-                html += `<div class="tree-item${subActive ? ' active' : ''}" data-category-id="${sub.id}" onclick="selectTreeCategory(event, '${sub.id}')">
-                    <span class="tree-icon leaf">▸</span>
-                    <span class="tree-label">${escapeHtml(sub.name)}</span>
-                </div>`;
-            });
-            html += '</div>';
-        }
+        const arrow = hasChildren ? '<span class="pill-arrow">▾</span>' : '';
+        const active = currentCategoryId === String(cat.id) || (hasChildren && currentCategoryId && allCategories.find(c => String(c.id) === currentCategoryId)?.parent_id == cat.id);
+        html += `<button class="cat-pill${active ? ' active' : ''}" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}${arrow}</button>`;
     });
 
-    if (!ft && roots.length === 0) {
-        html += '<div class="tree-loading">Нет категорий</div>';
-    }
-
-    tree.innerHTML = html;
+    bar.innerHTML = html;
 }
 
-function selectTreeCategory(event, categoryId) {
-    event.stopPropagation();
-    const idStr = String(categoryId);
+function renderSubcategoryBar(parentId) {
+    const sub = document.getElementById('subcategoryBar');
+    if (!sub) return;
 
-    if (idStr === '') {
-        // "Все товары"
-        activeCategoryId = '';
-        activeParentId = '';
-    } else {
-        const cat = allCategories.find(c => String(c.id) === idStr);
-        if (!cat) return;
-
-        const hasChildren = childrenByParent.has(idStr);
-        if (hasChildren) {
-            // Клик по родителю: раскрываем/сворачиваем, но НЕ меняем категорию
-            // (категория меняется только при клике на лист или "Все в категории")
-            const treeItem = event.currentTarget;
-            const wasExpanded = treeItem.classList.contains('expanded');
-            if (wasExpanded) {
-                treeItem.classList.remove('expanded');
-                const childrenDiv = treeItem.nextElementSibling;
-                if (childrenDiv && childrenDiv.classList.contains('tree-children')) {
-                    childrenDiv.classList.add('collapsed');
-                    childrenDiv.style.maxHeight = '0';
-                }
-            } else {
-                treeItem.classList.add('expanded');
-                const childrenDiv = treeItem.nextElementSibling;
-                if (childrenDiv && childrenDiv.classList.contains('tree-children')) {
-                    childrenDiv.classList.remove('collapsed');
-                    const count = childrenDiv.querySelectorAll('.tree-item').length;
-                    childrenDiv.style.maxHeight = (count * 36) + 'px';
-                }
-            }
-            // При раскрытии родителя — показываем все товары этой категории + подкатегорий
-            activeCategoryId = idStr;
-            activeParentId = idStr;
-        } else {
-            // Клик по листу (подкатегории)
-            activeCategoryId = idStr;
-            activeParentId = cat.parent_id ? String(cat.parent_id) : '';
-        }
+    const children = childrenByParent.get(String(parentId)) || [];
+    if (children.length === 0) {
+        sub.innerHTML = '';
+        sub.hidden = true;
+        return;
     }
 
-    // Перерисовываем дерево
-    renderCategoryTree();
+    let html = `<button class="cat-pill${currentCategoryId === String(parentId) ? ' active' : ''}" data-category-id="${parentId}" onclick="selectCategory(event, '${parentId}')">Все в категории</button>`;
+    children.forEach(cat => {
+        html += `<button class="cat-pill${currentCategoryId === String(cat.id) ? ' active' : ''}" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}</button>`;
+    });
 
-    // Обновляем breadcrumb
-    updateBreadcrumb();
+    sub.innerHTML = html;
+    sub.hidden = false;
+}
 
-    // Загружаем товары
-    currentCategoryId = activeCategoryId;
+function selectCategory(event, categoryId) {
+    event.preventDefault();
+    const idStr = String(categoryId);
+
+    currentCategoryId = idStr;
     currentOffset = 0;
     currentQuery = '';
     const input = document.getElementById('searchInput');
     if (input) input.value = '';
+
+    // Показываем/скрываем подкатегории
+    if (idStr === '') {
+        document.getElementById('subcategoryBar').hidden = true;
+    } else {
+        const cat = allCategories.find(c => String(c.id) === idStr);
+        if (cat && !cat.parent_id) {
+            // Это корневая категория — показываем её подкатегории
+            renderSubcategoryBar(idStr);
+        } else if (cat && cat.parent_id) {
+            // Это подкатегория — показываем соседей
+            renderSubcategoryBar(String(cat.parent_id));
+        } else {
+            document.getElementById('subcategoryBar').hidden = true;
+        }
+    }
+
+    renderCategoryBar();
+    updateBreadcrumb();
     loadProducts();
 }
 
@@ -789,12 +737,12 @@ function updateBreadcrumb() {
     const bc = document.getElementById('breadcrumb');
     if (!bc) return;
 
-    if (!activeCategoryId) {
+    if (!currentCategoryId) {
         bc.innerHTML = '<span class="breadcrumb-item active">Все товары</span>';
         return;
     }
 
-    const cat = allCategories.find(c => String(c.id) === activeCategoryId);
+    const cat = allCategories.find(c => String(c.id) === currentCategoryId);
     if (!cat) {
         bc.innerHTML = '<span class="breadcrumb-item active">Все товары</span>';
         return;
@@ -804,36 +752,12 @@ function updateBreadcrumb() {
     if (cat.parent_id) {
         const parent = allCategories.find(c => String(c.id) === String(cat.parent_id));
         if (parent) {
-            html += `<span class="breadcrumb-item" onclick="selectTreeCategory(event, '${parent.id}')">${escapeHtml(parent.name)}</span>`;
+            html += `<span class="breadcrumb-item" onclick="selectCategory(event, '${parent.id}')">${escapeHtml(parent.name)}</span>`;
             html += '<span class="breadcrumb-sep">›</span>';
         }
     }
     html += `<span class="breadcrumb-item active">${escapeHtml(cat.name)}</span>`;
     bc.innerHTML = html;
 }
-
-// Фильтр категорий в sidebar
-function filterCategoryTree() {
-    const input = document.getElementById('sidebarSearch');
-    const ft = (input?.value || '').trim();
-    renderCategoryTree(ft);
-}
-
-// Toggle sidebar (мобильные)
-function toggleSidebar() {
-    const sidebar = document.getElementById('catalogSidebar');
-    if (!sidebar) return;
-    sidebar.classList.toggle('collapsed');
-}
-
-// Overlay click to close sidebar on mobile
-document.addEventListener('click', function(e) {
-    const sidebar = document.getElementById('catalogSidebar');
-    if (!sidebar || sidebar.classList.contains('collapsed')) return;
-    if (window.innerWidth > 768) return;
-    if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-open-btn')) {
-        sidebar.classList.add('collapsed');
-    }
-});
 
 
