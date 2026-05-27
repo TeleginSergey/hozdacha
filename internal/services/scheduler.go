@@ -312,6 +312,13 @@ func (s *Scheduler) FullSync(ctx context.Context) error {
 		zap.Int("total_batches", totalBatches),
 		zap.String("note", "workers will process batches in parallel"))
 
+	// Логируем статистику привязки товаров к категориям с задержкой,
+	// чтобы worker pool успел обработать большую часть батчей.
+	go func() {
+		time.Sleep(2 * time.Minute)
+		s.syncService.LogCategoryLinkStats()
+	}()
+
 	return nil
 }
 

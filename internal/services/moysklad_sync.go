@@ -29,6 +29,13 @@ type MoyskladSyncService struct {
 	// Обновляется в syncCategoriesFromMoysklad / RefreshCategories.
 	folderMu         sync.RWMutex
 	folderDBIDByUUID map[string]int64
+
+	// Диагностические счётчики: инкрементируются worker pool'ом в SyncSingleProduct.
+	// Сбрасываются в RefreshCategories. Читаются в scheduler по завершении.
+	linkCatSet       int32 // товаров привязано к категории через folder href
+	linkCatMissing   int32 // товар имеет folder, но UUID не нашёлся в кэше
+	linkCatNoFolder  int32 // у товара вообще нет ProductFolder в JSON
+	linkCatPreserved int32 // обновление: фолдера нет/не нашли — оставили существующее
 }
 
 func NewMoyskladSyncService(
@@ -382,9 +389,17 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 		var categoryID *int64
 		if product.ProductFolder != nil {
 			categoryID = s.lookupCategoryIDByFolderHref(product.ProductFolder.Meta.Href)
+			if categoryID != nil {
+				atomic.AddInt32(&s.linkCatSet, 1)
+			} else {
+				atomic.AddInt32(&s.linkCatMissing, 1)
+			}
+		} else {
+			atomic.AddInt32(&s.linkCatNoFolder, 1)
 		}
-		if categoryID == nil {
+		if categoryID == nil && existingProduct.CategoryID != nil {
 			categoryID = existingProduct.CategoryID
+			atomic.AddInt32(&s.linkCatPreserved, 1)
 		}
 
 		updated := &db.Product{
@@ -428,6 +443,13 @@ func (s *MoyskladSyncService) SyncSingleProduct(ctx context.Context, product moy
 		var categoryID *int64
 		if product.ProductFolder != nil {
 			categoryID = s.lookupCategoryIDByFolderHref(product.ProductFolder.Meta.Href)
+			if categoryID != nil {
+				atomic.AddInt32(&s.linkCatSet, 1)
+			} else {
+				atomic.AddInt32(&s.linkCatMissing, 1)
+			}
+		} else {
+			atomic.AddInt32(&s.linkCatNoFolder, 1)
 		}
 
 		newProduct := &db.Product{
@@ -604,8 +626,27 @@ func (s *MoyskladSyncService) syncCategoriesFromMoysklad(ctx context.Context) ma
 
 // RefreshCategories — публичная обёртка вокруг syncCategoriesFromMoysklad для scheduler.
 // Загружает группы товаров из МойСклад, апсертит их в БД с иерархией и обновляет кэш.
+// Также сбрасывает диагностические счётчики привязки товаров к категориям.
 func (s *MoyskladSyncService) RefreshCategories(ctx context.Context) {
+	atomic.StoreInt32(&s.linkCatSet, 0)
+	atomic.StoreInt32(&s.linkCatMissing, 0)
+	atomic.StoreInt32(&s.linkCatNoFolder, 0)
+	atomic.StoreInt32(&s.linkCatPreserved, 0)
 	s.syncCategoriesFromMoysklad(ctx)
+}
+
+// LogCategoryLinkStats логирует диагностические счётчики привязки товаров к категориям.
+// Вызывается scheduler'ом после завершения worker pool полной синхронизации.
+func (s *MoyskladSyncService) LogCategoryLinkStats() {
+	s.folderMu.RLock()
+	cacheSize := len(s.folderDBIDByUUID)
+	s.folderMu.RUnlock()
+	s.logger.Info("Product→category link stats (worker pool sync)",
+		zap.Int("folder_cache_size", cacheSize),
+		zap.Int32("linked_via_folder", atomic.LoadInt32(&s.linkCatSet)),
+		zap.Int32("folder_uuid_missing_in_cache", atomic.LoadInt32(&s.linkCatMissing)),
+		zap.Int32("product_without_folder", atomic.LoadInt32(&s.linkCatNoFolder)),
+		zap.Int32("preserved_existing_category", atomic.LoadInt32(&s.linkCatPreserved)))
 }
 
 // lookupCategoryIDByFolderHref берёт href папки из MoyskladProduct.ProductFolder.Meta.Href
