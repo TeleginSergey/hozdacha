@@ -24,7 +24,7 @@ type Category struct {
 	ID          int64      `db:"categories_id_pk" json:"id"`
 	Name        string     `db:"categories_name" json:"name"`
 	Description *string    `db:"categories_description" json:"description,omitempty"`
-	ParentID    *int64     `db:"categories_parent_id_fk" json:"parent_id,omitempty"`
+	ParentID    *int64     `db:"categories_parent_id_fk" json:"parent_id"`
 	CreatedAt   *time.Time `db:"categories_created_at" json:"created_at,omitempty"`
 }
 
