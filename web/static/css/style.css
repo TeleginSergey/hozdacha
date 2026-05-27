@@ -196,8 +196,8 @@ section h2 {
 .promotions-grid,
 .products-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 1.25rem;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 1rem;
     align-items: stretch;
 }
 
@@ -615,6 +615,14 @@ footer {
    МОБИЛЬНАЯ АДАПТАЦИЯ
    ======================================== */
 
+/* Ноутбуки и небольшие десктопы (769–1200px): 4 колонки */
+@media (min-width: 769px) and (max-width: 1200px) {
+    .promotions-grid,
+    .products-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
 /* Планшеты и меньше (≤768px) */
 @media (max-width: 768px) {
     .container {
@@ -674,6 +682,60 @@ footer {
     .products-grid {
         grid-template-columns: repeat(2, 1fr);
         gap: 10px;
+    }
+
+    /* Каталог: sidebar скрыт, кнопка открытия видна */
+    .sidebar-overlay {
+        display: block;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s;
+    }
+
+    .catalog-sidebar:not(.collapsed) ~ .sidebar-overlay,
+    .catalog-sidebar:not(.collapsed) + .sidebar-overlay {
+        opacity: 1;
+        pointer-events: auto;
+    }
+
+    .catalog-sidebar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 1000;
+        height: 100vh;
+        max-height: 100vh;
+        margin-left: -280px;
+        width: 280px;
+        min-width: 280px;
+        box-shadow: 2px 0 20px rgba(0,0,0,0.15);
+        transition: margin-left 0.25s ease;
+    }
+
+    .catalog-sidebar:not(.collapsed) {
+        margin-left: 0;
+    }
+
+    .sidebar-open-btn {
+        display: inline-flex;
+    }
+
+    .sidebar-toggle {
+        display: block;
+    }
+
+    .catalog-main {
+        padding: 12px;
+    }
+
+    .catalog-topbar {
+        gap: 8px;
+    }
+
+    .catalog-breadcrumb {
+        width: 100%;
+        margin-left: 0;
+        margin-top: 4px;
     }
 
     .product-card img {
@@ -880,7 +942,232 @@ footer {
 }
 
 /* ========================================
-   ФИЛЬТР ПО КАТЕГОРИЯМ (чипы)
+   КАТАЛОГ: LAYOUT (sidebar + main)
+   ======================================== */
+.catalog-layout {
+    display: flex;
+    gap: 0;
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 0;
+    min-height: calc(100vh - 140px);
+}
+
+/* --- SIDEBAR --- */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.35);
+    z-index: 999;
+}
+
+.catalog-sidebar {
+    width: 260px;
+    min-width: 260px;
+    background: #FAFBFA;
+    border-right: 1px solid #E8EDE8;
+    padding: 0;
+    overflow-y: auto;
+    max-height: calc(100vh - 80px);
+    position: sticky;
+    top: 80px;
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid #E8EDE8;
+}
+
+.sidebar-header h3 {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #2A3B2D;
+    margin: 0;
+}
+
+.sidebar-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: #999;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.sidebar-toggle:hover {
+    background: #E8EDE8;
+    color: #555;
+}
+
+.sidebar-search {
+    padding: 10px 12px;
+    border-bottom: 1px solid #E8EDE8;
+}
+
+.sidebar-search input {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid #D8DDD8;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    background: white;
+    color: #333;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.sidebar-search input:focus {
+    border-color: #4A6E4D;
+    box-shadow: 0 0 0 2px rgba(74,110,77,0.12);
+}
+
+/* --- CATEGORY TREE --- */
+.category-tree {
+    padding: 6px 0;
+}
+
+.tree-loading {
+    padding: 20px;
+    text-align: center;
+    color: #999;
+    font-size: 0.85rem;
+}
+
+.tree-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    color: #444;
+    transition: background 0.12s;
+    border-left: 3px solid transparent;
+    user-select: none;
+    gap: 6px;
+}
+
+.tree-item:hover {
+    background: #EDF3ED;
+}
+
+.tree-item.active {
+    background: #E2EDE3;
+    color: #2A3B2D;
+    font-weight: 600;
+    border-left-color: #4A6E4D;
+}
+
+.tree-item .tree-icon {
+    width: 18px;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #999;
+    flex-shrink: 0;
+    transition: transform 0.2s;
+}
+
+.tree-item.expanded .tree-icon {
+    transform: rotate(90deg);
+}
+
+.tree-item .tree-icon.leaf {
+    visibility: hidden;
+}
+
+.tree-item .tree-label {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tree-item .tree-count {
+    font-size: 0.72rem;
+    color: #aaa;
+    background: #f0f0f0;
+    padding: 1px 7px;
+    border-radius: 10px;
+    flex-shrink: 0;
+}
+
+.tree-children {
+    overflow: hidden;
+    transition: max-height 0.25s ease;
+}
+
+.tree-children.collapsed {
+    max-height: 0 !important;
+}
+
+.tree-children .tree-item {
+    padding-left: 36px;
+    font-size: 0.84rem;
+}
+
+.tree-item.hidden-by-filter {
+    display: none;
+}
+
+/* --- MAIN AREA --- */
+.catalog-main {
+    flex: 1;
+    min-width: 0;
+    padding: 20px 24px;
+}
+
+.catalog-topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+}
+
+.sidebar-open-btn {
+    display: none;
+    white-space: nowrap;
+}
+
+.catalog-breadcrumb {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #888;
+    flex-wrap: wrap;
+    margin-left: auto;
+}
+
+.breadcrumb-item {
+    color: #888;
+    cursor: pointer;
+    padding: 3px 8px;
+    border-radius: 4px;
+    transition: background 0.12s;
+}
+
+.breadcrumb-item:hover {
+    background: #f0f0f0;
+    color: #555;
+}
+
+.breadcrumb-item.active {
+    color: #2A3B2D;
+    font-weight: 600;
+}
+
+.breadcrumb-sep {
+    color: #ccc;
+}
+
+/* ========================================
+   ФИЛЬТР ПО КАТЕГОРИЯМ (чипы) — оставлен для обратной совместимости
    ======================================== */
 .category-chips {
     display: flex;
