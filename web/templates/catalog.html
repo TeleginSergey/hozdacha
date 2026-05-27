@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}} - ХозДача</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=6">
+    <link rel="stylesheet" href="/static/css/style.css?v=8">
 </head>
 <body>
     <header>
@@ -29,30 +29,41 @@
         </div>
     </header>
 
-    <main class="container">
-        <section class="catalog-header">
-            <h2>Каталог товаров</h2>
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Поиск товаров...">
-                <button onclick="searchProducts()">Найти</button>
+    <main class="catalog-layout">
+        <!-- Боковая панель: дерево категорий -->
+        <aside class="catalog-sidebar" id="catalogSidebar">
+            <div class="sidebar-header">
+                <h3>Категории</h3>
+                <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Скрыть">✕</button>
             </div>
-        </section>
-
-        <div class="category-chips" id="categoryList">
-            <button class="chip active" data-category-id="" onclick="selectCategory(event, '')">Все товары</button>
-        </div>
-        <div class="subcategory-chips" id="subcategoryList" hidden></div>
-
-        <section class="products-grid" id="productsGrid">
-            <p>Загрузка товаров...</p>
-        </section>
-
-        <div class="pagination" id="paginationContainer">
-            <div style="display:flex; gap:12px; align-items:center; justify-content:center; margin:16px 0;">
-                <button class="btn" id="prevPageBtn" onclick="prevPage()" disabled>Назад</button>
-                <span id="pageInfo">Страница 1</span>
-                <button class="btn" id="nextPageBtn" onclick="nextPage()">Далее</button>
+            <div class="sidebar-search">
+                <input type="text" id="sidebarSearch" placeholder="Фильтр категорий..." oninput="filterCategoryTree()">
             </div>
+            <nav class="category-tree" id="categoryTree">
+                <div class="tree-loading">Загрузка...</div>
+            </nav>
+        </aside>
+        <!-- Overlay для мобильного sidebar -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+        <!-- Основная область: поиск + товары + пагинация -->
+        <div class="catalog-main">
+            <div class="catalog-topbar">
+                <button class="btn btn-outline sidebar-open-btn" id="sidebarOpenBtn" onclick="toggleSidebar()" title="Категории">☰ Категории</button>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Поиск товаров...">
+                    <button onclick="searchProducts()">Найти</button>
+                </div>
+                <div class="catalog-breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item active">Все товары</span>
+                </div>
+            </div>
+
+            <section class="products-grid" id="productsGrid">
+                <p>Загрузка товаров...</p>
+            </section>
+
+            <div class="pagination" id="paginationContainer"></div>
         </div>
 
         <div class="cart-section">
@@ -154,7 +165,7 @@
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', checkAuthState);
 </script>
-<script src="/static/js/catalog.js?v=7"></script>
+<script src="/static/js/catalog.js?v=8"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>

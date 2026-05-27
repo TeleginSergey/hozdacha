@@ -23,7 +23,7 @@ function safeParseJSON(str, defaultValue) {
 let cart = safeParseJSON(localStorage.getItem('cart'), []);
 
 // Пагинация
-const pageLimit = 24; // Кратно 2, 3, 4 колонкам — подходит для всех размеров экрана
+const pageLimit = 25; // Кратно 5 колонкам
 let currentOffset = 0;
 let currentQuery = '';
 let currentCategoryId = '';
@@ -241,11 +241,10 @@ function searchProducts() {
     currentOffset = 0;
     // Сбрасываем фильтр категории при поиске
     currentCategoryId = '';
-    const sub = document.getElementById('subcategoryList');
-    if (sub) { sub.innerHTML = ''; sub.hidden = true; }
-    document.querySelectorAll('#categoryList .chip').forEach(btn => {
-        btn.classList.toggle('active', btn.dataset.categoryId === '');
-    });
+    activeCategoryId = '';
+    activeParentId = '';
+    renderCategoryTree();
+    updateBreadcrumb();
     loadProducts(currentQuery);
 }
 
@@ -639,17 +638,18 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =============================================================================
-// КАТЕГОРИИ (двухуровневые: главные → подкатегории)
+// КАТЕГОРИИ: дерево в sidebar
 // =============================================================================
-let allCategories = [];           // полный плоский список с parent_id
-let childrenByParent = new Map(); // parent_id (или 'root') → [children]
+let allCategories = [];
+let childrenByParent = new Map();
+let activeCategoryId = '';
+let activeParentId = '';
 
 async function loadCategories() {
     try {
         const resp = await fetch('/api/categories');
         const data = await resp.json();
-        const bar = document.getElementById('categoryList');
-        if (!bar || !data.categories || !data.categories.length) return;
+        if (!data.categories || !data.categories.length) return;
 
         allCategories = data.categories;
         childrenByParent = new Map();
@@ -659,87 +659,181 @@ async function loadCategories() {
             childrenByParent.get(key).push(cat);
         });
 
-        renderMainCategories();
+        // Сортируем корневые и дочерние по имени
+        for (const [key, list] of childrenByParent) {
+            list.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+        }
+
+        renderCategoryTree();
     } catch (e) {
         console.error('Failed to load categories:', e);
     }
 }
 
-function renderMainCategories() {
-    const bar = document.getElementById('categoryList');
+function renderCategoryTree(filterText) {
+    const tree = document.getElementById('categoryTree');
+    if (!tree) return;
+
     const roots = childrenByParent.get('root') || [];
-    let html = '<button class="chip active" data-category-id="" onclick="selectCategory(event, \'\')">Все товары</button>';
+    const ft = (filterText || '').toLowerCase().trim();
+
+    let html = '';
+
+    // "Все товары"
+    const allMatch = !ft || 'все товары'.includes(ft);
+    html += `<div class="tree-item${activeCategoryId === '' ? ' active' : ''}${allMatch ? '' : ' hidden-by-filter'}" data-category-id="" onclick="selectTreeCategory(event, '')">
+        <span class="tree-icon leaf">▸</span>
+        <span class="tree-label">Все товары</span>
+    </div>`;
+
     roots.forEach(cat => {
         const hasChildren = childrenByParent.has(String(cat.id));
-        const arrow = hasChildren ? ' <span class="chip-arrow">▾</span>' : '';
-        html += `<button class="chip" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}${arrow}</button>`;
-    });
-    bar.innerHTML = html;
-}
+        const children = childrenByParent.get(String(cat.id)) || [];
+        const catMatch = !ft || cat.name.toLowerCase().includes(ft);
+        const childMatch = !ft || children.some(c => c.name.toLowerCase().includes(ft));
+        const visible = catMatch || childMatch;
 
-function renderSubcategories(parentId) {
-    const sub = document.getElementById('subcategoryList');
-    if (!sub) return;
-    const children = childrenByParent.get(String(parentId)) || [];
-    if (children.length === 0) {
-        sub.innerHTML = '';
-        sub.hidden = true;
-        return;
+        if (!visible) return;
+
+        const isActive = activeCategoryId === String(cat.id);
+        const isParentActive = activeParentId === String(cat.id);
+        const expanded = isActive || isParentActive || (!!ft && childMatch);
+
+        html += `<div class="tree-item${isActive ? ' active' : ''}${expanded ? ' expanded' : ''}" data-category-id="${cat.id}" onclick="selectTreeCategory(event, '${cat.id}')">
+            <span class="tree-icon">▸</span>
+            <span class="tree-label">${escapeHtml(cat.name)}</span>
+        </div>`;
+
+        if (hasChildren) {
+            html += '<div class="tree-children' + (expanded ? '' : ' collapsed') + '" style="max-height:' + (expanded ? (children.length * 36) + 'px' : '0') + '">';
+            children.forEach(sub => {
+                const subMatch = !ft || sub.name.toLowerCase().includes(ft);
+                if (!subMatch && ft) return;
+                const subActive = activeCategoryId === String(sub.id);
+                html += `<div class="tree-item${subActive ? ' active' : ''}" data-category-id="${sub.id}" onclick="selectTreeCategory(event, '${sub.id}')">
+                    <span class="tree-icon leaf">▸</span>
+                    <span class="tree-label">${escapeHtml(sub.name)}</span>
+                </div>`;
+            });
+            html += '</div>';
+        }
+    });
+
+    if (!ft && roots.length === 0) {
+        html += '<div class="tree-loading">Нет категорий</div>';
     }
-    let html = `<button class="chip chip-sub active" data-category-id="${parentId}" onclick="selectCategory(event, '${parentId}')">Все в категории</button>`;
-    children.forEach(cat => {
-        html += `<button class="chip chip-sub" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}</button>`;
-    });
-    sub.innerHTML = html;
-    sub.hidden = false;
+
+    tree.innerHTML = html;
 }
 
-function selectCategory(event, categoryId) {
-    event.preventDefault();
-    currentCategoryId = categoryId;
+function selectTreeCategory(event, categoryId) {
+    event.stopPropagation();
+    const idStr = String(categoryId);
+
+    if (idStr === '') {
+        // "Все товары"
+        activeCategoryId = '';
+        activeParentId = '';
+    } else {
+        const cat = allCategories.find(c => String(c.id) === idStr);
+        if (!cat) return;
+
+        const hasChildren = childrenByParent.has(idStr);
+        if (hasChildren) {
+            // Клик по родителю: раскрываем/сворачиваем, но НЕ меняем категорию
+            // (категория меняется только при клике на лист или "Все в категории")
+            const treeItem = event.currentTarget;
+            const wasExpanded = treeItem.classList.contains('expanded');
+            if (wasExpanded) {
+                treeItem.classList.remove('expanded');
+                const childrenDiv = treeItem.nextElementSibling;
+                if (childrenDiv && childrenDiv.classList.contains('tree-children')) {
+                    childrenDiv.classList.add('collapsed');
+                    childrenDiv.style.maxHeight = '0';
+                }
+            } else {
+                treeItem.classList.add('expanded');
+                const childrenDiv = treeItem.nextElementSibling;
+                if (childrenDiv && childrenDiv.classList.contains('tree-children')) {
+                    childrenDiv.classList.remove('collapsed');
+                    const count = childrenDiv.querySelectorAll('.tree-item').length;
+                    childrenDiv.style.maxHeight = (count * 36) + 'px';
+                }
+            }
+            // При раскрытии родителя — показываем все товары этой категории + подкатегорий
+            activeCategoryId = idStr;
+            activeParentId = idStr;
+        } else {
+            // Клик по листу (подкатегории)
+            activeCategoryId = idStr;
+            activeParentId = cat.parent_id ? String(cat.parent_id) : '';
+        }
+    }
+
+    // Перерисовываем дерево
+    renderCategoryTree();
+
+    // Обновляем breadcrumb
+    updateBreadcrumb();
+
+    // Загружаем товары
+    currentCategoryId = activeCategoryId;
     currentOffset = 0;
     currentQuery = '';
     const input = document.getElementById('searchInput');
     if (input) input.value = '';
-
-    // Определяем, является ли выбранная категория корневой/главной.
-    const idStr = String(categoryId);
-    const cat = allCategories.find(c => String(c.id) === idStr);
-    const isRoot = !cat || !cat.parent_id;
-
-    if (idStr === '') {
-        // "Все товары" — скрываем подкатегории, активируем главную плашку.
-        const sub = document.getElementById('subcategoryList');
-        if (sub) { sub.innerHTML = ''; sub.hidden = true; }
-        document.querySelectorAll('#categoryList .chip').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.categoryId === '');
-        });
-    } else if (isRoot) {
-        // Главная категория выбрана — рендерим её детей (если есть).
-        renderSubcategories(categoryId);
-        document.querySelectorAll('#categoryList .chip').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.categoryId === idStr);
-        });
-    } else {
-        // Подкатегория выбрана — оставляем её родителя активным сверху,
-        // обновляем активность среди подкатегорий.
-        const parentId = String(cat.parent_id);
-        // Если ряд подкатегорий пуст или не от того родителя — перерисовать.
-        const sub = document.getElementById('subcategoryList');
-        const firstSub = sub && sub.querySelector('.chip-sub');
-        const subParent = firstSub ? firstSub.dataset.categoryId : null;
-        if (!firstSub || subParent !== parentId) {
-            renderSubcategories(parentId);
-        }
-        document.querySelectorAll('#categoryList .chip').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.categoryId === parentId);
-        });
-        document.querySelectorAll('#subcategoryList .chip').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.categoryId === idStr);
-        });
-    }
-
     loadProducts();
 }
+
+function updateBreadcrumb() {
+    const bc = document.getElementById('breadcrumb');
+    if (!bc) return;
+
+    if (!activeCategoryId) {
+        bc.innerHTML = '<span class="breadcrumb-item active">Все товары</span>';
+        return;
+    }
+
+    const cat = allCategories.find(c => String(c.id) === activeCategoryId);
+    if (!cat) {
+        bc.innerHTML = '<span class="breadcrumb-item active">Все товары</span>';
+        return;
+    }
+
+    let html = '';
+    if (cat.parent_id) {
+        const parent = allCategories.find(c => String(c.id) === String(cat.parent_id));
+        if (parent) {
+            html += `<span class="breadcrumb-item" onclick="selectTreeCategory(event, '${parent.id}')">${escapeHtml(parent.name)}</span>`;
+            html += '<span class="breadcrumb-sep">›</span>';
+        }
+    }
+    html += `<span class="breadcrumb-item active">${escapeHtml(cat.name)}</span>`;
+    bc.innerHTML = html;
+}
+
+// Фильтр категорий в sidebar
+function filterCategoryTree() {
+    const input = document.getElementById('sidebarSearch');
+    const ft = (input?.value || '').trim();
+    renderCategoryTree(ft);
+}
+
+// Toggle sidebar (мобильные)
+function toggleSidebar() {
+    const sidebar = document.getElementById('catalogSidebar');
+    if (!sidebar) return;
+    sidebar.classList.toggle('collapsed');
+}
+
+// Overlay click to close sidebar on mobile
+document.addEventListener('click', function(e) {
+    const sidebar = document.getElementById('catalogSidebar');
+    if (!sidebar || sidebar.classList.contains('collapsed')) return;
+    if (window.innerWidth > 768) return;
+    if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-open-btn')) {
+        sidebar.classList.add('collapsed');
+    }
+});
 
 
