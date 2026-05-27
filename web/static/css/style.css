@@ -947,8 +947,7 @@ footer {
 .catalog-layout {
     display: flex;
     gap: 0;
-    max-width: 1440px;
-    margin: 0 auto;
+    margin: 0;
     padding: 0;
     min-height: calc(100vh - 140px);
 }
@@ -963,15 +962,12 @@ footer {
 }
 
 .catalog-sidebar {
-    width: 260px;
-    min-width: 260px;
+    width: 250px;
+    min-width: 250px;
     background: #FAFBFA;
     border-right: 1px solid #E8EDE8;
     padding: 0;
     overflow-y: auto;
-    max-height: calc(100vh - 80px);
-    position: sticky;
-    top: 80px;
 }
 
 .sidebar-header {
