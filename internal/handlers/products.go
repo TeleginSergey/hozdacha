@@ -147,7 +147,15 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 		offset = 0
 	}
 
-	products, err := h.uc.SearchProducts(c.Request.Context(), query, limit, offset)
+	// Опциональный фильтр по категории (включая подкатегории).
+	var categoryID *int64
+	if cidStr := c.Query("category_id"); cidStr != "" {
+		if cid, err := strconv.ParseInt(cidStr, 10, 64); err == nil && cid > 0 {
+			categoryID = &cid
+		}
+	}
+
+	products, err := h.uc.SearchProducts(c.Request.Context(), query, categoryID, limit, offset)
 	if err != nil {
 		h.logger.Error("Failed to search products", zap.Error(err))
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search products"})
@@ -155,7 +163,7 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 	}
 
 	// Получаем общее количество найденных товаров
-	total, err := h.uc.GetSearchProductsCount(c.Request.Context(), query)
+	total, err := h.uc.GetSearchProductsCount(c.Request.Context(), query, categoryID)
 	if err != nil {
 		h.logger.Warn("Failed to get search count", zap.Error(err))
 		total = 0

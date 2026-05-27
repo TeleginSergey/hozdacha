@@ -16,11 +16,11 @@ type ProductRepository interface {
 	GetByMoyskladID(ctx context.Context, moyskladID string) (*db.Product, error)
 	GetAll(ctx context.Context, limit, offset int) ([]*db.Product, error)
 	GetActive(ctx context.Context, limit, offset int) ([]*db.Product, error)
-	Search(ctx context.Context, query string, limit, offset int) ([]*db.Product, error)
+	Search(ctx context.Context, query string, categoryID *int64, limit, offset int) ([]*db.Product, error)
 	GetByCategory(ctx context.Context, categoryID int64, limit, offset int) ([]*db.Product, error)
 	CountActive(ctx context.Context) (int, error)
 	CountByCategory(ctx context.Context, categoryID int64) (int, error)
-	CountSearch(ctx context.Context, query string) (int, error)
+	CountSearch(ctx context.Context, query string, categoryID *int64) (int, error)
 	Insert(ctx context.Context, product *db.Product) (*db.Product, error)
 	Update(ctx context.Context, product *db.Product, id int64) (*db.Product, error)
 	Delete(ctx context.Context, id int64) error
@@ -148,7 +148,7 @@ func (u *ProductUsecase) GetProductByID(ctx context.Context, id int64) (*db.Prod
 	return product, nil
 }
 
-func (u *ProductUsecase) SearchProducts(ctx context.Context, q string, limit, offset int) ([]*db.Product, error) {
+func (u *ProductUsecase) SearchProducts(ctx context.Context, q string, categoryID *int64, limit, offset int) ([]*db.Product, error) {
 	if limit <= 0 {
 		return []*db.Product{}, nil
 	}
@@ -160,7 +160,7 @@ func (u *ProductUsecase) SearchProducts(ctx context.Context, q string, limit, of
 	batchOffset := offset
 
 	for batches := 0; batches < maxBatches && len(collected) < limit; batches++ {
-		products, err := u.repo.Search(ctx, q, batchLimit, batchOffset)
+		products, err := u.repo.Search(ctx, q, categoryID, batchLimit, batchOffset)
 		if err != nil {
 			return nil, err
 		}
@@ -211,8 +211,8 @@ func (u *ProductUsecase) GetActiveProductsCount(ctx context.Context, categoryID 
 }
 
 // GetSearchProductsCount возвращает количество товаров по поисковому запросу
-func (u *ProductUsecase) GetSearchProductsCount(ctx context.Context, query string) (int, error) {
-	return u.repo.CountSearch(ctx, query)
+func (u *ProductUsecase) GetSearchProductsCount(ctx context.Context, query string, categoryID *int64) (int, error) {
+	return u.repo.CountSearch(ctx, query, categoryID)
 }
 
 // applyStockBuffer повторно использует уже существующую логику по смещению остатков.

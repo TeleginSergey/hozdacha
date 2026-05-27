@@ -153,6 +153,9 @@ async function loadProducts(query = '', append = false) {
         let url;
         if (query) {
             url = `/api/products/search?q=${encodeURIComponent(query)}&limit=${pageLimit}&offset=${currentOffset}`;
+            if (currentCategoryId) {
+                url += `&category_id=${encodeURIComponent(currentCategoryId)}`;
+            }
         } else {
             url = `/api/products?limit=${pageLimit}&offset=${currentOffset}`;
             if (currentCategoryId) {
@@ -239,10 +242,21 @@ function searchProducts() {
     const query = document.getElementById('searchInput').value;
     currentQuery = (query || '').trim();
     currentOffset = 0;
-    currentCategoryId = '';
-    document.getElementById('subcategoryBar').hidden = true;
-    renderCategoryBar();
-    updateBreadcrumb();
+
+    // Читаем scope: если выбрана категория — ищем только в ней
+    const scope = document.getElementById('searchScope');
+    if (scope && scope.value) {
+        currentCategoryId = scope.value;
+    } else {
+        currentCategoryId = '';
+    }
+
+    if (!currentQuery) {
+        // Пустой поиск — просто показываем каталог с текущей категорией
+        loadProducts();
+        return;
+    }
+
     loadProducts(currentQuery);
 }
 
@@ -712,16 +726,17 @@ function selectCategory(event, categoryId) {
     const input = document.getElementById('searchInput');
     if (input) input.value = '';
 
+    // Синхронизируем dropdown поиска
+    updateSearchScope(idStr);
+
     // Показываем/скрываем подкатегории
     if (idStr === '') {
         document.getElementById('subcategoryBar').hidden = true;
     } else {
         const cat = allCategories.find(c => String(c.id) === idStr);
         if (cat && !cat.parent_id) {
-            // Это корневая категория — показываем её подкатегории
             renderSubcategoryBar(idStr);
         } else if (cat && cat.parent_id) {
-            // Это подкатегория — показываем соседей
             renderSubcategoryBar(String(cat.parent_id));
         } else {
             document.getElementById('subcategoryBar').hidden = true;
@@ -731,6 +746,25 @@ function selectCategory(event, categoryId) {
     renderCategoryBar();
     updateBreadcrumb();
     loadProducts();
+}
+
+function updateSearchScope(categoryId) {
+    const scope = document.getElementById('searchScope');
+    if (!scope) return;
+
+    if (!categoryId) {
+        scope.innerHTML = '<option value="">Везде</option>';
+        return;
+    }
+
+    const cat = allCategories.find(c => String(c.id) === categoryId);
+    if (!cat) {
+        scope.innerHTML = '<option value="">Везде</option>';
+        return;
+    }
+
+    scope.innerHTML = '<option value="">Везде</option>' +
+        '<option value="' + categoryId + '" selected>В категории «' + escapeHtml(cat.name) + '»</option>';
 }
 
 function updateBreadcrumb() {
