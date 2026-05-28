@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}} - ХозДача</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=13">
+    <link rel="stylesheet" href="/static/css/style.css?v=14">
 </head>
 <body>
     <header>
@@ -24,6 +24,7 @@
                     <div class="user-avatar" id="userAvatar">
                         <span id="avatarLetter">U</span>
                     </div>
+                    <span class="user-greeting" id="userGreeting"></span>
                 </a>
             </div>
         </div>
@@ -145,6 +146,7 @@
         // Set avatar letter (first letter of name, then username, then email)
         const name = user.full_name || user.username || user.email || 'U';
         avatarLetter.textContent = name.charAt(0).toUpperCase();
+        document.getElementById('userGreeting').textContent = 'Здравствуйте, ' + (user.full_name || user.username || 'Гость');
     }
 
     // Show auth buttons for guests

@@ -42,6 +42,7 @@
                 </div>
                 <a href="/profile" id="userMenu" style="display:none;text-decoration:none">
                     <div class="user-avatar"><span id="avatarLetter">U</span></div>
+                    <span class="user-greeting" id="userGreeting"></span>
                 </a>
             </div>
         </div>
@@ -99,6 +100,7 @@
             document.getElementById('profilePhone').textContent = u.phone || '';
             document.getElementById('profileInitial').textContent = (u.full_name || u.username || u.email || 'U').charAt(0).toUpperCase();
             document.getElementById('avatarLetter').textContent = (u.full_name || u.username || u.email || 'U').charAt(0).toUpperCase();
+            document.getElementById('userGreeting').textContent = 'Здравствуйте, ' + (u.full_name || u.username || 'Гость');
             document.querySelector('[name=name]').value = u.full_name || '';
             document.querySelector('[name=phone]').value = u.phone || '';
             document.getElementById('authButtons').style.display = 'none';
