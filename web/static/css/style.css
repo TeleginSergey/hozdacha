@@ -966,10 +966,10 @@ footer {
    ======================================== */
 .catalog-layout {
     display: flex;
+    align-items: flex-start;
     gap: 0;
     margin: 0;
     padding: 0;
-    min-height: calc(100vh - 140px);
 }
 
 /* --- SIDEBAR --- */
@@ -988,6 +988,9 @@ footer {
     border-right: 1px solid #E8EDE8;
     padding: 0;
     overflow-y: auto;
+    max-height: calc(100vh - 80px);
+    position: sticky;
+    top: 0;
 }
 
 .sidebar-header {
