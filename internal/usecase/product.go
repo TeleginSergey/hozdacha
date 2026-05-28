@@ -36,6 +36,7 @@ type ProductUsecase struct {
 		BatchSetStocks(ctx context.Context, products []*db.Product) error
 	}
 	stockBuffer float64
+	pricer      *PromotionPricer
 	logger      *zap.Logger
 }
 
@@ -51,6 +52,19 @@ func NewProductUsecase(
 		stockBuffer: stockBuffer,
 		logger:      logger,
 	}
+}
+
+// SetPromotionPricer подключает калькулятор акций. Безопасен для nil — тогда цены остаются базовыми.
+func (u *ProductUsecase) SetPromotionPricer(p *PromotionPricer) {
+	u.pricer = p
+}
+
+// applyPromotions — точка интеграции акций. Если pricer не задан, ничего не делает.
+func (u *ProductUsecase) applyPromotions(ctx context.Context, products []*db.Product) {
+	if u.pricer == nil || len(products) == 0 {
+		return
+	}
+	u.pricer.Apply(ctx, products)
 }
 
 func (u *ProductUsecase) GetCatalogProducts(ctx context.Context, limit, offset int, categoryID *int64) ([]*db.Product, error) {
@@ -115,6 +129,7 @@ func (u *ProductUsecase) GetCatalogProducts(ctx context.Context, limit, offset i
 		batchOffset += batchLimit
 	}
 
+	u.applyPromotions(ctx, collected)
 	return collected, nil
 }
 
@@ -145,6 +160,7 @@ func (u *ProductUsecase) GetProductByID(ctx context.Context, id int64) (*db.Prod
 		product.Stock = 0
 	}
 
+	u.applyPromotions(ctx, []*db.Product{product})
 	return product, nil
 }
 
@@ -199,6 +215,7 @@ func (u *ProductUsecase) SearchProducts(ctx context.Context, q string, categoryI
 		batchOffset += batchLimit
 	}
 
+	u.applyPromotions(ctx, collected)
 	return collected, nil
 }
 

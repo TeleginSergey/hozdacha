@@ -71,7 +71,6 @@ func NewApp() (*App, error) {
 	productRepo := db.NewProductQuery(database.Pool, database.SQ, logger)
 	promotionRepo := db.NewPromotionQuery(database.Pool, database.SQ, logger)
 	promotionLinkRepo := db.NewPromotionLinkQuery(database.Pool, database.SQ, logger)
-	_ = promotionLinkRepo // TODO: будет передан в usecase расчёта эффективной цены
 	orderRepo := db.NewOrderQuery(database.Pool, database.SQ, logger)
 	orderEventRepo := db.NewOrderEventQuery(database.Pool, logger)
 	cartRepo := db.NewCartItemQuery(database.Pool, logger)
@@ -109,6 +108,8 @@ func NewApp() (*App, error) {
 	authService := services.NewAuthService(userRepo, cfg.JWT.Secret, logger)
 	userUC := usecase.NewUserUsecase(userRepo, logger, cfg.JWT.Secret)
 	productUC := usecase.NewProductUsecase(productRepo, stockCache, cfg.Moysklad.StockBuffer, logger)
+	categoryRepoForPricer := &db.CategoryQuery{DB: database}
+	productUC.SetPromotionPricer(usecase.NewPromotionPricer(promotionLinkRepo, categoryRepoForPricer, logger))
 	orderUC := usecase.NewOrderUsecase(orderRepo, productRepo, stockCache, moyskladClient, orderEventRepo, logger)
 	categoryRepo := &db.CategoryQuery{DB: database}
 	moyskladSyncService := services.NewMoyskladSyncService(
