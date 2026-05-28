@@ -48,6 +48,13 @@ type Product struct {
 	LastSyncUpdated *time.Time `db:"products_last_sync_updated" insert:"products_last_sync_updated" update:"products_last_sync_updated"`
 	CreatedAt       time.Time  `db:"products_created_at"`
 	UpdatedAt       time.Time  `db:"products_updated_at" update:"products_updated_at"`
+
+	// Транзитные поля, заполняются usecase-слоем при отдаче клиенту.
+	// В БД не хранятся и в SELECT/INSERT/UPDATE не участвуют (нет нужных тегов).
+	EffectivePrice  *float64 `db:"-" json:"EffectivePrice,omitempty"`
+	DiscountPercent *float64 `db:"-" json:"DiscountPercent,omitempty"`
+	PromotionType   string   `db:"-" json:"PromotionType,omitempty"` // "product" | "category" | ""
+	PromotionTitle  string   `db:"-" json:"PromotionTitle,omitempty"`
 }
 
 var (

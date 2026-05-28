@@ -75,6 +75,48 @@ func (q *CategoryQuery) SetParent(ctx context.Context, id int64, parentID *int64
 	return nil
 }
 
+// AncestorMap возвращает для каждой категории список её ID-предков (включая саму категорию).
+// Используется для разрешения акций на родительские категории: если акция привязана к
+// «Посуда», то все её подкатегории её получают.
+func (q *CategoryQuery) AncestorMap(ctx context.Context) (map[int64][]int64, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	sql := `SELECT ` + CategoriesID + `, ` + CategoriesParentID + ` FROM ` + CategoriesTable
+	rows, err := q.Pool.Query(ctx, sql)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load categories: %w", err)
+	}
+	defer rows.Close()
+
+	parent := make(map[int64]*int64)
+	for rows.Next() {
+		var id int64
+		var pid *int64
+		if err := rows.Scan(&id, &pid); err != nil {
+			return nil, fmt.Errorf("failed to scan category: %w", err)
+		}
+		parent[id] = pid
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("rows error: %w", err)
+	}
+
+	// Защита от циклов на случай битых данных.
+	const maxDepth = 32
+	result := make(map[int64][]int64, len(parent))
+	for id := range parent {
+		chain := []int64{id}
+		cur := parent[id]
+		for depth := 0; cur != nil && depth < maxDepth; depth++ {
+			chain = append(chain, *cur)
+			cur = parent[*cur]
+		}
+		result[id] = chain
+	}
+	return result, nil
+}
+
 func (q *CategoryQuery) ListAll(ctx context.Context) ([]*Category, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
