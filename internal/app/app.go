@@ -70,6 +70,8 @@ func NewApp() (*App, error) {
 	userRepo := db.NewUserQuery(database.Pool, database.SQ, logger)
 	productRepo := db.NewProductQuery(database.Pool, database.SQ, logger)
 	promotionRepo := db.NewPromotionQuery(database.Pool, database.SQ, logger)
+	promotionLinkRepo := db.NewPromotionLinkQuery(database.Pool, database.SQ, logger)
+	_ = promotionLinkRepo // TODO: будет передан в usecase расчёта эффективной цены
 	orderRepo := db.NewOrderQuery(database.Pool, database.SQ, logger)
 	orderEventRepo := db.NewOrderEventQuery(database.Pool, logger)
 	cartRepo := db.NewCartItemQuery(database.Pool, logger)
