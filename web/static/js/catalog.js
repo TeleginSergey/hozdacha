@@ -342,7 +342,7 @@ async function addToCart(id, name, price) {
         const stock = parseInt(product.Stock || product.products_stock || 0);
         
         if (stock <= 0) {
-            alert('Товар закончился');
+            alert('Этого товара сейчас нет на складе. Выберите другой товар.');
             return;
         }
         
@@ -351,7 +351,7 @@ async function addToCart(id, name, price) {
         const currentQuantity = existingItem ? existingItem.quantity : 0;
         
         if (currentQuantity >= stock) {
-            alert(`Доступно только ${stock} шт. этого товара`);
+            alert('Вы уже добавили всё, что есть на складе. Доступно всего ' + stock + ' шт.');
             return;
         }
         
@@ -427,6 +427,25 @@ function updateCartUI() {
 
 function changeCartQty(index, delta) {
     if (index < 0 || index >= cart.length) return;
+    if (delta > 0) {
+        // Проверяем остаток на складе перед увеличением
+        const item = cart[index];
+        fetch(`/api/products/${item.id}`)
+            .then(r => r.json())
+            .then(product => {
+                const stock = parseInt(product.Stock || product.products_stock || 0);
+                if (item.quantity >= stock) {
+                    alert('На складе больше нет этого товара. Доступно всего ' + stock + ' шт.');
+                    return;
+                }
+                item.quantity += delta;
+                saveCart();
+                updateCartUI();
+                loadProducts(currentQuery);
+            })
+            .catch(() => alert('Не удалось проверить наличие товара'));
+        return;
+    }
     cart[index].quantity += delta;
     if (cart[index].quantity <= 0) cart.splice(index, 1);
     saveCart();
