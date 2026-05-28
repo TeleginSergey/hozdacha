@@ -35,7 +35,7 @@ type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8"`
 	Phone    string `json:"phone" binding:"required"`
-	Name     string `json:"name" binding:"required"`
+	Name     string `json:"name" binding:"required,max=32"`
 	Website  string `json:"website"` // Honeypot field - должно быть пустым
 }
 
@@ -398,6 +398,9 @@ func (u *UserUsecase) UpdateProfile(ctx context.Context, userID int64, req map[s
 
 	// Обновляем поля если они переданы
 	if fullName, ok := req["full_name"].(string); ok {
+		if len(fullName) > 32 {
+			return nil, fmt.Errorf("имя не должно быть длиннее 32 символов")
+		}
 		user.FullName = &fullName
 	}
 	if phone, ok := req["phone"].(string); ok {
