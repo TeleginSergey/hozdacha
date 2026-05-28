@@ -17,12 +17,14 @@ import (
 )
 
 type MoyskladSyncService struct {
-	moyskladClient *moysklad.Client
-	productQuery   db.ProductQuery
-	categoryQuery  *db.CategoryQuery
-	stockCache     *cache.StockCache
-	stockBuffer    float64
-	logger         *zap.Logger
+	moyskladClient     *moysklad.Client
+	productQuery       db.ProductQuery
+	categoryQuery      *db.CategoryQuery
+	promotionQuery     db.PromotionQuery
+	promotionLinkQuery db.PromotionLinkQuery
+	stockCache         *cache.StockCache
+	stockBuffer        float64
+	logger             *zap.Logger
 
 	// Кэш отображения moysklad_uuid папки → DB id категории.
 	// Используется обоими путями синхронизации (admin SyncProducts и worker pool).

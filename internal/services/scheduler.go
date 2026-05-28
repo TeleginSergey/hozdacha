@@ -62,6 +62,11 @@ func (s *Scheduler) Start(ctx context.Context) {
 		go s.runImageSyncLoop(ctx)
 	}
 
+	// Лёгкая периодическая синхронизация акций (specialpricediscount).
+	// Дёргает только entity/specialpricediscount + апдейт связей — отдельно от
+	// тяжёлой синхронизации товаров.
+	go s.runPromotionsSyncLoop(ctx)
+
 	ticker := time.NewTicker(s.interval)
 	defer ticker.Stop()
 
@@ -83,6 +88,50 @@ func (s *Scheduler) Start(ctx context.Context) {
 			s.logger.Info("Scheduler stopped due to context cancellation")
 			return
 		}
+	}
+}
+
+// runPromotionsSyncLoop запускает периодическую синхронизацию акций из МойСклад.
+// Интервал — фиксированные 10 минут: акции редко меняются, а API дешёвый.
+// Первый запуск — через 30 секунд после старта, чтобы дать товарам/категориям загрузиться.
+func (s *Scheduler) runPromotionsSyncLoop(ctx context.Context) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Error("runPromotionsSyncLoop panicked", zap.Any("panic", r))
+		}
+	}()
+
+	const interval = 10 * time.Minute
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(30 * time.Second):
+	}
+	s.runPromotionsSyncOnce(ctx)
+
+	t := time.NewTicker(interval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.stopChan:
+			return
+		case <-t.C:
+			s.runPromotionsSyncOnce(ctx)
+		}
+	}
+}
+
+func (s *Scheduler) runPromotionsSyncOnce(parent context.Context) {
+	if s.syncService == nil {
+		return
+	}
+	ctx, cancel := context.WithTimeout(parent, 5*time.Minute)
+	defer cancel()
+	if _, err := s.syncService.SyncPromotions(ctx); err != nil {
+		s.logger.Warn("Periodic promotions sync failed", zap.Error(err))
 	}
 }
 
@@ -314,9 +363,18 @@ func (s *Scheduler) FullSync(ctx context.Context) error {
 
 	// Логируем статистику привязки товаров к категориям с задержкой,
 	// чтобы worker pool успел обработать большую часть батчей.
+	// Заодно — синхронизируем акции: они зависят от уже импортированных
+	// товаров (по moysklad_id) и категорий (по folder UUID), которые к этому
+	// моменту уже доступны.
 	go func() {
 		time.Sleep(2 * time.Minute)
 		s.syncService.LogCategoryLinkStats()
+
+		pctx, pcancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		defer pcancel()
+		if _, err := s.syncService.SyncPromotions(pctx); err != nil {
+			s.logger.Warn("Promotions sync failed", zap.Error(err))
+		}
 	}()
 
 	return nil

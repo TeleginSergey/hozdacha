@@ -956,6 +956,91 @@ type ProductFolderItem struct {
 	ProductFolder *MoyskladProductFolder `json:"productFolder,omitempty"`
 }
 
+// MoyskladMetaRef — общая meta-ссылка на сущность МойСклад. Из href извлекается UUID.
+type MoyskladMetaRef struct {
+	Meta struct {
+		Href string `json:"href"`
+		Type string `json:"type"`
+	} `json:"meta"`
+}
+
+// MoyskladSpecialPriceDiscount — спец-цена/скидка в МойСклад (entity/specialpricediscount).
+// Это самый частый тип «акции» в hozmag-сценариях: фиксированный % на список товаров
+// и/или папок товаров. Личные/накопительные скидки в эту модель не подпадают.
+type MoyskladSpecialPriceDiscount struct {
+	ID             string            `json:"id"`
+	Name           string            `json:"name"`
+	Active         bool              `json:"active"`
+	AllProducts    bool              `json:"allProducts"`
+	Discount       float64           `json:"discount"`
+	Assortment     []MoyskladMetaRef `json:"assortment,omitempty"`
+	ProductFolders []MoyskladMetaRef `json:"productFolders,omitempty"`
+}
+
+// GetSpecialPriceDiscounts возвращает все спец-цены (specialpricediscount) из МойСклад.
+// Используется для синхронизации акций в локальную таблицу promotions с привязками
+// к товарам/категориям.
+func (c *Client) GetSpecialPriceDiscounts(ctx context.Context) ([]MoyskladSpecialPriceDiscount, error) {
+	type response struct {
+		Rows []MoyskladSpecialPriceDiscount `json:"rows"`
+	}
+
+	var all []MoyskladSpecialPriceDiscount
+	limit := 100
+	offset := 0
+
+	for {
+		endpoint := fmt.Sprintf("%s/entity/specialpricediscount", c.baseURL)
+		req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create specialpricediscount request: %w", err)
+		}
+		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("Accept", "application/json;charset=utf-8")
+
+		q := req.URL.Query()
+		q.Set("limit", strconv.Itoa(limit))
+		q.Set("offset", strconv.Itoa(offset))
+		req.URL.RawQuery = q.Encode()
+
+		resp, err := c.doRequestWithRetry(ctx, req)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch specialpricediscount: %w", err)
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			body, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return nil, fmt.Errorf("moysklad specialpricediscount API error: %s, body: %s", resp.Status, string(body))
+		}
+
+		var result response
+		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("failed to decode specialpricediscount response: %w", err)
+		}
+		resp.Body.Close()
+
+		all = append(all, result.Rows...)
+		if len(result.Rows) < limit {
+			break
+		}
+		offset += limit
+		if offset > 10000 {
+			break
+		}
+	}
+
+	c.logger.Info("Fetched specialpricediscount from Moysklad", zap.Int("total", len(all)))
+	return all, nil
+}
+
+// ExtractUUIDFromHref извлекает UUID из href вида ".../entity/.../UUID".
+// Экспортируется, чтобы другие пакеты могли разбирать meta-ссылки скидок.
+func (c *Client) ExtractUUIDFromHref(href string) string {
+	return c.extractIDFromHref(href)
+}
+
 // GetProductFolders возвращает все группы товаров из МойСклад.
 // Использует отдельный endpoint /entity/productfolder — надёжнее expand.
 func (c *Client) GetProductFolders(ctx context.Context) ([]ProductFolderItem, error) {
