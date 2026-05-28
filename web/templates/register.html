@@ -45,10 +45,7 @@
             transition: border-color 0.2s; background: #fafafa;
         }
         .field input:focus { outline: none; border-color: #4A7C59; background: #fff; }
-        .pw-hints { font-size: 0.78rem; color: #999; margin-top: 4px; display: flex; gap: 12px; flex-wrap: wrap; }
-        .pw-hints span { display: flex; align-items: center; gap: 4px; }
-        .pw-hints .ok { color: #4A7C59; }
-        .pw-hints .bad { color: #c0392b; }
+        .field .hint { font-size: 0.78rem; color: #888; margin-top: 3px; }
         .btn {
             width: 100%; padding: 12px; border: none; border-radius: 8px;
             font-size: 1rem; font-weight: 600; cursor: pointer; transition: all 0.2s;
@@ -105,14 +102,7 @@
         <div class="field">
             <label for="phone">Телефон</label>
             <input type="tel" id="phone" placeholder="+7 999 123-45-67" autocomplete="tel">
-        </div>
-        <div class="field">
-            <label for="password">Пароль</label>
-            <input type="password" id="password" placeholder="Не менее 8 знаков" autocomplete="new-password">
-            <div class="pw-hints">
-                <span id="hintLen" class="bad">◌ 8+ символов</span>
-                <span id="hintUpper" class="bad">◌ заглавная буква</span>
-            </div>
+            <div class="hint">Нужен для связи по заказу</div>
         </div>
         <!-- honeypot -->
         <div style="position:absolute;left:-9999px" aria-hidden="true">
@@ -148,20 +138,8 @@
         let pendingEmail = null;
         let formStartTime = null;
 
-        // --- Password hints ---
-        const pw = document.getElementById('password');
-        const hintLen = document.getElementById('hintLen');
-        const hintUpper = document.getElementById('hintUpper');
-        pw.addEventListener('input', function() {
-            const v = pw.value;
-            hintLen.className = v.length >= 8 ? 'ok' : 'bad';
-            hintLen.textContent = (v.length >= 8 ? '●' : '◌') + ' 8+ символов';
-            hintUpper.className = /[A-ZА-ЯЁ]/.test(v) ? 'ok' : 'bad';
-            hintUpper.textContent = (/[A-ZА-ЯЁ]/.test(v) ? '●' : '◌') + ' заглавная буква';
-        });
-
         // --- Timer ---
-        ['email','password'].forEach(function(id) {
+        ['email'].forEach(function(id) {
             document.getElementById(id).addEventListener('focus', function() {
                 if (!formStartTime) formStartTime = Date.now();
             });
@@ -213,23 +191,14 @@
             var email = document.getElementById('email').value.trim();
             var name = document.getElementById('name').value.trim();
             var phone = document.getElementById('phone').value.trim();
-            var password = pw.value;
 
-            if (!email || !name || !phone || !password) {
+            if (!email || !name || !phone) {
                 showMsg('error', 'Заполните все поля');
                 return;
             }
             var phoneDigits = phone.replace(/\D/g, '');
             if (phoneDigits.length !== 11 || !/^(7|8)/.test(phoneDigits)) {
                 showMsg('error', 'Введите номер в формате +7 999 123-45-67');
-                return;
-            }
-            if (password.length < 8) {
-                showMsg('error', 'Пароль должен быть не короче 8 знаков');
-                return;
-            }
-            if (!/[A-ZА-ЯЁ]/.test(password)) {
-                showMsg('error', 'Нужна хотя бы одна заглавная буква');
                 return;
             }
 
@@ -239,7 +208,7 @@
                 var r = await fetch('/api/auth/register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({email: email, name: name, phone: phone, password: password})
+                    body: JSON.stringify({email: email, name: name, phone: phone})
                 });
                 var d = await r.json();
 
@@ -249,10 +218,7 @@
                     goStep(2);
                     document.querySelectorAll('#codeBox input').forEach(function(inp) { inp.value = ''; });
                     document.getElementById('codeBox').querySelector('input').focus();
-                    showMsg('success', d.message || 'Код отправлен на вашу почту!');
-                    pw.value = '';
-                    hintLen.className = 'bad'; hintLen.textContent = '◌ 8+ символов';
-                    hintUpper.className = 'bad'; hintUpper.textContent = '◌ заглавная буква';
+                    showMsg('success', d.message || 'Код отправлен на почту!');
                 } else {
                     showMsg('error', d.error || 'Ошибка при регистрации');
                     if (d.retry_after) {
@@ -305,12 +271,13 @@
                 });
                 var d = await r.json();
                 if (r.ok) {
-                    showMsg('success', 'Почта подтверждена! Сейчас переадресуем на вход...');
+                    // Сохраняем токен и данные пользователя
+                    localStorage.setItem('auth_token', d.token);
+                    localStorage.setItem('user', JSON.stringify(d.user));
+                    showMsg('success', 'Регистрация завершена! Сейчас переадресуем...');
                     setTimeout(function() {
-                        var p = new URLSearchParams(window.location.search);
-                        var redir = p.get('redirect');
-                        window.location.href = redir ? '/login?redirect=' + redir : '/login';
-                    }, 2000);
+                        window.location.href = '/profile';
+                    }, 1500);
                 } else {
                     showMsg('error', d.error || 'Неверный код');
                 }
