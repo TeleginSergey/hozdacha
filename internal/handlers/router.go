@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"html/template"
 	"net/http"
 	"time"
 
@@ -11,6 +12,17 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/middleware"
 	"github.com/TeleginSergey/hozdacha/internal/services"
 )
+
+// templateFuncs — общие функции для всех HTML-шаблонов.
+var templateFuncs = template.FuncMap{
+	// deref безопасно разыменовывает указатель на float64. Для nil возвращает 0.
+	"deref": func(v *float64) float64 {
+		if v == nil {
+			return 0
+		}
+		return *v
+	},
+}
 
 // SetupRouter — общий конструктор роутера, переиспользуемый из app.NewApp().
 func SetupRouter(
@@ -44,6 +56,7 @@ func SetupRouter(
 
 	// Статические файлы
 	router.Static("/static", "./web/static")
+	router.SetFuncMap(templateFuncs)
 	router.LoadHTMLGlob("web/templates/*")
 
 	// Главная страница

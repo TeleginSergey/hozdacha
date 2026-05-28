@@ -253,6 +253,75 @@ section h2 {
     overflow: hidden;
     text-decoration: none;
     color: inherit;
+    position: relative;
+}
+
+/* Бейдж акции на карточке товара */
+.product-card .promo-badge {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    background: #C0392B;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.85rem;
+    padding: 4px 10px;
+    border-radius: 14px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    letter-spacing: 0.3px;
+}
+
+.product-card.has-promo {
+    border: 1px solid rgba(192,57,43,0.25);
+}
+
+/* Цена со скидкой: старая зачёркнутая + новая выделенная */
+.product-card .price-old {
+    color: #999;
+    text-decoration: line-through;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin-right: 8px;
+}
+
+.product-card .price-new {
+    color: #C0392B;
+    font-weight: 700;
+}
+
+/* Промо-баннер и цены на странице товара (product.html) */
+.promo-banner {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(192,57,43,0.1);
+    color: #C0392B;
+    border: 1px solid rgba(192,57,43,0.25);
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+}
+
+.promo-banner .promo-percent {
+    background: #C0392B;
+    color: #fff;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+}
+
+.product-price-stock .price-old {
+    color: #999;
+    text-decoration: line-through;
+    margin-right: 10px;
+    font-weight: 500;
+}
+
+.product-price-stock .price-new {
+    color: #C0392B;
+    font-weight: 700;
 }
 
 .promotion-card:hover,

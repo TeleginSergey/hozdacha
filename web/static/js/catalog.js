@@ -173,7 +173,13 @@ async function loadProducts(query = '', append = false) {
                 const inCart = cart.find(item => item.id === productId);
                 const name = escapeHtml(product.Name || product.products_name || '');
                 const image = (product.ImageURL || product.products_image_url) ? escapeHtml(product.ImageURL || product.products_image_url) : '';
-                const price = parseFloat(product.Price || product.products_price || 0).toFixed(2);
+                const basePrice = parseFloat(product.Price || product.products_price || 0);
+                const effectivePriceRaw = product.EffectivePrice;
+                const hasPromo = effectivePriceRaw !== undefined && effectivePriceRaw !== null && effectivePriceRaw < basePrice;
+                const effectivePrice = hasPromo ? parseFloat(effectivePriceRaw) : basePrice;
+                const discountPercent = hasPromo ? parseFloat(product.DiscountPercent || 0) : 0;
+                const promoTitle = hasPromo ? escapeHtml(product.PromotionTitle || '') : '';
+                const price = effectivePrice.toFixed(2);
                 const stock = parseInt(product.Stock || product.products_stock || 0);
                 const isActive = (product.Active !== undefined ? product.Active : product.products_active) !== false;
                 
@@ -195,14 +201,25 @@ async function loadProducts(query = '', append = false) {
                 // Плейсхолдер для изображения, если нет
                 const imagePlaceholder = image || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
                 
+                const promoBadge = hasPromo
+                    ? `<span class="promo-badge" title="${promoTitle}">−${Math.round(discountPercent)}%</span>`
+                    : '';
+                const priceBlock = hasPromo
+                    ? `<p class="price">
+                           <span class="price-old">${basePrice.toFixed(2)} руб.</span>
+                           <span class="price-new">${price} руб.</span>
+                       </p>`
+                    : `<p class="price">${price} руб.</p>`;
+
                 return `
-                    <a href="/product/${productId}" class="product-card">
+                    <a href="/product/${productId}" class="product-card${hasPromo ? ' has-promo' : ''}">
+                        ${promoBadge}
                         <img src="${imagePlaceholder}" alt="${name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4='">
                         <div class="product-card-content">
                             <h3>${name}</h3>
-                            <p class="price">${price} руб.</p>
+                            ${priceBlock}
                             <p class="stock ${stockClass}">${stockText}</p>
-                            <button class="btn" onclick="event.preventDefault(); addToCart(${productId}, '${nameEscaped}', ${price}); return false;" 
+                            <button class="btn" onclick="event.preventDefault(); addToCart(${productId}, '${nameEscaped}', ${price}); return false;"
                                     ${!isActive || stock === 0 ? 'disabled' : ''}>
                                 ${inCart ? 'В корзине' : 'В корзину'}
                             </button>
