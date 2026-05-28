@@ -219,6 +219,11 @@
                 showMsg('error', 'Заполните все поля');
                 return;
             }
+            var phoneDigits = phone.replace(/\D/g, '');
+            if (phoneDigits.length !== 11 || !/^(7|8)/.test(phoneDigits)) {
+                showMsg('error', 'Введите номер в формате +7 999 123-45-67');
+                return;
+            }
             if (password.length < 8) {
                 showMsg('error', 'Пароль должен быть не короче 8 знаков');
                 return;

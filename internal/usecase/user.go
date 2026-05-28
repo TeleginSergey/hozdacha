@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/big"
+	"regexp"
 	"strings"
 	"time"
 
@@ -404,6 +405,10 @@ func (u *UserUsecase) UpdateProfile(ctx context.Context, userID int64, req map[s
 		user.FullName = &fullName
 	}
 	if phone, ok := req["phone"].(string); ok {
+		digits := regexp.MustCompile(`\D`).ReplaceAllString(phone, "")
+		if len(digits) != 11 || (digits[0] != '7' && digits[0] != '8') {
+			return nil, fmt.Errorf("неверный формат телефона")
+		}
 		user.Phone = &phone
 	}
 

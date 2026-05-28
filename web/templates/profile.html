@@ -117,7 +117,8 @@
         if (name.length < 2) { showMsg(msgErr, 'Имя должно быть не короче 2 букв'); return; }
         if (name.length > 32) { showMsg(msgErr, 'Имя не должно быть длиннее 32 символов'); return; }
         if (!phone) { showMsg(msgErr, 'Укажите телефон'); return; }
-        if (!/^[\d\s\+\-\(\)]{7,20}$/.test(phone)) { showMsg(msgErr, 'Неверный формат телефона'); return; }
+        const phoneDigits = phone.replace(/\D/g, '');
+        if (phoneDigits.length !== 11 || !/^(7|8)/.test(phoneDigits)) { showMsg(msgErr, 'Введите номер в формате +7 999 123-45-67'); return; }
 
         try {
             const r = await api('/api/auth/profile', {
