@@ -96,14 +96,6 @@ func (h *UserHandler) Register(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат почты"})
 		return
 	}
-	if len(req.Password) < 8 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль должен быть не короче 8 символов"})
-		return
-	}
-	if !strings.ContainsAny(req.Password, "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль должен содержать хотя бы одну заглавную букву"})
-		return
-	}
 
 	// Проверяем, существует ли пользователь с таким email
 	existingUser, err := h.userUC.GetUserByEmail(c.Request.Context(), req.Email)
@@ -241,7 +233,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Защита от брутфорса - проверяем IP
+	// Защита от брутфорса
 	clientIP := c.ClientIP()
 	registrationMu.RLock()
 	lastLogin, loginExists := lastRegistrationTime[clientIP]
@@ -251,28 +243,45 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	authResp, err := h.userUC.Login(c.Request.Context(), req)
+	user, err := h.userUC.Login(c.Request.Context(), req)
 	registrationMu.Lock()
 	lastRegistrationTime[clientIP] = time.Now()
 	registrationMu.Unlock()
 	if err != nil {
 		h.logger.Warn("Login failed",
-			zap.String("username", req.Username),
+			zap.String("email", req.Email),
 			zap.String("ip", clientIP),
 			zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный логин или пароль"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Пользователь с такой почтой не найден. Зарегистрируйтесь."})
 		return
 	}
 
-	h.logger.Info("User logged in successfully",
-		zap.Int64("user_id", authResp.User.ID),
-		zap.String("username", authResp.User.Username),
-		zap.String("ip", clientIP))
+	// Генерируем код и отправляем на почту
+	code := h.userUC.GenerateVerificationCode()
+	err = h.userUC.SaveVerificationCode(c.Request.Context(), user.ID, code)
+	if err != nil {
+		h.logger.Error("Failed to save login code", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать код"})
+		return
+	}
+
+	go func() {
+		name := user.Username
+		if user.FullName != nil && *user.FullName != "" {
+			name = *user.FullName
+		}
+		if err := h.emailService.SendVerificationCode(user.Email, name, code); err != nil {
+			h.logger.Error("Failed to send login code", zap.Error(err))
+		}
+	}()
+
+	h.logger.Info("Login code sent",
+		zap.Int64("user_id", user.ID),
+		zap.String("email", user.Email))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Вход выполнен",
-		"token":   authResp.Token,
-		"user":    authResp.User,
+		"message": "Код отправлен на почту. Введите его для входа.",
+		"email":   user.Email,
 	})
 }
 

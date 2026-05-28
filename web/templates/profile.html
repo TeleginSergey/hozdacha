@@ -6,7 +6,8 @@
     <title>Личный кабинет — ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <style>
-        .profile-wrap { max-width: 800px; margin: 30px auto; background: white; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); padding: 24px; }
+        .profile-wrap { max-width: 800px; margin: 30px auto; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.10); padding: 28px 24px; position: relative; overflow: hidden; }
+        .profile-wrap::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #4A7C59, #8B6F47); }
         .profile-top { display: flex; gap: 20px; align-items: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
         .avatar-lg { width: 80px; height: 80px; border-radius: 50%; background: #8B6F47; color: white; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; flex-shrink: 0; }
         .profile-top-info h2 { margin: 0 0 6px; font-size: 1.3rem; }
