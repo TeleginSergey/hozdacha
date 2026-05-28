@@ -70,7 +70,7 @@
             <div>
                 <h3 class="section-title">Изменить данные</h3>
                 <form id="editForm">
-                    <div class="form-row"><label>Имя</label><input name="name" required minlength="2"></div>
+                    <div class="form-row"><label>Имя</label><input name="name" required minlength="2" maxlength="32"></div>
                     <div class="form-row"><label>Телефон *</label><input name="phone" required type="tel" placeholder="+7 (999) 123-45-67"></div>
                     <button type="submit" class="btn">Сохранить</button>
                 </form>
@@ -115,6 +115,7 @@
         const phone = fd.get('phone').trim();
 
         if (name.length < 2) { showMsg(msgErr, 'Имя должно быть не короче 2 букв'); return; }
+        if (name.length > 32) { showMsg(msgErr, 'Имя не должно быть длиннее 32 символов'); return; }
         if (!phone) { showMsg(msgErr, 'Укажите телефон'); return; }
         if (!/^[\d\s\+\-\(\)]{7,20}$/.test(phone)) { showMsg(msgErr, 'Неверный формат телефона'); return; }
 
