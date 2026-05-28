@@ -37,7 +37,7 @@
                 <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Скрыть">✕</button>
             </div>
             <div class="sidebar-search">
-                <input type="text" id="sidebarSearch" placeholder="Фильтр категорий..." oninput="filterCategoryTree()">
+                <input type="text" id="sidebarSearch" placeholder="Поиск категории..." oninput="filterCategoryTree()">
             </div>
             <nav class="category-tree" id="categoryTree">
                 <div class="tree-loading">Загрузка...</div>
@@ -92,11 +92,11 @@
         <div class="modal-content">
             <span class="close" onclick="closeCheckout()">&times;</span>
             <h2>Оформление заказа</h2>
-            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Бронь действует 3 дня, затем автоматически отменится.</p>
+            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Заказ хранится 3 дня. Потом отменится.</p>
             <form id="checkoutForm">
                 <div style="margin-bottom:4px">
                     <label style="font-size:0.9rem;font-weight:600;color:#555;display:block;margin-bottom:6px">
-                        Когда придёте забрать? <span style="font-weight:400;color:#888">(необязательно)</span>
+                        Когда заберёте? <span style="font-weight:400;color:#888">(можно не указывать)</span>
                     </label>
                     <div style="display:flex;gap:8px">
                         <select id="pickupDate" style="flex:1;padding:9px 10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem;color:#333;background:#fff">
@@ -107,7 +107,7 @@
                         </select>
                     </div>
                 </div>
-                <textarea name="comment" placeholder="Комментарий к заказу (необязательно)"></textarea>
+                <textarea name="comment" placeholder="Примечание к заказу (не обязательно)"></textarea>
                 <button type="submit" class="btn">Подтвердить заказ</button>
             </form>
         </div>
@@ -168,7 +168,7 @@
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', checkAuthState);
 </script>
-<script src="/static/js/catalog.js?v=11"></script>
+<script src="/static/js/catalog.js?v=12"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>

@@ -63,7 +63,7 @@
 
     <footer><div class="container"><p>&copy; <span class="footer-year"></span> ХозДача</p></div></footer>
 
-    <script src="/static/js/catalog.js?v=5"></script>
+    <script src="/static/js/catalog.js?v=12"></script>
     <script>
     // Auth UI
     (function() {
@@ -185,7 +185,7 @@
 
     function checkout() {
         const token = localStorage.getItem('auth_token');
-        if (!token) { alert('Войдите, чтобы оформить заказ'); location.href = '/login?redirect=/cart'; return; }
+        if (!token) { alert('Нужно войти для оформления заказа'); location.href = '/login?redirect=/cart'; return; }
         const cart = JSON.parse(localStorage.getItem('cart') || '[]');
         if (cart.length === 0) { alert('Корзина пуста'); return; }
 
@@ -194,11 +194,11 @@
 
         modal.innerHTML = `<div style="background:white;padding:24px;border-radius:10px;width:90%;max-width:440px;max-height:90vh;overflow-y:auto">
             <h3 style="margin-bottom:8px">Оформление заказа</h3>
-            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Бронь действует 3 дня, затем автоматически отменится.</p>
+            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Заказ хранится 3 дня. Потом отменится.</p>
             <form id="coForm" style="display:flex;flex-direction:column;gap:10px">
                 <div>
                     <label style="font-size:0.9rem;font-weight:600;color:#555;display:block;margin-bottom:6px">
-                        Когда придёте забрать? <span style="font-weight:400;color:#888">(необязательно)</span>
+                        Когда заберёте? <span style="font-weight:400;color:#888">(можно не указывать)</span>
                     </label>
                     <div style="display:flex;gap:8px">
                         <select id="coPickupDate" style="flex:1;padding:9px 10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem;color:#333;background:#fff">
@@ -209,7 +209,7 @@
                         </select>
                     </div>
                 </div>
-                <textarea name="comment" placeholder="Комментарий к заказу (необязательно)" style="padding:10px;border:1px solid #ddd;border-radius:5px;min-height:70px;resize:vertical"></textarea>
+                <textarea name="comment" placeholder="Примечание к заказу (не обязательно)" style="padding:10px;border:1px solid #ddd;border-radius:5px;min-height:70px;resize:vertical"></textarea>
                 <button type="submit" class="btn btn-accent">Подтвердить заказ</button>
                 <button type="button" class="btn" style="background:#888" onclick="this.closest('[style*=fixed]').remove()">Отмена</button>
             </form>

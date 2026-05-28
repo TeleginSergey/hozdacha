@@ -102,10 +102,10 @@
                     </div>
                 `).join('');
                 const reservedUntil = o.reserved_until
-                    ? '<div style="font-size:0.82rem;color:#F57F17;margin-top:6px">⏳ Бронь до: ' + fmtDt(o.reserved_until) + '</div>'
+                    ? '<div style="font-size:0.82rem;color:#F57F17;margin-top:6px">⏳ Заказ до: ' + fmtDt(o.reserved_until) + '</div>'
                     : '';
                 const pickupAt = o.pickup_at
-                    ? '<div style="font-size:0.82rem;color:#2E7D32;margin-top:4px">🕐 Заберу: ' + fmtDt(o.pickup_at) + '</div>'
+                    ? '<div style="font-size:0.82rem;color:#2E7D32;margin-top:4px">🕐 Самовывоз: ' + fmtDt(o.pickup_at) + '</div>'
                     : '';
                 const cancelBtn = isPending
                     ? `<button onclick="cancelOrder(${o.id}, this)" style="margin-top:12px;padding:7px 16px;background:#C62828;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:0.88rem;font-weight:600">Отменить заказ</button>`
@@ -122,7 +122,7 @@
                 </div>`;
             }).join('');
         } catch {
-            el.innerHTML = '<div class="empty-state"><p style="color:red">Ошибка загрузки</p></div>';
+            el.innerHTML = '<div class="empty-state"><p style="color:red">Не удалось загрузить</p></div>';
         }
     }
 
@@ -135,7 +135,7 @@
     }
 
     async function cancelOrder(id, btn) {
-        if (!confirm('Отменить заказ #' + id + '? Товары вернутся на склад.')) return;
+        if (!confirm('Отменить заказ №' + id + '?')) return;
         btn.disabled = true;
         btn.textContent = 'Отмена...';
         try {

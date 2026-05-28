@@ -22,11 +22,11 @@ async function loadPromotions() {
             `;
             }).join('');
         } else {
-            grid.innerHTML = '<p>Акций пока нет</p>';
+            grid.innerHTML = '<p>Сейчас акций нет</p>';
         }
     } catch (error) {
         console.error('Error loading promotions:', error);
-        document.getElementById('promotionsGrid').innerHTML = '<p>Ошибка загрузки акций</p>';
+        document.getElementById('promotionsGrid').innerHTML = '<p>Не удалось загрузить акции</p>';
     }
 }
 
@@ -59,7 +59,7 @@ async function loadProducts() {
         }
     } catch (error) {
         console.error('Error loading products:', error);
-        document.getElementById('productsGrid').innerHTML = '<p>Ошибка загрузки товаров</p>';
+        document.getElementById('productsGrid').innerHTML = '<p>Не удалось загрузить товары</p>';
     }
 }
 
