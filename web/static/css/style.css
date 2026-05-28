@@ -114,10 +114,16 @@ header .container {
 }
 
 .user-greeting {
-    font-size: 0.9rem;
-    color: #555;
+    font-size: 1.1rem;
+    color: white;
     white-space: nowrap;
-    font-weight: 500;
+    font-weight: 600;
+    line-height: 40px;
+}
+
+#userMenu {
+    align-items: center;
+    gap: 10px;
 }
 
 .dropdown-menu {
