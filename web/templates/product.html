@@ -40,16 +40,28 @@
                 {{end}}
                 
                 <div class="product-price-stock">
-                    <p class="price">Цена: <span>{{printf "%.2f" .product.Price}} руб.</span></p>
+                    {{if .product.EffectivePrice}}
+                        <div class="promo-banner">
+                            Акция{{if .product.PromotionTitle}}: {{.product.PromotionTitle}}{{end}}
+                            {{if .product.DiscountPercent}}<span class="promo-percent">−{{printf "%.0f" (deref .product.DiscountPercent)}}%</span>{{end}}
+                        </div>
+                        <p class="price">
+                            Цена:
+                            <span class="price-old">{{printf "%.2f" .product.Price}} руб.</span>
+                            <span class="price-new">{{printf "%.2f" (deref .product.EffectivePrice)}} руб.</span>
+                        </p>
+                    {{else}}
+                        <p class="price">Цена: <span>{{printf "%.2f" .product.Price}} руб.</span></p>
+                    {{end}}
                     {{if gt .product.Stock 0}}
                         <p class="stock">В наличии: <span>{{.product.Stock}} шт.</span></p>
                     {{else}}
                         <p class="stock out-of-stock">Сейчас нет в наличии</p>
                     {{end}}
                 </div>
-                
+
                 <div class="product-actions">
-                    <button class="btn btn-primary" onclick="addToCartFromDetail({{.product.ID}}, '{{.product.Name}}', {{.product.Price}})" 
+                    <button class="btn btn-primary" onclick="addToCartFromDetail({{.product.ID}}, '{{.product.Name}}', {{if .product.EffectivePrice}}{{deref .product.EffectivePrice}}{{else}}{{.product.Price}}{{end}})"
                             {{if or (not .product.Active) (eq .product.Stock 0)}}disabled{{end}}>
                         В корзину
                     </button>
@@ -65,7 +77,7 @@
         </div>
     </footer>
 
-    <script src="/static/js/catalog.js?v=5"></script>
+    <script src="/static/js/catalog.js?v=14"></script>
     <script>
         function addToCartFromDetail(productId, name, price) {
             addToCart(productId, name, price);
