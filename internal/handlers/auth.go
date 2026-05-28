@@ -25,7 +25,7 @@ func NewAuthHandler(authService *services.AuthService, logger *zap.Logger) *Auth
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req services.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
@@ -41,7 +41,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		h.logger.Warn("Login failed", zap.String("username", req.Username))
 		// Задержка для защиты от brute force (можно улучшить)
 		time.Sleep(500 * time.Millisecond)
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid credentials"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный логин или пароль"})
 		return
 	}
 

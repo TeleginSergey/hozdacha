@@ -28,7 +28,7 @@ func (h *PromotionHandler) GetActivePromotions(c *gin.Context) {
 	promotions, err := h.promotionQuery.GetActive(c.Request.Context())
 	if err != nil {
 		h.logger.Error("Failed to get active promotions", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get promotions"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить акции"})
 		return
 	}
 
@@ -39,7 +39,7 @@ func (h *PromotionHandler) GetAllPromotions(c *gin.Context) {
 	promotions, err := h.promotionQuery.GetAll(c.Request.Context())
 	if err != nil {
 		h.logger.Error("Failed to get promotions", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get promotions"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить акции"})
 		return
 	}
 
@@ -49,19 +49,19 @@ func (h *PromotionHandler) GetAllPromotions(c *gin.Context) {
 func (h *PromotionHandler) GetPromotion(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid promotion ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер акции"})
 		return
 	}
 
 	promotion, err := h.promotionQuery.GetByID(c.Request.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to get promotion", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get promotion"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить акцию"})
 		return
 	}
 
 	if promotion == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Promotion not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Акция не найдена"})
 		return
 	}
 
@@ -71,7 +71,7 @@ func (h *PromotionHandler) GetPromotion(c *gin.Context) {
 func (h *PromotionHandler) CreatePromotion(c *gin.Context) {
 	var promotion db.Promotion
 	if err := c.ShouldBindJSON(&promotion); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
@@ -91,7 +91,7 @@ func (h *PromotionHandler) CreatePromotion(c *gin.Context) {
 	created, err := h.promotionQuery.Insert(c.Request.Context(), &promotion)
 	if err != nil {
 		h.logger.Error("Failed to create promotion", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create promotion"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать акцию"})
 		return
 	}
 
@@ -101,13 +101,13 @@ func (h *PromotionHandler) CreatePromotion(c *gin.Context) {
 func (h *PromotionHandler) UpdatePromotion(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid promotion ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер акции"})
 		return
 	}
 
 	var promotion db.Promotion
 	if err := c.ShouldBindJSON(&promotion); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
@@ -127,7 +127,7 @@ func (h *PromotionHandler) UpdatePromotion(c *gin.Context) {
 	updated, err := h.promotionQuery.Update(c.Request.Context(), &promotion, id)
 	if err != nil {
 		h.logger.Error("Failed to update promotion", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update promotion"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить акцию"})
 		return
 	}
 
@@ -137,13 +137,13 @@ func (h *PromotionHandler) UpdatePromotion(c *gin.Context) {
 func (h *PromotionHandler) DeletePromotion(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid promotion ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер акции"})
 		return
 	}
 
 	if err := h.promotionQuery.Delete(c.Request.Context(), id); err != nil {
 		h.logger.Error("Failed to delete promotion", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete promotion"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить акцию"})
 		return
 	}
 

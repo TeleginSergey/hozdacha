@@ -37,7 +37,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		// Для API запросов возвращаем ошибку
 		if c.Request.Header.Get("Content-Type") == "application/json" {
 			c.JSON(http.StatusUnauthorized, gin.H{
-				"error":        "Authentication required",
+				"error":        "Нужно войти",
 				"redirect_url": "/login?redirect=checkout",
 			})
 			return
@@ -51,7 +51,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 
 	var req usecase.CreateOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
@@ -66,7 +66,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 			} else if mail, ok := email.(string); ok && mail != "" {
 				req.CustomerName = mail
 			} else {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Customer name is required"})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Нужно указать имя"})
 				return
 			}
 		}
@@ -74,7 +74,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		if req.Phone == "" {
 			user, err := h.userRepo.GetByID(c.Request.Context(), userID.(int64))
 			if err != nil || user == nil || user.Phone == nil || *user.Phone == "" {
-				c.JSON(http.StatusBadRequest, gin.H{"error": "Phone number is required. Please update your profile."})
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Нужен номер телефона. Укажите его в профиле."})
 				return
 			}
 			req.Phone = *user.Phone
@@ -109,7 +109,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 			return
 		}
 		h.logger.Error("Failed to create order", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create order"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать заказ"})
 		return
 	}
 
@@ -121,31 +121,31 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 func (h *OrderHandler) CancelOrder(c *gin.Context) {
 	userIDRaw, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Нужно войти"})
 		return
 	}
 	userID, ok := userIDRaw.(int64)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid user"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный пользователь"})
 		return
 	}
 
 	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || orderID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер заказа"})
 		return
 	}
 
 	if err := h.orderUC.CancelOrderByUser(c.Request.Context(), userID, orderID); err != nil {
 		if errors.Is(err, db.ErrOrderForbidden) {
-			c.JSON(http.StatusForbidden, gin.H{"error": "Order does not belong to you"})
+			c.JSON(http.StatusForbidden, gin.H{"error": "Это не ваш заказ"})
 			return
 		}
 		h.logger.Error("Failed to cancel order",
 			zap.Int64("order_id", orderID),
 			zap.Int64("user_id", userID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отменить заказ"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "cancelled"})
@@ -156,7 +156,7 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 func (h *OrderHandler) ShipOrder(c *gin.Context) {
 	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || orderID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер заказа"})
 		return
 	}
 
@@ -164,7 +164,7 @@ func (h *OrderHandler) ShipOrder(c *gin.Context) {
 		h.logger.Error("Failed to ship order",
 			zap.Int64("order_id", orderID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to ship order"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отгрузить заказ"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "completed"})
@@ -176,7 +176,7 @@ func (h *OrderHandler) ShipOrder(c *gin.Context) {
 func (h *OrderHandler) CancelOrderByAdmin(c *gin.Context) {
 	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || orderID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер заказа"})
 		return
 	}
 
@@ -184,7 +184,7 @@ func (h *OrderHandler) CancelOrderByAdmin(c *gin.Context) {
 		h.logger.Error("Failed to cancel order by admin",
 			zap.Int64("order_id", orderID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to cancel order"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отменить заказ"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "cancelled"})
@@ -195,7 +195,7 @@ func (h *OrderHandler) CancelOrderByAdmin(c *gin.Context) {
 func (h *OrderHandler) ExpireOrder(c *gin.Context) {
 	orderID, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || orderID <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid order id"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер заказа"})
 		return
 	}
 
@@ -203,7 +203,7 @@ func (h *OrderHandler) ExpireOrder(c *gin.Context) {
 		h.logger.Error("Failed to expire order",
 			zap.Int64("order_id", orderID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to expire order"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отменить просроченный заказ"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "expired"})
@@ -226,14 +226,14 @@ func (h *OrderHandler) GetUserOrders(c *gin.Context) {
 	// Проверяем авторизацию
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Authentication required"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Нужно войти"})
 		return
 	}
 
 	orders, err := h.orderUC.GetUserOrders(c.Request.Context(), userID.(int64))
 	if err != nil {
 		h.logger.Error("Failed to get user orders", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get orders"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить заказы"})
 		return
 	}
 

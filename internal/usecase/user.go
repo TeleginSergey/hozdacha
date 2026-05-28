@@ -64,17 +64,17 @@ type AuthResponse struct {
 func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.User, error) {
 	// Валидация
 	if req.Email == "" || req.Password == "" || req.Name == "" || req.Phone == "" {
-		return nil, fmt.Errorf("email, password, name and phone are required")
+		return nil, fmt.Errorf("нужны почта, пароль, имя и телефон")
 	}
 
 	// Honeypot проверка - если поле website заполнено, это бот
 	if strings.TrimSpace(req.Website) != "" {
-		return nil, fmt.Errorf("bot detected")
+		return nil, fmt.Errorf("обнаружен бот")
 	}
 
 	// Проверяем сложность пароля
 	if !u.isPasswordStrong(req.Password) {
-		return nil, fmt.Errorf("password is too weak. Use at least 8 characters with letters, numbers and symbols.")
+		return nil, fmt.Errorf("пароль слишком простой. Используйте не менее 8 символов с буквами, цифрами и знаками.")
 	}
 
 	// Генерируем username из email, если не указан
@@ -91,16 +91,16 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 	// Проверяем существует ли пользователь
 	exists, err := u.users.ExistsByUsernameOrEmail(ctx, username, req.Email)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check user existence: %w", err)
+		return nil, fmt.Errorf("не удалось проверить пользователя: %w", err)
 	}
 	if exists {
-		return nil, fmt.Errorf("user with this username or email already exists")
+		return nil, fmt.Errorf("пользователь с таким именем или почтой уже есть")
 	}
 
 	// Хешируем пароль
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %w", err)
+		return nil, fmt.Errorf("не удалось захешировать пароль: %w", err)
 	}
 
 	// Создаем пользователя (требуется верификация email)
@@ -119,7 +119,7 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 
 	user, err = u.users.Insert(ctx, user)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
+		return nil, fmt.Errorf("не удалось создать пользователя: %w", err)
 	}
 
 	u.logger.Info("User registered, awaiting email verification",
@@ -150,13 +150,13 @@ func (u *UserUsecase) VerifyEmailByCode(ctx context.Context, email, code string)
 	// Ищем пользователя с указанным email и кодом
 	user, err := u.users.GetByEmailAndCode(ctx, email, code)
 	if err != nil {
-		return nil, fmt.Errorf("invalid or expired verification code")
+		return nil, fmt.Errorf("неверный или просроченный код")
 	}
 
 	// Помечаем email как верифицированный
 	err = u.users.VerifyEmailByCode(ctx, user.ID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to verify email: %w", err)
+		return nil, fmt.Errorf("не удалось подтвердить почту: %w", err)
 	}
 
 	// Обновляем данные пользователя
@@ -175,17 +175,17 @@ func (u *UserUsecase) VerifyEmailByCode(ctx context.Context, email, code string)
 func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterRequest) (*db.User, error) {
 	// Валидация
 	if req.Email == "" || req.Password == "" || req.Name == "" || req.Phone == "" {
-		return nil, fmt.Errorf("email, password, name and phone are required")
+		return nil, fmt.Errorf("нужны почта, пароль, имя и телефон")
 	}
 
 	// Honeypot проверка - если поле website заполнено, это бот
 	if strings.TrimSpace(req.Website) != "" {
-		return nil, fmt.Errorf("bot detected")
+		return nil, fmt.Errorf("обнаружен бот")
 	}
 
 	// Проверяем сложность пароля
 	if !u.isPasswordStrong(req.Password) {
-		return nil, fmt.Errorf("password is too weak. Use at least 8 characters with letters, numbers and symbols.")
+		return nil, fmt.Errorf("пароль слишком простой. Используйте не менее 8 символов с буквами, цифрами и знаками.")
 	}
 
 	// Генерируем username из email, если не указан
@@ -202,22 +202,22 @@ func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterR
 	// Проверяем существует ли пользователь (в транзакции)
 	exists, err := u.users.ExistsByUsernameOrEmail(ctx, username, req.Email)
 	if err != nil {
-		return nil, fmt.Errorf("failed to check user existence: %w", err)
+		return nil, fmt.Errorf("не удалось проверить пользователя: %w", err)
 	}
 	if exists {
-		return nil, fmt.Errorf("user with this username or email already exists")
+		return nil, fmt.Errorf("пользователь с таким именем или почтой уже есть")
 	}
 
 	// Хешируем пароль
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return nil, fmt.Errorf("failed to hash password: %w", err)
+		return nil, fmt.Errorf("не удалось захешировать пароль: %w", err)
 	}
 
 	// Начинаем транзакцию
 	tx, err := u.users.BeginTx(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to begin transaction: %w", err)
+		return nil, fmt.Errorf("не удалось начать транзакцию: %w", err)
 	}
 	defer tx.Rollback(ctx)
 
@@ -238,13 +238,13 @@ func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterR
 	// Вставляем пользователя в транзакции
 	user, err = u.users.InsertWithTx(ctx, tx, user)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create user: %w", err)
+		return nil, fmt.Errorf("не удалось создать пользователя: %w", err)
 	}
 
 	// Коммитим транзакцию
 	err = tx.Commit(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to commit transaction: %w", err)
+		return nil, fmt.Errorf("не удалось завершить транзакцию: %w", err)
 	}
 
 	u.logger.Info("User registered with transaction, awaiting email verification",
@@ -256,35 +256,35 @@ func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterR
 
 func (u *UserUsecase) Login(ctx context.Context, req LoginRequest) (*AuthResponse, error) {
 	if req.Username == "" || req.Password == "" {
-		return nil, fmt.Errorf("username and password are required")
+		return nil, fmt.Errorf("нужны имя пользователя и пароль")
 	}
 
 	// Ищем пользователя по username или email
 	user, err := u.users.GetByUsername(ctx, req.Username)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, fmt.Errorf("не удалось найти пользователя: %w", err)
 	}
 	if user == nil {
 		// Пробуем найти по email если не нашли по username
 		user, err = u.users.GetByEmail(ctx, req.Username)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get user: %w", err)
+			return nil, fmt.Errorf("не удалось найти пользователя: %w", err)
 		}
 	}
 
 	if user == nil {
-		return nil, fmt.Errorf("invalid username or password")
+		return nil, fmt.Errorf("неверный логин или пароль")
 	}
 
 	// Проверяем пароль
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password))
 	if err != nil {
-		return nil, fmt.Errorf("invalid username or password")
+		return nil, fmt.Errorf("неверный логин или пароль")
 	}
 
 	// Проверяем, что email верифицирован
 	if !user.EmailVerified {
-		return nil, fmt.Errorf("email not verified. Please verify your email before logging in")
+		return nil, fmt.Errorf("почта не подтверждена. Проверьте почту и подтвердите её.")
 	}
 
 	// Определяем роль пользователя
@@ -331,7 +331,7 @@ func (u *UserUsecase) GetUserByEmail(ctx context.Context, email string) (*db.Use
 		return nil, err
 	}
 	if user == nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("пользователь не найден")
 	}
 	return user, nil
 }
@@ -372,10 +372,10 @@ func generateJTI() string {
 func (u *UserUsecase) GetProfile(ctx context.Context, userID int64) (*db.User, error) {
 	user, err := u.users.GetByID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user profile: %w", err)
+		return nil, fmt.Errorf("не удалось загрузить профиль: %w", err)
 	}
 	if user == nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("пользователь не найден")
 	}
 
 	// Не возвращаем чувствительные данные
@@ -391,10 +391,10 @@ func (u *UserUsecase) GetProfile(ctx context.Context, userID int64) (*db.User, e
 func (u *UserUsecase) UpdateProfile(ctx context.Context, userID int64, req map[string]interface{}) (*db.User, error) {
 	user, err := u.users.GetByID(ctx, userID)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get user: %w", err)
+		return nil, fmt.Errorf("не удалось найти пользователя: %w", err)
 	}
 	if user == nil {
-		return nil, fmt.Errorf("user not found")
+		return nil, fmt.Errorf("пользователь не найден")
 	}
 
 	// Обновляем поля если они переданы
@@ -474,19 +474,19 @@ func (u *UserUsecase) GetByEmailAndCode(ctx context.Context, email, code string)
 func (u *UserUsecase) ResetPassword(ctx context.Context, userID int64, newPassword string) error {
 	// Проверяем сложность пароля
 	if !u.isPasswordStrong(newPassword) {
-		return fmt.Errorf("password is too weak")
+		return fmt.Errorf("пароль слишком простой")
 	}
 
 	// Хешируем новый пароль
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
-		return fmt.Errorf("failed to hash password: %w", err)
+		return fmt.Errorf("не удалось захешировать пароль: %w", err)
 	}
 
 	// Получаем пользователя
 	user, err := u.users.GetByID(ctx, userID)
 	if err != nil {
-		return fmt.Errorf("failed to get user: %w", err)
+		return fmt.Errorf("не удалось найти пользователя: %w", err)
 	}
 
 	// Обновляем пароль
@@ -496,7 +496,7 @@ func (u *UserUsecase) ResetPassword(ctx context.Context, userID int64, newPasswo
 
 	_, err = u.users.Update(ctx, user, userID)
 	if err != nil {
-		return fmt.Errorf("failed to update password: %w", err)
+		return fmt.Errorf("не удалось обновить пароль: %w", err)
 	}
 
 	u.logger.Info("Password reset successfully",

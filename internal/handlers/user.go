@@ -39,7 +39,7 @@ var (
 func (h *UserHandler) Register(c *gin.Context) {
 	var req usecase.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
@@ -58,7 +58,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 
 	if exists {
 		if time.Since(lastTime) < minRegistrationInterval {
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Please wait before trying again"})
+			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Подождите перед повторной попыткой"})
 			return
 		}
 
@@ -73,14 +73,14 @@ func (h *UserHandler) Register(c *gin.Context) {
 					zap.String("ip", clientIP),
 					zap.Int("attempts", attempts))
 				c.JSON(http.StatusTooManyRequests, gin.H{
-					"error":       "Too many registration attempts. Please try again later.",
+					"error":       "Слишком много попыток. Попробуйте позже.",
 					"retry_after": int(time.Until(lastTime.Add(time.Hour)).Seconds()),
 				})
 				return
 			}
 
 			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "Please wait before registering again",
+				"error":       "Подождите перед повторной регистрацией",
 				"retry_after": int(time.Until(lastTime.Add(time.Hour)).Seconds()),
 			})
 			return
@@ -89,19 +89,19 @@ func (h *UserHandler) Register(c *gin.Context) {
 
 	// Валидация
 	if len(req.Email) < 3 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email must be at least 3 characters"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Почта должна быть не короче 3 символов"})
 		return
 	}
 	if !strings.Contains(req.Email, "@") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid email format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат почты"})
 		return
 	}
 	if len(req.Password) < 8 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must be at least 8 characters"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль должен быть не короче 8 символов"})
 		return
 	}
 	if !strings.ContainsAny(req.Password, "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must contain at least one uppercase letter"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль должен содержать хотя бы одну заглавную букву"})
 		return
 	}
 
@@ -113,7 +113,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 			// Email уже подтвержден
 			h.logger.Warn("Registration attempted for existing verified user",
 				zap.String("email", req.Email))
-			c.JSON(http.StatusBadRequest, gin.H{"error": "User with this email already exists and is verified. Please log in."})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Пользователь с такой почтой уже зарегистрирован. Войдите."})
 			return
 		} else {
 			// Email не подтвержден - отправляем новый код и возвращаем специальный ответ
@@ -130,7 +130,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 				h.logger.Error("Failed to save verification code for existing user",
 					zap.Int64("user_id", existingUser.ID),
 					zap.Error(err))
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate verification code"})
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать код подтверждения"})
 				return
 			}
 
@@ -155,7 +155,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 			}()
 
 			c.JSON(http.StatusAccepted, gin.H{
-				"message":               "User with this email already exists but is not verified. A new verification code has been sent to your email.",
+				"message":               "Пользователь с такой почтой уже есть, но не подтверждён. Новый код отправлен на почту.",
 				"requires_verification": true,
 				"user": gin.H{
 					"id":       existingUser.ID,
@@ -187,7 +187,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 		h.logger.Error("Failed to save verification code",
 			zap.Int64("user_id", user.ID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save verification code"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сохранить код подтверждения"})
 		return
 	}
 
@@ -224,7 +224,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 		zap.String("ip", clientIP))
 
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "Registration successful. Please check your email and enter the verification code.",
+		"message": "Регистрация прошла успешно. Проверьте почту и введите код подтверждения.",
 		"user": gin.H{
 			"id":       user.ID,
 			"username": user.Username,
@@ -237,7 +237,7 @@ func (h *UserHandler) Register(c *gin.Context) {
 func (h *UserHandler) Login(c *gin.Context) {
 	var req usecase.LoginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
@@ -247,7 +247,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 	lastLogin, loginExists := lastRegistrationTime[clientIP]
 	registrationMu.RUnlock()
 	if loginExists && time.Since(lastLogin) < 5*time.Second {
-		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Too many login attempts. Please wait."})
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Слишком много попыток входа. Подождите."})
 		return
 	}
 
@@ -260,7 +260,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 			zap.String("username", req.Username),
 			zap.String("ip", clientIP),
 			zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid username or password"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный логин или пароль"})
 		return
 	}
 
@@ -270,7 +270,7 @@ func (h *UserHandler) Login(c *gin.Context) {
 		zap.String("ip", clientIP))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Login successful",
+		"message": "Вход выполнен",
 		"token":   authResp.Token,
 		"user":    authResp.User,
 	})
@@ -280,14 +280,14 @@ func (h *UserHandler) GetProfile(c *gin.Context) {
 	// Проверяем авторизацию
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
 	user, err := h.userUC.GetProfile(c.Request.Context(), userID.(int64))
 	if err != nil {
 		h.logger.Error("Failed to get user profile", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get profile"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить профиль"})
 		return
 	}
 
@@ -312,7 +312,7 @@ type ResendCodeRequest struct {
 func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	var req VerifyEmailRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format. Email and 6-digit code required."})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса. Нужна почта и код из 6 цифр."})
 		return
 	}
 
@@ -323,14 +323,14 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	}
 
 	if code == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Verification code is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Нужен код подтверждения"})
 		return
 	}
 
 	// Если email не передан, ищем по коду
 	email := req.Email
 	if email == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email is required for verification"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Нужна почта для подтверждения"})
 		return
 	}
 
@@ -340,7 +340,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		h.logger.Warn("Email verification failed",
 			zap.String("email", email),
 			zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired verification code"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный или просроченный код подтверждения"})
 		return
 	}
 
@@ -348,7 +348,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	token, err := h.userUC.GenerateJWTToken(user.ID, user.Username, user.Email)
 	if err != nil {
 		h.logger.Error("Failed to generate token after verification", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate authentication token"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать токен"})
 		return
 	}
 
@@ -357,7 +357,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		zap.String("email", user.Email))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Email verified successfully. You are now logged in.",
+		"message": "Почта подтверждена. Вы вошли.",
 		"token":   token,
 		"user": gin.H{
 			"id":       user.ID,
@@ -372,7 +372,7 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 func (h *UserHandler) ResendVerificationCode(c *gin.Context) {
 	var req ResendCodeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Valid email required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Нужна правильная почта"})
 		return
 	}
 
@@ -381,13 +381,13 @@ func (h *UserHandler) ResendVerificationCode(c *gin.Context) {
 	if err != nil {
 		h.logger.Warn("Resend code failed - user not found",
 			zap.String("email", req.Email))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User not found or email already verified"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Пользователь не найден или почта уже подтверждена"})
 		return
 	}
 
 	// Проверяем, что email еще не верифицирован
 	if user.EmailVerified {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Email already verified"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Почта уже подтверждена"})
 		return
 	}
 
@@ -400,7 +400,7 @@ func (h *UserHandler) ResendVerificationCode(c *gin.Context) {
 		h.logger.Error("Failed to save new verification code",
 			zap.Int64("user_id", user.ID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate new code"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось создать новый код"})
 		return
 	}
 
@@ -429,7 +429,7 @@ func (h *UserHandler) ResendVerificationCode(c *gin.Context) {
 		zap.String("email", user.Email))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Verification code sent. Please check your email.",
+		"message": "Код отправлен. Проверьте почту.",
 	})
 }
 
@@ -437,7 +437,7 @@ func (h *UserHandler) VerifyToken(c *gin.Context) {
 	// Проверяем авторизацию
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный токен"})
 		return
 	}
 
@@ -451,25 +451,25 @@ func (h *UserHandler) UpdateProfile(c *gin.Context) {
 	// Проверяем авторизацию
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
 	var req map[string]interface{}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
 	user, err := h.userUC.UpdateProfile(c.Request.Context(), userID.(int64), req)
 	if err != nil {
 		h.logger.Error("Failed to update profile", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update profile"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Profile updated successfully",
+		"message": "Профиль обновлён",
 		"user":    user,
 	})
 }
@@ -478,12 +478,12 @@ func (h *UserHandler) GenerateTOTP(c *gin.Context) {
 	// Проверяем авторизацию
 	_, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "2FA setup not implemented yet",
+		"message": "Двухфакторная аутентификация пока не настроена",
 	})
 }
 
@@ -494,20 +494,20 @@ func (h *UserHandler) VerifyTOTP(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
 	// Проверяем авторизацию
 	_, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
 	// Для простоты примера - всегда успех
 	c.JSON(http.StatusOK, gin.H{
-		"message": "2FA verification successful",
+		"message": "Двухфакторная проверка пройдена",
 	})
 }
 
@@ -517,14 +517,14 @@ func (h *UserHandler) Logout(c *gin.Context) {
 	// Получаем JTI из контекста
 	jti, exists := c.Get("jti")
 	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "No token to revoke"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Нет токена для отзыва"})
 		return
 	}
 
 	// Получаем время истечения токена из контекста
 	exp, exists := c.Get("exp")
 	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid token"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный токен"})
 		return
 	}
 
@@ -555,7 +555,7 @@ func (h *UserHandler) Logout(c *gin.Context) {
 		zap.Duration("ttl", ttl))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Logged out successfully",
+		"message": "Вы вышли",
 	})
 }
 
@@ -568,7 +568,7 @@ type ForgotPasswordRequest struct {
 func (h *UserHandler) ForgotPassword(c *gin.Context) {
 	var req ForgotPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Valid email required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Нужна правильная почта"})
 		return
 	}
 
@@ -579,7 +579,7 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 		h.logger.Warn("Forgot password - user not found",
 			zap.String("email", req.Email))
 		c.JSON(http.StatusOK, gin.H{
-			"message": "If the email exists, a reset code has been sent",
+			"message": "Если почта есть в системе, код отправлен",
 		})
 		return
 	}
@@ -593,7 +593,7 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 		h.logger.Error("Failed to save reset code",
 			zap.Int64("user_id", user.ID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to process request"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обработать запрос"})
 		return
 	}
 
@@ -614,7 +614,7 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 			zap.Int64("user_id", user.ID),
 			zap.String("email", user.Email),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to send reset email: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отправить письмо: " + err.Error()})
 		return
 	}
 
@@ -623,7 +623,7 @@ func (h *UserHandler) ForgotPassword(c *gin.Context) {
 		zap.String("email", user.Email))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "If the email exists, a reset code has been sent",
+		"message": "Если почта есть в системе, код отправлен",
 	})
 }
 
@@ -638,7 +638,7 @@ type ResetPasswordRequest struct {
 func (h *UserHandler) ResetPassword(c *gin.Context) {
 	var req ResetPasswordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request format"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат запроса"})
 		return
 	}
 
@@ -648,12 +648,12 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 		h.logger.Warn("Reset password - invalid code",
 			zap.String("email", req.Email),
 			zap.Error(err))
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid or expired code"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный или просроченный код"})
 		return
 	}
 
 	if !strings.ContainsAny(req.NewPassword, "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Password must contain at least one uppercase letter"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль должен содержать хотя бы одну заглавную букву"})
 		return
 	}
 
@@ -663,7 +663,7 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 		h.logger.Error("Failed to reset password",
 			zap.Int64("user_id", user.ID),
 			zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to reset password"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сбросить пароль"})
 		return
 	}
 
@@ -680,6 +680,6 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 		zap.String("email", user.Email))
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Password reset successfully. Please login with your new password.",
+		"message": "Пароль изменён. Войдите с новым паролем.",
 	})
 }
