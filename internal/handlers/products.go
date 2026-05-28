@@ -74,7 +74,7 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	if categoryID != "" {
 		categoryIDInt, err3 := strconv.ParseInt(categoryID, 10, 64)
 		if err3 != nil || categoryIDInt <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid category_id"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверная категория"})
 			return
 		}
 		categoryPtr = &categoryIDInt
@@ -83,7 +83,7 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 	products, err := h.uc.GetCatalogProducts(c.Request.Context(), limit, offset, categoryPtr)
 	if err != nil {
 		h.logger.Error("Failed to get products", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get products"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить товары"})
 		return
 	}
 
@@ -104,19 +104,19 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 func (h *ProductHandler) GetProduct(c *gin.Context) {
 	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер товара"})
 		return
 	}
 
 	product, err := h.uc.GetProductByID(c.Request.Context(), id)
 	if err != nil {
 		h.logger.Error("Failed to get product", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get product"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить товар"})
 		return
 	}
 
 	if product == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "Product not found"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "Товар не найден"})
 		return
 	}
 
@@ -126,14 +126,14 @@ func (h *ProductHandler) GetProduct(c *gin.Context) {
 func (h *ProductHandler) SearchProducts(c *gin.Context) {
 	query := c.Query("q")
 	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Введите что искать"})
 		return
 	}
 
 	// Санитизация поискового запроса
 	query = middleware.SanitizeString(query, 100)
 	if len(query) < 2 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Search query must be at least 2 characters"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Поиск должен быть не короче 2 букв"})
 		return
 	}
 
@@ -158,7 +158,7 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 	products, err := h.uc.SearchProducts(c.Request.Context(), query, categoryID, limit, offset)
 	if err != nil {
 		h.logger.Error("Failed to search products", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search products"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось найти товары"})
 		return
 	}
 
@@ -181,7 +181,7 @@ func (h *ProductHandler) ListCategories(c *gin.Context) {
 	categories, err := (&db.CategoryQuery{DB: h.db}).ListAll(c.Request.Context())
 	if err != nil {
 		h.logger.Error("Failed to list categories", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to load categories"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить категории"})
 		return
 	}
 	if categories == nil {

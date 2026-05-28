@@ -24,7 +24,7 @@ func NewCartHandler(cartUsecase *usecase.CartUsecase, logger *zap.Logger) *CartH
 func (h *CartHandler) AddToCart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
@@ -38,7 +38,7 @@ func (h *CartHandler) AddToCart(c *gin.Context) {
 
 	if err := h.cartUsecase.AddToCart(c.Request.Context(), &req); err != nil {
 		h.logger.Error("Failed to add to cart", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to add to cart"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось добавить в корзину"})
 		return
 	}
 
@@ -48,14 +48,14 @@ func (h *CartHandler) AddToCart(c *gin.Context) {
 func (h *CartHandler) GetCart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
 	cart, err := h.cartUsecase.GetCart(c.Request.Context(), userID.(int64))
 	if err != nil {
 		h.logger.Error("Failed to get cart", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get cart"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить корзину"})
 		return
 	}
 
@@ -65,7 +65,7 @@ func (h *CartHandler) GetCart(c *gin.Context) {
 func (h *CartHandler) UpdateCart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
@@ -79,7 +79,7 @@ func (h *CartHandler) UpdateCart(c *gin.Context) {
 
 	if err := h.cartUsecase.UpdateCart(c.Request.Context(), &req); err != nil {
 		h.logger.Error("Failed to update cart", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update cart"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось обновить корзину"})
 		return
 	}
 
@@ -89,20 +89,20 @@ func (h *CartHandler) UpdateCart(c *gin.Context) {
 func (h *CartHandler) RemoveFromCart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
 	productIDStr := c.Param("id")
 	productID, err := strconv.ParseInt(productIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid product ID"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный номер товара"})
 		return
 	}
 
 	if err := h.cartUsecase.RemoveFromCart(c.Request.Context(), userID.(int64), productID); err != nil {
 		h.logger.Error("Failed to remove from cart", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to remove from cart"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось удалить из корзины"})
 		return
 	}
 
@@ -112,13 +112,13 @@ func (h *CartHandler) RemoveFromCart(c *gin.Context) {
 func (h *CartHandler) ClearCart(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
 	if err := h.cartUsecase.ClearCart(c.Request.Context(), userID.(int64)); err != nil {
 		h.logger.Error("Failed to clear cart", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to clear cart"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось очистить корзину"})
 		return
 	}
 
@@ -128,14 +128,14 @@ func (h *CartHandler) ClearCart(c *gin.Context) {
 func (h *CartHandler) GetCartTotal(c *gin.Context) {
 	userID, exists := c.Get("user_id")
 	if !exists {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Не авторизован"})
 		return
 	}
 
 	total, err := h.cartUsecase.GetCartTotal(c.Request.Context(), userID.(int64))
 	if err != nil {
 		h.logger.Error("Failed to get cart total", zap.Error(err))
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get cart total"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось посчитать сумму"})
 		return
 	}
 
