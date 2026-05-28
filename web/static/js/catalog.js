@@ -358,7 +358,7 @@ async function addToCart(id, name, price) {
         if (existingItem) {
             existingItem.quantity += 1;
         } else {
-            cart.push({ id, name, price, quantity: 1 });
+            cart.push({ id, name, price, quantity: 1, image: product.ImageURL || product.products_image_url || '' });
         }
         saveCart();
         updateCartUI();
