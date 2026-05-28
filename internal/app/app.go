@@ -120,6 +120,9 @@ func NewApp() (*App, error) {
 		cfg.Moysklad.StockBuffer,
 		logger,
 	)
+	// Подключаем репозитории акций к синхронизации МойСклад. Если хотя бы один nil,
+	// SyncPromotions молча выходит, поэтому безопасно даже без отдельного флага.
+	moyskladSyncService.SetPromotionRepos(promotionRepo, promotionLinkRepo)
 
 	// Scheduler
 	var scheduler *services.Scheduler

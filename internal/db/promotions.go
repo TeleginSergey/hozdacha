@@ -26,6 +26,7 @@ const (
 	PromotionsActive      = "promotions_active"
 	PromotionsStartDate   = "promotions_start_date"
 	PromotionsEndDate     = "promotions_end_date"
+	PromotionsMoyskladID  = "promotions_moysklad_id"
 	PromotionsCreatedAt   = "promotions_created_at"
 	PromotionsUpdatedAt   = "promotions_updated_at"
 )
@@ -39,6 +40,7 @@ type Promotion struct {
 	Active      bool       `db:"promotions_active" insert:"promotions_active" update:"promotions_active"`
 	StartDate   *time.Time `db:"promotions_start_date" insert:"promotions_start_date" update:"promotions_start_date"`
 	EndDate     *time.Time `db:"promotions_end_date" insert:"promotions_end_date" update:"promotions_end_date"`
+	MoyskladID  *string    `db:"promotions_moysklad_id" insert:"promotions_moysklad_id" update:"promotions_moysklad_id"`
 	CreatedAt   time.Time  `db:"promotions_created_at"`
 	UpdatedAt   time.Time  `db:"promotions_updated_at" update:"promotions_updated_at"`
 }
@@ -55,6 +57,7 @@ func (p *Promotion) columns(pref string) []string {
 
 type PromotionQuery interface {
 	GetByID(ctx context.Context, id int64) (*Promotion, error)
+	GetByMoyskladID(ctx context.Context, moyskladID string) (*Promotion, error)
 	GetActive(ctx context.Context) ([]*Promotion, error)
 	GetAll(ctx context.Context) ([]*Promotion, error)
 	Insert(ctx context.Context, promotion *Promotion) (*Promotion, error)
@@ -101,6 +104,31 @@ func (p *promotionQuery) GetByID(ctx context.Context, id int64) (*Promotion, err
 				zap.String("pg_error_code", pgErr.Code),
 				zap.Error(err),
 			)
+		}
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	return promotion, nil
+}
+
+func (p *promotionQuery) GetByMoyskladID(ctx context.Context, moyskladID string) (*Promotion, error) {
+	if moyskladID == "" {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	promotion := &Promotion{}
+	qb, args, err := p.sq.Select(promotion.columns("")...).
+		From(PromotionsTable).
+		Where(squirrel.Eq{PromotionsMoyskladID: moyskladID}).
+		Limit(1).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+	if err := pgxscan.Get(ctx, p.runner, promotion, qb, args...); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
 		}
 		return nil, fmt.Errorf("failed to execute query: %w", err)
 	}
