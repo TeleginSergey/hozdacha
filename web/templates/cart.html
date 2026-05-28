@@ -49,6 +49,7 @@
                 </div>
                 <a href="/profile" id="userMenu" style="display:none;text-decoration:none">
                     <div class="user-avatar" id="userAvatar"><span id="avatarLetter">U</span></div>
+                    <span class="user-greeting" id="userGreeting"></span>
                 </a>
             </div>
         </div>
@@ -73,6 +74,7 @@
             document.getElementById('authButtons').style.display = 'none';
             document.getElementById('userMenu').style.display = 'flex';
             document.getElementById('avatarLetter').textContent = (user.full_name || user.username || user.email || 'U').charAt(0).toUpperCase();
+            document.getElementById('userGreeting').textContent = 'Здравствуйте, ' + (user.full_name || user.username || 'Гость');
         }
     })();
 

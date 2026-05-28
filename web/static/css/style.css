@@ -113,6 +113,13 @@ header .container {
     background-color: #4E3219;
 }
 
+.user-greeting {
+    font-size: 0.9rem;
+    color: #555;
+    white-space: nowrap;
+    font-weight: 500;
+}
+
 .dropdown-menu {
     position: absolute;
     top: 100%;
@@ -672,6 +679,10 @@ footer {
     .user-area {
         width: 100%;
         justify-content: center;
+    }
+
+    .user-greeting {
+        display: none;
     }
 
     .auth-buttons {
