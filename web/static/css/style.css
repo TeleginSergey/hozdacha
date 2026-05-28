@@ -320,7 +320,7 @@ section h2 {
 }
 
 .btn {
-    background-color: #674422;
+    background-color: #4A7C59;
     color: white;
     padding: 0.75rem 1.5rem;
     border: none;
@@ -333,7 +333,7 @@ section h2 {
 }
 
 .btn:hover {
-    background-color: #4E3219;
+    background-color: #3d6a4b;
 }
 
 .search-box {
@@ -547,11 +547,11 @@ footer {
 }
 
 .pagination-controls .btn:hover:not(:disabled) {
-    background: #4A6E4D;
+    background: #4A7C59;
     color: white;
-    border-color: #4A6E4D;
+    border-color: #4A7C59;
     transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(74, 110, 77, 0.3);
+    box-shadow: 0 4px 8px rgba(74, 124, 89, 0.3);
 }
 
 .pagination-controls .btn:active:not(:disabled) {
@@ -569,14 +569,14 @@ footer {
 }
 
 .pagination-controls .btn-primary {
-    background: #674422;
+    background: #4A7C59;
     color: white;
-    border-color: #674422;
+    border-color: #4A7C59;
 }
 
 .pagination-controls .btn-primary:hover:not(:disabled) {
-    background: #4E3219;
-    border-color: #4E3219;
+    background: #3d6a4b;
+    border-color: #3d6a4b;
 }
 
 .pagination-controls .btn-secondary {
