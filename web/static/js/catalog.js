@@ -247,12 +247,19 @@ function searchProducts() {
     const scope = document.getElementById('searchScope');
     if (scope && scope.value) {
         currentCategoryId = scope.value;
+        activeCategoryId = scope.value;
+        const cat = allCategories.find(c => String(c.id) === scope.value);
+        activeParentId = cat && cat.parent_id ? String(cat.parent_id) : (cat ? scope.value : '');
     } else {
         currentCategoryId = '';
+        activeCategoryId = '';
+        activeParentId = '';
     }
 
+    renderCategoryTree();
+    updateBreadcrumb();
+
     if (!currentQuery) {
-        // Пустой поиск — просто показываем каталог с текущей категорией
         loadProducts();
         return;
     }
@@ -650,10 +657,12 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // =============================================================================
-// КАТЕГОРИИ: горизонтальная панель
+// КАТЕГОРИИ: дерево в sidebar
 // =============================================================================
 let allCategories = [];
 let childrenByParent = new Map();
+let activeCategoryId = '';
+let activeParentId = '';
 
 async function loadCategories() {
     try {
@@ -673,79 +682,143 @@ async function loadCategories() {
             list.sort((a, b) => a.name.localeCompare(b.name, 'ru'));
         }
 
-        renderCategoryBar();
+        renderCategoryTree();
     } catch (e) {
         console.error('Failed to load categories:', e);
     }
 }
 
-function renderCategoryBar() {
-    const bar = document.getElementById('categoryBar');
-    if (!bar) return;
+function renderCategoryTree(filterText) {
+    const tree = document.getElementById('categoryTree');
+    if (!tree) return;
 
     const roots = childrenByParent.get('root') || [];
-    let html = `<button class="cat-pill${currentCategoryId === '' ? ' active' : ''}" data-category-id="" onclick="selectCategory(event, '')">Все</button>`;
+    const ft = (filterText || '').toLowerCase().trim();
+
+    let html = '';
+
+    const allMatch = !ft || 'все товары'.includes(ft);
+    html += `<div class="tree-item${activeCategoryId === '' ? ' active' : ''}${allMatch ? '' : ' hidden-by-filter'}" data-category-id="" onclick="selectTreeCategory(event, '')">
+        <span class="tree-icon leaf">▸</span>
+        <span class="tree-label">Все товары</span>
+    </div>`;
 
     roots.forEach(cat => {
         const hasChildren = childrenByParent.has(String(cat.id));
-        const arrow = hasChildren ? '<span class="pill-arrow">▾</span>' : '';
-        const active = currentCategoryId === String(cat.id) || (hasChildren && currentCategoryId && allCategories.find(c => String(c.id) === currentCategoryId)?.parent_id == cat.id);
-        html += `<button class="cat-pill${active ? ' active' : ''}" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}${arrow}</button>`;
+        const children = childrenByParent.get(String(cat.id)) || [];
+        const catMatch = !ft || cat.name.toLowerCase().includes(ft);
+        const childMatch = !ft || children.some(c => c.name.toLowerCase().includes(ft));
+        const visible = catMatch || childMatch;
+
+        if (!visible) return;
+
+        const isActive = activeCategoryId === String(cat.id);
+        const isParentActive = activeParentId === String(cat.id);
+        const expanded = isActive || isParentActive || (!!ft && childMatch);
+
+        html += `<div class="tree-item${isActive ? ' active' : ''}${expanded ? ' expanded' : ''}" data-category-id="${cat.id}" onclick="selectTreeCategory(event, '${cat.id}')">
+            <span class="tree-icon">▸</span>
+            <span class="tree-label">${escapeHtml(cat.name)}</span>
+        </div>`;
+
+        if (hasChildren) {
+            html += '<div class="tree-children' + (expanded ? '' : ' collapsed') + '" style="max-height:' + (expanded ? (children.length * 36) + 'px' : '0') + '">';
+            children.forEach(sub => {
+                const subMatch = !ft || sub.name.toLowerCase().includes(ft);
+                if (!subMatch && ft) return;
+                const subActive = activeCategoryId === String(sub.id);
+                html += `<div class="tree-item${subActive ? ' active' : ''}" data-category-id="${sub.id}" onclick="selectTreeCategory(event, '${sub.id}')">
+                    <span class="tree-icon leaf">▸</span>
+                    <span class="tree-label">${escapeHtml(sub.name)}</span>
+                </div>`;
+            });
+            html += '</div>';
+        }
     });
 
-    bar.innerHTML = html;
-}
-
-function renderSubcategoryBar(parentId) {
-    const sub = document.getElementById('subcategoryBar');
-    if (!sub) return;
-
-    const children = childrenByParent.get(String(parentId)) || [];
-    if (children.length === 0) {
-        sub.innerHTML = '';
-        sub.hidden = true;
-        return;
+    if (!ft && roots.length === 0) {
+        html += '<div class="tree-loading">Нет категорий</div>';
     }
 
-    let html = `<button class="cat-pill${currentCategoryId === String(parentId) ? ' active' : ''}" data-category-id="${parentId}" onclick="selectCategory(event, '${parentId}')">Все в категории</button>`;
-    children.forEach(cat => {
-        html += `<button class="cat-pill${currentCategoryId === String(cat.id) ? ' active' : ''}" data-category-id="${cat.id}" onclick="selectCategory(event, '${cat.id}')">${escapeHtml(cat.name)}</button>`;
-    });
-
-    sub.innerHTML = html;
-    sub.hidden = false;
+    tree.innerHTML = html;
 }
 
-function selectCategory(event, categoryId) {
-    event.preventDefault();
+function selectTreeCategory(event, categoryId) {
+    event.stopPropagation();
     const idStr = String(categoryId);
 
-    currentCategoryId = idStr;
+    if (idStr === '') {
+        activeCategoryId = '';
+        activeParentId = '';
+    } else {
+        const cat = allCategories.find(c => String(c.id) === idStr);
+        if (!cat) return;
+
+        const hasChildren = childrenByParent.has(idStr);
+        if (hasChildren) {
+            const treeItem = event.currentTarget;
+            const wasExpanded = treeItem.classList.contains('expanded');
+            if (wasExpanded) {
+                treeItem.classList.remove('expanded');
+                const childrenDiv = treeItem.nextElementSibling;
+                if (childrenDiv && childrenDiv.classList.contains('tree-children')) {
+                    childrenDiv.classList.add('collapsed');
+                    childrenDiv.style.maxHeight = '0';
+                }
+            } else {
+                treeItem.classList.add('expanded');
+                const childrenDiv = treeItem.nextElementSibling;
+                if (childrenDiv && childrenDiv.classList.contains('tree-children')) {
+                    childrenDiv.classList.remove('collapsed');
+                    const count = childrenDiv.querySelectorAll('.tree-item').length;
+                    childrenDiv.style.maxHeight = (count * 36) + 'px';
+                }
+            }
+            activeCategoryId = idStr;
+            activeParentId = idStr;
+        } else {
+            activeCategoryId = idStr;
+            activeParentId = cat.parent_id ? String(cat.parent_id) : '';
+        }
+    }
+
+    renderCategoryTree();
+    updateBreadcrumb();
+    updateSearchScope(activeCategoryId);
+
+    currentCategoryId = activeCategoryId;
     currentOffset = 0;
     currentQuery = '';
     const input = document.getElementById('searchInput');
     if (input) input.value = '';
+    loadProducts();
+}
 
-    // Синхронизируем dropdown поиска
-    updateSearchScope(idStr);
+function updateBreadcrumb() {
+    const bc = document.getElementById('breadcrumb');
+    if (!bc) return;
 
-    // Показываем/скрываем подкатегории
-    if (idStr === '') {
-        document.getElementById('subcategoryBar').hidden = true;
-    } else {
-        const cat = allCategories.find(c => String(c.id) === idStr);
-        if (cat && !cat.parent_id) {
-            renderSubcategoryBar(idStr);
-        } else if (cat && cat.parent_id) {
-            renderSubcategoryBar(String(cat.parent_id));
-        } else {
-            document.getElementById('subcategoryBar').hidden = true;
-        }
+    if (!activeCategoryId) {
+        bc.innerHTML = '<span class="breadcrumb-item active">Все товары</span>';
+        return;
     }
 
-    renderCategoryBar();
-    updateBreadcrumb();
-    loadProducts();
+    const cat = allCategories.find(c => String(c.id) === activeCategoryId);
+    if (!cat) {
+        bc.innerHTML = '<span class="breadcrumb-item active">Все товары</span>';
+        return;
+    }
+
+    let html = '';
+    if (cat.parent_id) {
+        const parent = allCategories.find(c => String(c.id) === String(cat.parent_id));
+        if (parent) {
+            html += `<span class="breadcrumb-item" onclick="selectTreeCategory(event, '${parent.id}')">${escapeHtml(parent.name)}</span>`;
+            html += '<span class="breadcrumb-sep">›</span>';
+        }
+    }
+    html += `<span class="breadcrumb-item active">${escapeHtml(cat.name)}</span>`;
+    bc.innerHTML = html;
 }
 
 function updateSearchScope(categoryId) {
@@ -767,31 +840,25 @@ function updateSearchScope(categoryId) {
         '<option value="' + categoryId + '" selected>В категории «' + escapeHtml(cat.name) + '»</option>';
 }
 
-function updateBreadcrumb() {
-    const bc = document.getElementById('breadcrumb');
-    if (!bc) return;
-
-    if (!currentCategoryId) {
-        bc.innerHTML = '<span class="breadcrumb-item active">Все товары</span>';
-        return;
-    }
-
-    const cat = allCategories.find(c => String(c.id) === currentCategoryId);
-    if (!cat) {
-        bc.innerHTML = '<span class="breadcrumb-item active">Все товары</span>';
-        return;
-    }
-
-    let html = '';
-    if (cat.parent_id) {
-        const parent = allCategories.find(c => String(c.id) === String(cat.parent_id));
-        if (parent) {
-            html += `<span class="breadcrumb-item" onclick="selectCategory(event, '${parent.id}')">${escapeHtml(parent.name)}</span>`;
-            html += '<span class="breadcrumb-sep">›</span>';
-        }
-    }
-    html += `<span class="breadcrumb-item active">${escapeHtml(cat.name)}</span>`;
-    bc.innerHTML = html;
+function filterCategoryTree() {
+    const input = document.getElementById('sidebarSearch');
+    const ft = (input?.value || '').trim();
+    renderCategoryTree(ft);
 }
+
+function toggleSidebar() {
+    const sidebar = document.getElementById('catalogSidebar');
+    if (!sidebar) return;
+    sidebar.classList.toggle('collapsed');
+}
+
+document.addEventListener('click', function(e) {
+    const sidebar = document.getElementById('catalogSidebar');
+    if (!sidebar || sidebar.classList.contains('collapsed')) return;
+    if (window.innerWidth > 768) return;
+    if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-open-btn')) {
+        sidebar.classList.add('collapsed');
+    }
+});
 
 

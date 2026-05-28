@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}} - ХозДача</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
     <header>
@@ -30,34 +30,44 @@
     </header>
 
     <main class="catalog-layout">
-        <div class="catalog-topbar">
-            <div class="search-box">
-                <input type="text" id="searchInput" placeholder="Поиск товаров...">
-                <select id="searchScope" class="search-scope">
-                    <option value="">Везде</option>
-                </select>
-                <button onclick="searchProducts()">Найти</button>
+        <!-- Боковая панель: дерево категорий -->
+        <aside class="catalog-sidebar" id="catalogSidebar">
+            <div class="sidebar-header">
+                <h3>Категории</h3>
+                <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()" title="Скрыть">✕</button>
             </div>
-            <div class="catalog-breadcrumb" id="breadcrumb">
-                <span class="breadcrumb-item active">Все товары</span>
+            <div class="sidebar-search">
+                <input type="text" id="sidebarSearch" placeholder="Фильтр категорий..." oninput="filterCategoryTree()">
             </div>
+            <nav class="category-tree" id="categoryTree">
+                <div class="tree-loading">Загрузка...</div>
+            </nav>
+        </aside>
+        <!-- Overlay для мобильного sidebar -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+        <!-- Основная область: поиск + товары + пагинация -->
+        <div class="catalog-main">
+            <div class="catalog-topbar">
+                <button class="btn btn-outline sidebar-open-btn" id="sidebarOpenBtn" onclick="toggleSidebar()" title="Категории">☰ Категории</button>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Поиск товаров...">
+                    <select id="searchScope" class="search-scope">
+                        <option value="">Везде</option>
+                    </select>
+                    <button onclick="searchProducts()">Найти</button>
+                </div>
+                <div class="catalog-breadcrumb" id="breadcrumb">
+                    <span class="breadcrumb-item active">Все товары</span>
+                </div>
+            </div>
+
+            <section class="products-grid" id="productsGrid">
+                <p>Загрузка товаров...</p>
+            </section>
+
+            <div class="pagination" id="paginationContainer"></div>
         </div>
-
-        <!-- Горизонтальная панель категорий -->
-        <div class="category-bar-wrapper">
-            <div class="category-bar" id="categoryBar">
-                <button class="cat-pill active" data-category-id="" onclick="selectCategory(event, '')">Все</button>
-            </div>
-        </div>
-
-        <!-- Строка подкатегорий (появляется при выборе родительской) -->
-        <div class="subcategory-bar" id="subcategoryBar" hidden></div>
-
-        <section class="products-grid" id="productsGrid">
-            <p>Загрузка товаров...</p>
-        </section>
-
-        <div class="pagination" id="paginationContainer"></div>
 
         <div class="cart-section">
             <button class="cart-btn" onclick="showCart()" title="Корзина">🛒<span id="cartCount" style="position:absolute;top:-4px;right:-4px;background:#8B6F47;color:white;border-radius:50%;width:20px;height:20px;font-size:0.7rem;display:flex;align-items:center;justify-content:center;line-height:1">0</span></button>
@@ -158,7 +168,7 @@
     // Initialize on page load
     document.addEventListener('DOMContentLoaded', checkAuthState);
 </script>
-<script src="/static/js/catalog.js?v=10"></script>
+<script src="/static/js/catalog.js?v=11"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
