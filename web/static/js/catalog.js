@@ -334,7 +334,7 @@ async function addToCart(id, name, price) {
         // Проверяем доступный остаток перед добавлением
         const response = await fetch(`/api/products/${id}`);
         if (!response.ok) {
-            alert('Не удалось получить информацию о товаре');
+            alert('Не удалось загрузить товар');
             return;
         }
         
@@ -399,8 +399,10 @@ function updateCartUI() {
                 const price = parseFloat(item.price || 0);
                 const quantity = parseInt(item.quantity || 0);
                 const subtotal = price * quantity;
+                const img = item.image || '';
                 return `
                 <div style="display:flex;gap:12px;padding:12px 0;border-bottom:1px solid #eee;align-items:center">
+                    ${img ? `<img src="${escapeHtml(img)}" alt="" style="width:56px;height:56px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#f5f5f5" onerror="this.style.display='none'">` : ''}
                     <div style="flex:1;min-width:0">
                         <div style="font-weight:600;font-size:0.92rem;margin-bottom:2px">${name}</div>
                         <div style="color:#8B6F47;font-weight:700;font-size:0.9rem">${price.toFixed(0)} ₽</div>
@@ -549,7 +551,7 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
     });
     
     if (validItems.length === 0) {
-        alert('Нет валидных товаров в корзине');
+        alert('В корзине нет товаров');
         return;
     }
     
@@ -566,7 +568,7 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
 
     const token = localStorage.getItem('auth_token');
     if (!token) {
-        alert('Чтобы оформить заказ, войдите в аккаунт.');
+        alert('Для оформления заказа нужно войти');
         window.location.href = '/login?redirect=' + encodeURIComponent('/catalog');
         return;
     }
@@ -582,7 +584,7 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
         });
         
         if (response.ok) {
-            alert('Заявка успешно отправлена! Мы свяжемся с вами в ближайшее время.');
+            alert('Заказ принят! Мы с вами свяжемся.');
             cart = [];
             saveCart();
             updateCartCount();
@@ -590,11 +592,11 @@ document.getElementById('checkoutForm')?.addEventListener('submit', async (e) =>
             loadProducts();
         } else {
             const error = await response.json();
-            alert('Ошибка: ' + (error.error || 'Не удалось отправить заявку'));
+            alert('Ошибка: ' + (error.error || 'Не удалось оформить заказ'));
         }
     } catch (error) {
         console.error('Error submitting order:', error);
-        alert('Ошибка при отправке заявки');
+        alert('Ошибка при оформлении заказа');
     }
 });
 

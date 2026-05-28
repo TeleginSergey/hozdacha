@@ -88,7 +88,7 @@
             
             <form id="login-form" class="auth-form">
                 <div class="form-group">
-                    <label for="username">Имя пользователя или Email</label>
+                    <label for="username">Email или имя</label>
                     <input type="text" id="username" name="username" required>
                 </div>
                 
@@ -102,7 +102,7 @@
             
             <div class="register-link">
                 <p style="margin-bottom: 8px;"><a href="/forgot-password">Забыли пароль?</a></p>
-                <p>Нет аккаунта? <a href="/register">Зарегистрируйтесь</a></p>
+                <p>Нет аккаунта? <a href="/register">Создайте</a></p>
             </div>
         </div>
     </div>
@@ -140,7 +140,7 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    successDiv.textContent = 'Вход успешен! Перенаправление...';
+                    successDiv.textContent = 'Вход выполнен! Сейчас переадресуем...';
                     successDiv.style.display = 'block';
                     
                     // Сохраняем токен
@@ -161,7 +161,7 @@
                         }
                     }, 1000);
                 } else {
-                    errorDiv.textContent = data.error || 'Ошибка входа';
+                    errorDiv.textContent = data.error || 'Неверный логин или пароль';
                     errorDiv.style.display = 'block';
                     
                     // Если слишком много попыток, показываем когда можно повторить
@@ -173,7 +173,7 @@
                     }
                 }
             } catch (error) {
-                errorDiv.textContent = 'Ошибка соединения. Попробуйте еще раз.';
+                errorDiv.textContent = 'Нет связи. Попробуйте ещё раз.';
                 errorDiv.style.display = 'block';
             }
             

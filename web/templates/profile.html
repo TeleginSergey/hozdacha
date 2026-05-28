@@ -67,7 +67,7 @@
             </div>
 
             <div>
-                <h3 class="section-title">Редактирование</h3>
+                <h3 class="section-title">Изменить данные</h3>
                 <form id="editForm">
                     <div class="form-row"><label>Имя</label><input name="name" required minlength="2"></div>
                     <div class="form-row"><label>Телефон *</label><input name="phone" required type="tel" placeholder="+7 (999) 123-45-67"></div>
@@ -103,7 +103,7 @@
             document.querySelector('[name=phone]').value = u.phone || '';
             document.getElementById('authButtons').style.display = 'none';
             document.getElementById('userMenu').style.display = 'flex';
-        } catch { showMsg(msgErr, 'Ошибка загрузки'); }
+        } catch { showMsg(msgErr, 'Не удалось загрузить'); }
     }
 
     document.getElementById('editForm').onsubmit = async (e) => {
@@ -112,9 +112,9 @@
         const name = fd.get('name').trim();
         const phone = fd.get('phone').trim();
 
-        if (name.length < 2) { showMsg(msgErr, 'Имя должно содержать минимум 2 символа'); return; }
-        if (!phone) { showMsg(msgErr, 'Телефон обязателен'); return; }
-        if (!/^[\d\s\+\-\(\)]{7,20}$/.test(phone)) { showMsg(msgErr, 'Некорректный формат телефона'); return; }
+        if (name.length < 2) { showMsg(msgErr, 'Имя должно быть не короче 2 букв'); return; }
+        if (!phone) { showMsg(msgErr, 'Укажите телефон'); return; }
+        if (!/^[\d\s\+\-\(\)]{7,20}$/.test(phone)) { showMsg(msgErr, 'Неверный формат телефона'); return; }
 
         try {
             const r = await api('/api/auth/profile', {

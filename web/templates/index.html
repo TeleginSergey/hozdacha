@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.title}} - Магазин хозяйственных товаров</title>
+    <title>{{.title}} - ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
@@ -31,8 +31,8 @@
 
     <main class="container">
         <section class="hero">
-            <h2>Добро пожаловать в наш магазин!</h2>
-            <p>Широкий ассортимент хозяйственных товаров для вашего дома</p>
+            <h2>Добро пожаловать в ХозДачу!</h2>
+            <p>Товары для дома и дачи</p>
         </section>
 
         <section class="promotions" id="promotions">
@@ -47,7 +47,7 @@
             <div class="products-grid" id="productsGrid">
                 <p>Загрузка товаров...</p>
             </div>
-            <a href="/catalog" class="btn">Смотреть все товары</a>
+            <a href="/catalog" class="btn">Все товары</a>
         </section>
     </main>
 
@@ -107,7 +107,7 @@
         document.addEventListener('DOMContentLoaded', checkAuthState);
     </script>
 
-    <script src="/static/js/main.js"></script>
+    <script src="/static/js/main.js?v=2"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
