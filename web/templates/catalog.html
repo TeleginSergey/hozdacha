@@ -7,23 +7,24 @@
     <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>ХозДача</h1>
+    <header class="site-header">
+        <div class="container site-header__inner">
+            <a href="/" class="brand">
+                <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
+                <span>ХозДача</span>
+            </a>
             <nav class="main-nav">
                 <a href="/">Главная</a>
-                <a href="/catalog">Каталог</a>
+                <a href="/catalog" class="active">Каталог</a>
                 <a href="/cart">Корзина</a>
             </nav>
-            <div class="user-area" id="userArea">
+            <div class="header-actions" id="userArea">
                 <div class="auth-buttons" id="authButtons">
-                    <a href="/register" class="btn btn-outline">Регистрация</a>
-                    <a href="/login" class="btn btn-primary">Вход</a>
+                    <a href="/register" class="btn btn--outline btn--sm">Регистрация</a>
+                    <a href="/login" class="btn btn--sm">Вход</a>
                 </div>
-                <a href="/profile" id="userMenu" style="display:none;text-decoration:none">
-                    <div class="user-avatar" id="userAvatar">
-                        <span id="avatarLetter">U</span>
-                    </div>
+                <a href="/profile" id="userMenu" class="user-menu" style="display:none">
+                    <span class="user-avatar" id="avatarLetter">U</span>
                     <span class="user-greeting" id="userGreeting"></span>
                 </a>
             </div>

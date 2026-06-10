@@ -3,44 +3,56 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.title}} - ХозДача</title>
+    <title>{{.title}} — ХозДача · Админ</title>
     <link rel="stylesheet" href="/static/css/style.css">
     <link rel="stylesheet" href="/static/css/admin.css">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>Админ-панель</h1>
-            <nav>
-                <a href="/">Главная</a>
-                <a href="/catalog">Каталог</a>
-            </nav>
-        </div>
-    </header>
 
-    <main class="container">
+<header class="site-header">
+    <div class="container site-header__inner">
+        <a href="/admin" class="brand">
+            <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
+            <span>ХозДача · Админ</span>
+        </a>
+        <nav class="main-nav">
+            <a href="/">На сайт</a>
+            <a href="/catalog">Каталог</a>
+        </nav>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+
         <div id="loginSection" class="login-section">
             <h2>Вход в админ-панель</h2>
+            <p class="text-muted" style="font-size:var(--fs-sm)">Введите логин и пароль администратора</p>
             <form id="loginForm">
-                <input type="text" name="username" placeholder="Логин" required>
-                <input type="password" name="password" placeholder="Пароль" required>
-                <button type="submit" class="btn">Войти</button>
+                <div class="form-row">
+                    <label>Логин</label>
+                    <input type="text" name="username" placeholder="admin" required autofocus>
+                </div>
+                <div class="form-row">
+                    <label>Пароль</label>
+                    <input type="password" name="password" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn--block" id="loginBtn">Войти</button>
+                <div id="loginError" class="msg msg-error" style="margin-top:var(--sp-3)"></div>
             </form>
         </div>
 
-        <div id="adminSection" class="admin-section" style="display: none;">
-            <!-- Табы -->
-            <div class="admin-tabs" role="tablist">
+        <div id="adminSection" class="admin-wrap" style="display:none">
+            <div class="tabs">
                 <button class="tab-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">📊 Дашборд</button>
                 <button class="tab-btn" data-tab="orders" onclick="switchTab('orders')">🧾 Заказы</button>
                 <button class="tab-btn" data-tab="users" onclick="switchTab('users')">👥 Клиенты</button>
                 <button class="tab-btn" data-tab="promotions" onclick="switchTab('promotions')">🎁 Акции</button>
-                <button class="tab-btn" data-tab="sync" onclick="switchTab('sync')">🔄 Синхронизация</button>
-                <button class="tab-btn tab-btn-logout" onclick="logoutAdmin()">Выход</button>
+                <button class="tab-btn" data-tab="sync" onclick="switchTab('sync')">🔄 Синхр.</button>
+                <button class="tab-btn tab-btn--logout" onclick="logoutAdmin()">Выйти</button>
             </div>
 
-            <!-- Дашборд -->
-            <section id="tab-dashboard" class="tab-content active">
+            <section id="tab-dashboard" class="tab-content">
                 <div class="dashboard-header">
                     <h2>Дашборд</h2>
                     <div class="period-filter">
@@ -55,20 +67,17 @@
                 </div>
 
                 <div class="stats-grid" id="statsGrid">
-                    <!-- Карточки статистики заполняются JS -->
+                    <p class="text-muted">Загрузка...</p>
                 </div>
 
-                <h3 style="margin-top: 2rem;">🕐 Самовывоз сегодня</h3>
+                <h3 class="today-orders-title">🕐 Самовывоз сегодня</h3>
                 <div id="todayOrders" class="orders-table-wrap">
-                    <p class="text-muted">Загрузка...</p>
+                    <p class="text-muted" style="padding:var(--sp-3)">Загрузка...</p>
                 </div>
             </section>
 
-            <!-- Заказы -->
-            <section id="tab-orders" class="tab-content">
-                <h2>Заказы</h2>
-
-                <!-- Фильтры -->
+            <section id="tab-orders" class="tab-content" style="display:none">
+                <h2 class="admin-section-title">Заказы</h2>
                 <div class="filters-bar">
                     <input type="text" id="ordersSearch" placeholder="Поиск: имя, телефон, ID заказа..." class="filter-input">
                     <select id="ordersStatus" class="filter-input">
@@ -87,109 +96,123 @@
                         <option value="pickup_at">По времени самовывоза</option>
                     </select>
                     <button class="btn" onclick="loadOrders()">Применить</button>
-                    <button class="btn btn-secondary" onclick="resetOrderFilters()">Сбросить</button>
+                    <button class="btn btn--ghost" onclick="resetOrderFilters()">Сбросить</button>
                 </div>
 
                 <div id="ordersTable" class="orders-table-wrap">
-                    <p class="text-muted">Загрузка...</p>
+                    <p class="text-muted" style="padding:var(--sp-3)">Загрузка...</p>
                 </div>
 
                 <div class="pagination">
-                    <button class="btn btn-secondary" id="ordersPrev" onclick="ordersPage(-1)">← Назад</button>
+                    <button class="btn btn--secondary" id="ordersPrev" onclick="ordersPage(-1)">← Назад</button>
                     <span id="ordersPageInfo">—</span>
-                    <button class="btn btn-secondary" id="ordersNext" onclick="ordersPage(1)">Вперёд →</button>
+                    <button class="btn btn--secondary" id="ordersNext" onclick="ordersPage(1)">Вперёд →</button>
                 </div>
             </section>
 
-            <!-- Клиенты -->
-            <section id="tab-users" class="tab-content">
-                <h2>Клиенты</h2>
-
+            <section id="tab-users" class="tab-content" style="display:none">
+                <h2 class="admin-section-title">Клиенты</h2>
                 <div class="filters-bar">
                     <input type="text" id="usersSearch" placeholder="Поиск: имя, email, телефон..." class="filter-input">
                     <button class="btn" onclick="loadUsers()">Найти</button>
-                    <button class="btn btn-secondary" onclick="resetUserFilters()">Сбросить</button>
+                    <button class="btn btn--ghost" onclick="resetUserFilters()">Сбросить</button>
                 </div>
 
                 <div id="usersTable" class="orders-table-wrap">
-                    <p class="text-muted">Загрузка...</p>
+                    <p class="text-muted" style="padding:var(--sp-3)">Загрузка...</p>
                 </div>
 
                 <div class="pagination">
-                    <button class="btn btn-secondary" id="usersPrev" onclick="usersPage(-1)">← Назад</button>
+                    <button class="btn btn--secondary" id="usersPrev" onclick="usersPage(-1)">← Назад</button>
                     <span id="usersPageInfo">—</span>
-                    <button class="btn btn-secondary" id="usersNext" onclick="usersPage(1)">Вперёд →</button>
+                    <button class="btn btn--secondary" id="usersNext" onclick="usersPage(1)">Вперёд →</button>
                 </div>
             </section>
 
-            <!-- Акции -->
-            <section id="tab-promotions" class="tab-content">
-                <h2>Управление акциями</h2>
-                <button class="btn" onclick="showCreatePromotionForm()">Создать акцию</button>
-                <div id="promotionsList"></div>
+            <section id="tab-promotions" class="tab-content" style="display:none">
+                <h2 class="admin-section-title">Управление акциями</h2>
+                <button class="btn" onclick="showCreatePromotionForm()">+ Создать акцию</button>
+                <div id="promotionsList" class="promotions-list"></div>
             </section>
 
-            <!-- Синхронизация -->
-            <section id="tab-sync" class="tab-content">
-                <h2>Синхронизация с МойСклад</h2>
-                <p class="text-muted">Webhook'и работают автоматически. Эта кнопка — резервная: дельта-синк
-                    по изменённым карточкам товаров.</p>
-                <button class="btn" onclick="syncProducts()" id="syncBtn">🔄 Обновить товары сейчас</button>
-                <button class="btn btn-secondary" onclick="syncProductsFull()" id="syncFullBtn">🔁 Полная пересинхронизация</button>
-                <div id="syncResult" style="margin-top: 1rem;"></div>
+            <section id="tab-sync" class="tab-content" style="display:none">
+                <h2 class="admin-section-title">Синхронизация с МойСклад</h2>
+                <p class="admin-section-sub">Webhook'и работают автоматически. Эта кнопка — резервная: дельта-синк по изменённым карточкам товаров.</p>
+                <div class="sync-actions">
+                    <button class="btn" onclick="syncProducts()" id="syncBtn">🔄 Обновить товары сейчас</button>
+                    <button class="btn btn--ghost" onclick="syncProductsFull()" id="syncFullBtn">🔁 Полная пересинхронизация</button>
+                </div>
+                <div id="syncResult" class="sync-result"></div>
             </section>
         </div>
-    </main>
+    </div>
+</main>
 
-    <!-- Модальное окно создания/редактирования акции -->
-    <div id="promotionModal" class="modal">
-        <div class="modal-content">
-            <span class="close" onclick="closePromotionModal()">&times;</span>
-            <h2 id="promotionModalTitle">Создать акцию</h2>
-            <form id="promotionForm">
-                <input type="hidden" id="promotionId">
-                <input type="text" id="promotionTitle" placeholder="Название акции" required>
-                <textarea id="promotionDescription" placeholder="Описание"></textarea>
-                <input type="number" id="promotionDiscount" placeholder="Скидка (%)" step="0.01" min="0" max="100">
-                <input type="url" id="promotionImageURL" placeholder="URL изображения">
-                <label>
-                    <input type="checkbox" id="promotionActive"> Активна
+<div id="promotionModal" class="modal">
+    <div class="modal__content">
+        <button class="modal__close" onclick="closePromotionModal()" aria-label="Закрыть">✕</button>
+        <h2 id="promotionModalTitle">Создать акцию</h2>
+        <form id="promotionForm">
+            <input type="hidden" id="promotionId">
+            <div class="form-row">
+                <label>Название</label>
+                <input type="text" id="promotionTitle" placeholder="Летняя распродажа" required>
+            </div>
+            <div class="form-row">
+                <label>Описание</label>
+                <textarea id="promotionDescription" placeholder="Краткое описание акции"></textarea>
+            </div>
+            <div class="form-row">
+                <label>Скидка (%)</label>
+                <input type="number" id="promotionDiscount" placeholder="15" step="0.01" min="0" max="100">
+            </div>
+            <div class="form-row">
+                <label>URL изображения</label>
+                <input type="url" id="promotionImageURL" placeholder="https://...">
+            </div>
+            <div class="form-row">
+                <label class="checkbox-row">
+                    <input type="checkbox" id="promotionActive" checked> Активна
                 </label>
-                <input type="datetime-local" id="promotionStartDate" placeholder="Дата начала">
-                <input type="datetime-local" id="promotionEndDate" placeholder="Дата окончания">
-                <button type="submit" class="btn">Сохранить</button>
-            </form>
-        </div>
-    </div>
-
-    <!-- Модальное окно карточки заказа -->
-    <div id="orderModal" class="modal">
-        <div class="modal-content modal-wide">
-            <span class="close" onclick="closeOrderModal()">&times;</span>
-            <div id="orderModalBody">
-                <p class="text-muted">Загрузка...</p>
             </div>
-        </div>
-    </div>
-
-    <!-- Модальное окно карточки клиента -->
-    <div id="userModal" class="modal">
-        <div class="modal-content modal-wide">
-            <span class="close" onclick="closeUserModal()">&times;</span>
-            <div id="userModalBody">
-                <p class="text-muted">Загрузка...</p>
+            <div class="form-row">
+                <label>Дата начала</label>
+                <input type="datetime-local" id="promotionStartDate">
             </div>
+            <div class="form-row">
+                <label>Дата окончания</label>
+                <input type="datetime-local" id="promotionEndDate">
+            </div>
+            <button type="submit" class="btn btn--block">Сохранить</button>
+        </form>
+    </div>
+</div>
+
+<div id="orderModal" class="modal modal--wide">
+    <div class="modal__content">
+        <button class="modal__close" onclick="closeOrderModal()" aria-label="Закрыть">✕</button>
+        <div id="orderModalBody">
+            <p class="text-muted">Загрузка...</p>
         </div>
     </div>
+</div>
 
-    <footer>
-        <div class="container">
-            <p>&copy; <span class="footer-year"></span> ХозДача</p>
+<div id="userModal" class="modal modal--wide">
+    <div class="modal__content">
+        <button class="modal__close" onclick="closeUserModal()" aria-label="Закрыть">✕</button>
+        <div id="userModalBody">
+            <p class="text-muted">Загрузка...</p>
         </div>
-    </footer>
+    </div>
+</div>
 
-    <script src="/static/js/admin.js"></script>
+<footer class="site-footer">
+    <div class="container">
+        <div class="site-footer__bottom">© <span class="footer-year"></span> ХозДача. Все права защищены.</div>
+    </div>
+</footer>
+
+<script src="/static/js/admin.js"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
-

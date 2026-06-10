@@ -201,27 +201,34 @@ async function loadProducts(query = '', append = false) {
                 // Плейсхолдер для изображения, если нет
                 const imagePlaceholder = image || 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=';
                 
-                const promoBadge = hasPromo
-                    ? `<span class="promo-badge" title="${promoTitle}">−${Math.round(discountPercent)}%</span>`
-                    : '';
-                const priceBlock = hasPromo
-                    ? `<p class="price">
-                           <span class="price-old">${basePrice.toFixed(2)} руб.</span>
-                           <span class="price-new">${price} руб.</span>
-                       </p>`
-                    : `<p class="price">${price} руб.</p>`;
+                const stockCls = stock === 0 ? 'product-card__stock product-card__stock--out'
+                                : (stock > 0 && stock < 5 ? 'product-card__stock product-card__stock--low'
+                                : 'product-card__stock product-card__stock--ok');
+                const priceRow = hasPromo
+                    ? `<div class="product-card__price-row">
+                            <span class="product-card__price--old">${basePrice.toFixed(0)} ₽</span>
+                            <span class="product-card__price product-card__price--new">${parseFloat(price).toFixed(0)} ₽</span>
+                       </div>`
+                    : `<div class="product-card__price-row">
+                            <span class="product-card__price">${parseFloat(price).toFixed(0)} ₽</span>
+                       </div>`;
+                const addBtnLabel = stock === 0 ? 'Нет в наличии' : (inCart ? 'В корзине ✓' : 'В корзину');
+                const addBtnDisabled = (!isActive || stock === 0) ? 'disabled' : '';
 
                 return `
                     <a href="/product/${productId}" class="product-card${hasPromo ? ' has-promo' : ''}">
-                        ${promoBadge}
-                        <img src="${imagePlaceholder}" alt="${name}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjUwIiBoZWlnaHQ9IjI1MCIgZmlsbD0iI2YwZjBmMCIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTgiIGZpbGw9IiM5OTkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4='">
-                        <div class="product-card-content">
-                            <h3>${name}</h3>
-                            ${priceBlock}
-                            <p class="stock ${stockClass}">${stockText}</p>
-                            <button class="btn" onclick="event.preventDefault(); addToCart(${productId}, '${nameEscaped}', ${price}); return false;"
-                                    ${!isActive || stock === 0 ? 'disabled' : ''}>
-                                ${inCart ? 'В корзине' : 'В корзину'}
+                        ${hasPromo ? `<span class="product-card__badge">−${Math.round(discountPercent)}%</span>` : ''}
+                        <div class="product-card__media">
+                            <img src="${imagePlaceholder}" alt="${name}" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'product-card__media--empty',textContent:'Нет фото'}))">
+                        </div>
+                        <div class="product-card__body">
+                            <div class="product-card__title">${name}</div>
+                            ${priceRow}
+                            <span class="${stockCls}">${stockText}</span>
+                            <button class="btn btn--block btn--sm" style="margin-top:8px"
+                                    onclick="event.preventDefault(); event.stopPropagation(); addToCart(${productId}, '${nameEscaped}', ${price}); return false;"
+                                    ${addBtnDisabled}>
+                                ${addBtnLabel}
                             </button>
                         </div>
                     </a>
