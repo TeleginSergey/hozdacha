@@ -3,35 +3,44 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.title}} - ХозДача</title>
+    <title>{{.title}} — ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>ХозДача</h1>
-            <nav>
-                <a href="/">Главная</a>
-                <a href="/catalog">Каталог</a>
-            </nav>
-        </div>
-    </header>
 
-    <main class="container">
-        <div style="text-align: center; padding: 3rem 0;">
-            <h2>{{.title}}</h2>
+<header class="site-header">
+    <div class="container site-header__inner">
+        <a href="/" class="brand">
+            <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
+            <span>ХозДача</span>
+        </a>
+        <nav class="main-nav">
+            <a href="/">Главная</a>
+            <a href="/catalog">Каталог</a>
+        </nav>
+        <div class="header-actions">
+            <a href="/login" class="btn btn--outline btn--sm">Вход</a>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div class="container">
+        <div class="empty-state" style="margin-top:var(--sp-7)">
+            <div class="empty-state__icon">😕</div>
+            <h3>{{.title}}</h3>
             <p>{{.message}}</p>
-            <a href="/catalog" class="btn">Вернуться в каталог</a>
+            <a href="/catalog" class="btn btn--lg">К каталогу</a>
         </div>
-    </main>
+    </div>
+</main>
 
-    <footer>
-        <div class="container">
-            <p>&copy; <span class="footer-year"></span> ХозДача</p>
-        </div>
-    </footer>
+<footer class="site-footer">
+    <div class="container">
+        <div class="site-footer__bottom">© <span class="footer-year"></span> ХозДача. Все права защищены.</div>
+    </div>
+</footer>
+
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
-
-

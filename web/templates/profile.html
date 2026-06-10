@@ -5,140 +5,149 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Личный кабинет — ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <style>
-        .profile-wrap { max-width: 800px; margin: 30px auto; background: white; border-radius: 16px; box-shadow: 0 8px 40px rgba(0,0,0,0.10); padding: 28px 24px; position: relative; overflow: hidden; }
-        .profile-wrap::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px; background: linear-gradient(90deg, #4A7C59, #8B6F47); }
-        .profile-top { display: flex; gap: 20px; align-items: center; margin-bottom: 24px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
-        .avatar-lg { width: 80px; height: 80px; border-radius: 50%; background: #8B6F47; color: white; display: flex; align-items: center; justify-content: center; font-size: 32px; font-weight: bold; flex-shrink: 0; }
-        .profile-top-info h2 { margin: 0 0 6px; font-size: 1.3rem; }
-        .profile-top-info p { margin: 3px 0; color: #666; font-size: 0.9rem; }
-        .section-title { font-size: 1.05rem; font-weight: 700; color: #4A7C59; margin-bottom: 12px; padding-bottom: 6px; border-bottom: 2px solid #4A7C59; }
-        .form-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; }
-        .form-row label { font-weight: 600; font-size: 0.9rem; color: #333; }
-        .form-row input { padding: 10px 12px; border: 1px solid #ddd; border-radius: 5px; font-size: 0.95rem; }
-        .btn { background: #4A7C59; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.95rem; text-decoration: none; display: inline-block; }
-        .btn:hover { background: #3D6B4A; }
-        .btn-danger { background: #C62828; }
-        .btn-danger:hover { background: #B71C1C; }
-        .btn-outline-brown { background: transparent; color: #8B6F47; border: 2px solid #8B6F47; }
-        .btn-outline-brown:hover { background: #8B6F47; color: white; }
-        .msg { padding: 10px 14px; border-radius: 5px; margin-bottom: 12px; display: none; font-size: 0.9rem; }
-        .msg-ok { background: #E8F5E9; color: #2E7D32; }
-        .msg-err { background: #FFEBEE; color: #C62828; }
-    </style>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>ХозДача</h1>
-            <nav class="main-nav">
-                <a href="/">Главная</a>
-                <a href="/catalog">Каталог</a>
-                <a href="/cart">Корзина</a>
-            </nav>
-            <div class="user-area" id="userArea">
-                <div class="auth-buttons" id="authButtons">
-                    <a href="/register" class="btn btn-outline">Регистрация</a>
-                    <a href="/login" class="btn btn-primary">Вход</a>
+
+<header class="site-header">
+    <div class="container site-header__inner">
+        <a href="/" class="brand">
+            <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
+            <span>ХозДача</span>
+        </a>
+        <nav class="main-nav">
+            <a href="/">Главная</a>
+            <a href="/catalog">Каталог</a>
+            <a href="/profile" class="active">Кабинет</a>
+        </nav>
+        <div class="header-actions" id="userArea">
+            <div class="auth-buttons" id="authButtons" style="display:none">
+                <a href="/register" class="btn btn--outline btn--sm">Регистрация</a>
+                <a href="/login" class="btn btn--sm">Вход</a>
+            </div>
+            <a href="/profile" id="userMenu" class="user-menu">
+                <span class="user-avatar" id="avatarLetter">U</span>
+                <span class="user-greeting" id="userGreeting"></span>
+            </a>
+        </div>
+    </div>
+</header>
+
+<main>
+    <div class="container" style="max-width:800px">
+        <div class="card">
+            <div class="profile-head">
+                <div class="avatar-lg" id="profileInitial">U</div>
+                <div class="profile-info" style="flex:1;min-width:0">
+                    <h2 id="profileName">Загрузка...</h2>
+                    <p>📧 <span id="profileEmail"></span></p>
+                    <p>📱 <span id="profilePhone"></span></p>
                 </div>
-                <a href="/profile" id="userMenu" style="display:none;text-decoration:none">
-                    <div class="user-avatar"><span id="avatarLetter">U</span></div>
-                    <span class="user-greeting" id="userGreeting"></span>
+                <button class="btn btn--danger" id="logoutBtn">Выйти</button>
+            </div>
+
+            <div id="msgErr" class="msg msg-error"></div>
+            <div id="msgOk" class="msg msg-success"></div>
+
+            <div style="margin-bottom:var(--sp-5)">
+                <a href="/orders" class="btn btn--outline">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    Мои заказы
                 </a>
             </div>
-        </div>
-    </header>
 
-    <main class="container">
-        <div class="profile-wrap">
-            <div class="profile-top">
-                <div class="avatar-lg" id="profileInitial">U</div>
-                <div class="profile-top-info">
-                    <h2 id="profileName">Загрузка...</h2>
-                    <p id="profileEmail"></p>
-                    <p id="profilePhone"></p>
+            <h3 class="section-title">Личные данные</h3>
+            <form id="editForm">
+                <div class="form-row">
+                    <label>Имя</label>
+                    <input name="name" required minlength="2" maxlength="32" placeholder="Иван Петров">
                 </div>
-                <button class="btn btn-danger" style="margin-left:auto" id="logoutBtn">Выйти</button>
-            </div>
-
-            <div class="msg msg-err" id="msgErr"></div>
-            <div class="msg msg-ok" id="msgOk"></div>
-
-            <div style="margin-bottom:24px">
-                <a href="/orders" class="btn btn-outline-brown">📋 Мои заказы</a>
-            </div>
-
-            <div>
-                <h3 class="section-title">Изменить данные</h3>
-                <form id="editForm">
-                    <div class="form-row"><label>Имя</label><input name="name" required minlength="2" maxlength="32"></div>
-                    <div class="form-row"><label>Телефон *</label><input name="phone" required type="tel" placeholder="+7 (999) 123-45-67"></div>
-                    <button type="submit" class="btn">Сохранить</button>
-                </form>
-            </div>
+                <div class="form-row">
+                    <label>Телефон <span style="color:var(--c-muted);font-weight:400">(обязательно)</span></label>
+                    <input name="phone" required type="tel" placeholder="+7 (999) 123-45-67">
+                </div>
+                <button type="submit" class="btn">Сохранить</button>
+            </form>
         </div>
-    </main>
+    </div>
+</main>
 
-    <footer><div class="container"><p>&copy; <span class="footer-year"></span> ХозДача</p></div></footer>
+<footer class="site-footer">
+    <div class="container">
+        <div class="site-footer__bottom">© <span class="footer-year"></span> ХозДача. Все права защищены.</div>
+    </div>
+</footer>
 
-    <script>
-    const token = localStorage.getItem('auth_token');
-    if (!token) location.href = '/login';
+<script>
+const token = localStorage.getItem('auth_token');
+if (!token) location.href = '/login';
 
-    const api = (url, opts = {}) => fetch(url, { ...opts, headers: { ...opts.headers, Authorization: 'Bearer ' + token } });
+const api = (url, opts = {}) => fetch(url, { ...opts, headers: { ...opts.headers, Authorization: 'Bearer ' + token } });
 
-    function showMsg(el, text) { el.textContent = text; el.style.display = 'block'; setTimeout(() => el.style.display = 'none', 3500); }
+function showMsg(el, text) {
+    el.textContent = text;
+    el.style.display = 'block';
+    setTimeout(() => el.style.display = 'none', 4000);
+}
 
-    async function loadProfile() {
-        try {
-            const r = await api('/api/auth/profile');
-            if (r.status === 401) { logout(); return; }
-            const d = await r.json();
-            const u = d.user || d;
-            localStorage.setItem('user', JSON.stringify(u));
-            document.getElementById('profileName').textContent = u.full_name || u.username || '—';
-            document.getElementById('profileEmail').textContent = u.email || '';
-            document.getElementById('profilePhone').textContent = u.phone || '';
-            document.getElementById('profileInitial').textContent = (u.full_name || u.username || u.email || 'U').charAt(0).toUpperCase();
-            document.getElementById('avatarLetter').textContent = (u.full_name || u.username || u.email || 'U').charAt(0).toUpperCase();
-            document.getElementById('userGreeting').textContent = 'Здравствуйте, ' + (u.full_name || u.username || 'Гость');
-            document.querySelector('[name=name]').value = u.full_name || '';
-            document.querySelector('[name=phone]').value = u.phone || '';
-            document.getElementById('authButtons').style.display = 'none';
-            document.getElementById('userMenu').style.display = 'flex';
-        } catch { showMsg(msgErr, 'Не удалось загрузить'); }
+async function loadProfile() {
+    const msgErr = document.getElementById('msgErr');
+    try {
+        const r = await api('/api/auth/profile');
+        if (r.status === 401) { logout(); return; }
+        const d = await r.json();
+        const u = d.user || d;
+        localStorage.setItem('user', JSON.stringify(u));
+        const name = u.full_name || u.username || '—';
+        document.getElementById('profileName').textContent = name;
+        document.getElementById('profileEmail').textContent = u.email || '—';
+        document.getElementById('profilePhone').textContent = u.phone || '—';
+        document.getElementById('profileInitial').textContent = (u.full_name || u.username || u.email || 'U').charAt(0).toUpperCase();
+        document.getElementById('avatarLetter').textContent = (u.full_name || u.username || u.email || 'U').charAt(0).toUpperCase();
+        document.getElementById('userGreeting').textContent = name;
+        document.querySelector('[name=name]').value = u.full_name || '';
+        document.querySelector('[name=phone]').value = u.phone || '';
+    } catch { showMsg(msgErr, 'Не удалось загрузить профиль'); }
+}
+
+document.getElementById('editForm').onsubmit = async (e) => {
+    e.preventDefault();
+    const msgErr = document.getElementById('msgErr');
+    const msgOk = document.getElementById('msgOk');
+    const fd = new FormData(e.target);
+    const name = fd.get('name').trim();
+    const phone = fd.get('phone').trim();
+
+    if (name.length < 2) { showMsg(msgErr, 'Имя должно быть не короче 2 букв'); return; }
+    if (name.length > 32) { showMsg(msgErr, 'Имя не должно быть длиннее 32 символов'); return; }
+    if (!phone) { showMsg(msgErr, 'Укажите телефон'); return; }
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (phoneDigits.length !== 11 || !/^(7|8)/.test(phoneDigits)) {
+        showMsg(msgErr, 'Введите номер в формате +7 999 123-45-67');
+        return;
     }
 
-    document.getElementById('editForm').onsubmit = async (e) => {
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        const name = fd.get('name').trim();
-        const phone = fd.get('phone').trim();
+    try {
+        const r = await api('/api/auth/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ full_name: name, phone: phone })
+        });
+        const d = await r.json();
+        if (!r.ok) throw new Error(d.error || 'Ошибка');
+        showMsg(msgOk, '✅ Сохранено!');
+        loadProfile();
+    } catch (err) { showMsg(msgErr, err.message); }
+};
 
-        if (name.length < 2) { showMsg(msgErr, 'Имя должно быть не короче 2 букв'); return; }
-        if (name.length > 32) { showMsg(msgErr, 'Имя не должно быть длиннее 32 символов'); return; }
-        if (!phone) { showMsg(msgErr, 'Укажите телефон'); return; }
-        const phoneDigits = phone.replace(/\D/g, '');
-        if (phoneDigits.length !== 11 || !/^(7|8)/.test(phoneDigits)) { showMsg(msgErr, 'Введите номер в формате +7 999 123-45-67'); return; }
+function logout() {
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user');
+    location.href = '/login';
+}
+document.getElementById('logoutBtn').onclick = logout;
 
-        try {
-            const r = await api('/api/auth/profile', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ full_name: name, phone: phone })
-            });
-            const d = await r.json();
-            if (!r.ok) throw new Error(d.error || 'Ошибка');
-            showMsg(msgOk, 'Сохранено!');
-            loadProfile();
-        } catch (err) { showMsg(msgErr, err.message); }
-    };
-
-    function logout() { localStorage.removeItem('auth_token'); localStorage.removeItem('user'); location.href = '/login'; }
-    document.getElementById('logoutBtn').onclick = logout;
-
-    loadProfile();
-    </script>
-    <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
+loadProfile();
+</script>
+<script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>

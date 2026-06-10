@@ -5,265 +5,252 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Корзина — ХозДача</title>
     <link rel="stylesheet" href="/static/css/style.css">
-    <style>
-        .cart-page { max-width: 900px; margin: 30px auto; }
-        .cart-card { background: white; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); padding: 24px; }
-        .cart-row { display: flex; gap: 16px; padding: 16px 0; border-bottom: 1px solid #eee; align-items: center; }
-        .cart-row:last-child { border-bottom: none; }
-        .cart-row-img { width: 80px; height: 80px; border-radius: 6px; object-fit: cover; background: #f5f5f5; flex-shrink: 0; }
-        .cart-row-info { flex: 1; min-width: 0; }
-        .cart-row-name { font-weight: 600; font-size: 0.95rem; margin-bottom: 4px; }
-        .cart-row-price { color: #8B6F47; font-weight: 700; }
-        .cart-row-qty { display: inline-flex; align-items: center; border: 1px solid #ddd; border-radius: 5px; overflow: hidden; margin-top: 6px; }
-        .cart-row-qty button { width: 32px; height: 32px; border: none; background: white; font-size: 1rem; cursor: pointer; color: #555; }
-        .cart-row-qty button:hover { background: #F5F1E8; color: #4A7C59; }
-        .cart-row-qty span { min-width: 36px; text-align: center; font-weight: 600; border-left: 1px solid #ddd; border-right: 1px solid #ddd; padding: 6px 0; }
-        .cart-row-total { font-weight: 700; color: #8B6F47; font-size: 1rem; min-width: 90px; text-align: right; }
-        .cart-row-del { background: none; border: none; color: #ccc; cursor: pointer; font-size: 1.1rem; padding: 4px 8px; }
-        .cart-row-del:hover { color: #C62828; }
-        .cart-summary { margin-top: 20px; padding-top: 20px; border-top: 2px solid #eee; display: flex; justify-content: space-between; align-items: center; }
-        .cart-summary-total { font-size: 1.2rem; font-weight: 700; color: #8B6F47; }
-        .btn { background: #4A7C59; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
-        .btn:hover { background: #3D6B4A; }
-        .btn-accent { background: #8B6F47; }
-        .btn-accent:hover { background: #6d5637; }
-        .cart-empty { text-align: center; padding: 60px 20px; }
-        .cart-empty-icon { font-size: 4rem; margin-bottom: 12px; }
-        .cart-empty h2 { margin-bottom: 8px; }
-        .cart-empty p { color: #888; margin-bottom: 20px; }
-    </style>
 </head>
 <body>
-    <header>
-        <div class="container">
-            <h1>ХозДача</h1>
-            <nav class="main-nav">
-                <a href="/">Главная</a>
-                <a href="/catalog">Каталог</a>
-                <a href="/cart" class="active">Корзина</a>
-            </nav>
-            <div class="user-area" id="userArea">
-                <div class="auth-buttons" id="authButtons">
-                    <a href="/register" class="btn btn-outline">Регистрация</a>
-                    <a href="/login" class="btn btn-primary">Вход</a>
-                </div>
-                <a href="/profile" id="userMenu" style="display:none;text-decoration:none">
-                    <div class="user-avatar" id="userAvatar"><span id="avatarLetter">U</span></div>
-                    <span class="user-greeting" id="userGreeting"></span>
-                </a>
+
+<header class="site-header">
+    <div class="container site-header__inner">
+        <a href="/" class="brand">
+            <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
+            <span>ХозДача</span>
+        </a>
+        <nav class="main-nav">
+            <a href="/">Главная</a>
+            <a href="/catalog">Каталог</a>
+            <a href="/cart" class="active">Корзина</a>
+        </nav>
+        <div class="header-actions" id="userArea">
+            <div class="auth-buttons" id="authButtons">
+                <a href="/register" class="btn btn--outline btn--sm">Регистрация</a>
+                <a href="/login" class="btn btn--sm">Вход</a>
             </div>
+            <a href="/profile" id="userMenu" class="user-menu" style="display:none">
+                <span class="user-avatar" id="avatarLetter">U</span>
+                <span class="user-greeting" id="userGreeting"></span>
+            </a>
         </div>
-    </header>
+    </div>
+</header>
 
-    <main class="container">
-        <div class="cart-page">
-            <h2 style="margin-bottom:20px">🛒 Корзина</h2>
-            <div class="cart-card" id="cartContent"></div>
-        </div>
-    </main>
+<main>
+    <div class="container cart-page">
+        <h2>🛒 Корзина</h2>
+        <div class="cart-card" id="cartContent"></div>
+    </div>
+</main>
 
-    <footer><div class="container"><p>&copy; <span class="footer-year"></span> ХозДача</p></div></footer>
+<footer class="site-footer">
+    <div class="container">
+        <div class="site-footer__bottom">© <span class="footer-year"></span> ХозДача. Все права защищены.</div>
+    </div>
+</footer>
 
-    <script src="/static/js/catalog.js?v=13"></script>
-    <script>
-    // Auth UI
-    (function() {
-        const token = localStorage.getItem('auth_token');
-        const user = JSON.parse(localStorage.getItem('user') || 'null');
-        if (token && user) {
-            document.getElementById('authButtons').style.display = 'none';
-            document.getElementById('userMenu').style.display = 'flex';
-            document.getElementById('avatarLetter').textContent = (user.full_name || user.username || user.email || 'U').charAt(0).toUpperCase();
-            document.getElementById('userGreeting').textContent = 'Здравствуйте, ' + (user.full_name || user.username || 'Гость');
-        }
-    })();
-
-    function renderCart() {
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        const el = document.getElementById('cartContent');
-
-        if (cart.length === 0) {
-            el.innerHTML = `<div class="cart-empty">
-                <div class="cart-empty-icon">🛒</div>
-                <h2>Корзина пуста</h2>
-                <p>Добавьте товары из каталога</p>
-                <a href="/catalog" class="btn">К каталогу</a>
-            </div>`;
-            return;
-        }
-
-        const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-        el.innerHTML = cart.map((item, idx) => `
-            <div class="cart-row">
-                <img class="cart-row-img" src="${item.image || ''}" alt="" onerror="this.style.display='none'">
-                <div class="cart-row-info">
-                    <div class="cart-row-name"><a href="/product/${item.id}" style="color:inherit">${item.name}</a></div>
-                    <div class="cart-row-price">${item.price} ₽</div>
-                    <div class="cart-row-qty">
-                        <button onclick="changeQty(${idx}, -1)">−</button>
-                        <span>${item.quantity}</span>
-                        <button onclick="changeQty(${idx}, 1)">+</button>
-                    </div>
-                </div>
-                <div class="cart-row-total">${(item.price * item.quantity).toLocaleString('ru-RU')} ₽</div>
-                <button class="cart-row-del" onclick="removeItem(${idx})" title="Удалить">✕</button>
-            </div>
-        `).join('') + `
-            <div class="cart-summary">
-                <div class="cart-summary-total">Итого: ${total.toLocaleString('ru-RU')} ₽</div>
-                <button class="btn btn-accent" onclick="checkout()">Оформить заказ</button>
-            </div>`;
+<script src="/static/js/catalog.js?v=13"></script>
+<script>
+(function() {
+    const token = localStorage.getItem('auth_token');
+    const user = JSON.parse(localStorage.getItem('user') || 'null');
+    if (token && user) {
+        document.getElementById('authButtons').style.display = 'none';
+        document.getElementById('userMenu').style.display = 'flex';
+        const name = user.full_name || user.username || user.email || 'U';
+        document.getElementById('avatarLetter').textContent = name.charAt(0).toUpperCase();
+        document.getElementById('userGreeting').textContent = name;
     }
+})();
 
-    function changeQty(idx, delta) {
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        if (idx < 0 || idx >= cart.length) return;
-        if (delta > 0) {
-            const item = cart[idx];
-            fetch('/api/products/' + item.id)
-                .then(r => r.json())
-                .then(product => {
-                    const stock = parseInt(product.Stock || product.products_stock || 0);
-                    if (item.quantity >= stock) {
-                        alert('На складе больше нет этого товара. Доступно всего ' + stock + ' шт.');
-                        return;
-                    }
-                    item.quantity += delta;
-                    localStorage.setItem('cart', JSON.stringify(cart));
-                    renderCart();
-                    updateCartCount();
-                })
-                .catch(() => alert('Не удалось проверить наличие товара'));
-            return;
-        }
-        cart[idx].quantity += delta;
-        if (cart[idx].quantity <= 0) cart.splice(idx, 1);
-        localStorage.setItem('cart', JSON.stringify(cart));
-        renderCart();
-        updateCartCount();
-    }
-
-    function removeItem(idx) {
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        cart.splice(idx, 1);
-        localStorage.setItem('cart', JSON.stringify(cart));
-        renderCart();
-        updateCartCount();
-    }
-
-    // ======= Пикер времени самовывоза =======
-    const _PM = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
-    function _closeH(d) {
-        if (d.getMonth()===0 && (d.getDate()===1 || d.getDate()===2)) return -1;
-        return (d.getDay()===0 || d.getDay()===6) ? 16 : 18;
-    }
-    function _initPicker(dateId, timeId) {
-        const now = new Date();
-        const expDay = new Date(now); expDay.setDate(expDay.getDate()+3);
-        const max = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate(), 3, 0, 0);
-        const dEl = document.getElementById(dateId), tEl = document.getElementById(timeId);
-        if (!dEl || !tEl) return;
-        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const maxDay = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate());
-        const tomorrow = new Date(today.getTime() + 86400000);
-        dEl.innerHTML = '<option value="">— дата —</option>';
-        for (let d = new Date(today); d <= maxDay; d = new Date(d.getTime()+86400000)) {
-            if (_closeH(d) < 0) continue;
-            const o = document.createElement('option');
-            o.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-            const pre = d.toDateString()===today.toDateString() ? 'Сегодня, '
-                : d.toDateString()===tomorrow.toDateString() ? 'Завтра, ' : '';
-            o.textContent = pre + d.getDate() + ' ' + _PM[d.getMonth()];
-            dEl.appendChild(o);
-        }
-        dEl.onchange = () => _fillTimes(dateId, timeId, now, max);
-        tEl.innerHTML = '<option value="">— время —</option>';
-    }
-    function _fillTimes(dateId, timeId, now, max) {
-        const dEl = document.getElementById(dateId), tEl = document.getElementById(timeId);
-        if (!dEl || !tEl) return;
-        tEl.innerHTML = '<option value="">— время —</option>';
-        const v = dEl.value; if (!v) return;
-        const dayDate = new Date(v+'T00:00:00');
-        const closeH = _closeH(dayDate);
-        if (closeH < 0) {
-            const o=document.createElement('option'); o.textContent='закрыто'; o.disabled=true; tEl.appendChild(o); return;
-        }
-        const minOk = new Date(now.getTime()+10*60*1000);
-        for (let h=9; h<24; h++) for (let m=0; m<60; m+=30) {
-            if (h*60+m > closeH*60) { m=60; continue; }
-            const hh=String(h).padStart(2,'0'), mm=String(m).padStart(2,'0');
-            const slot = new Date(v+'T'+hh+':'+mm+':00');
-            if (slot<=minOk || slot>max) continue;
-            const o = document.createElement('option');
-            o.value = slot.toISOString();
-            o.textContent = hh+':'+mm;
-            tEl.appendChild(o);
-        }
-    }
-    // ======= Конец пикера =======
-
-    function checkout() {
-        const token = localStorage.getItem('auth_token');
-        if (!token) { alert('Нужно войти для оформления заказа'); location.href = '/login?redirect=/cart'; return; }
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-        if (cart.length === 0) { alert('Корзина пуста'); return; }
-
-        const modal = document.createElement('div');
-        modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:999;display:flex;align-items:center;justify-content:center';
-
-        modal.innerHTML = `<div style="background:white;padding:24px;border-radius:10px;width:90%;max-width:440px;max-height:90vh;overflow-y:auto">
-            <h3 style="margin-bottom:8px">Оформление заказа</h3>
-            <p style="color:#C62828;font-size:0.85rem;margin-bottom:14px;background:#FFEBEE;padding:8px 12px;border-radius:5px">Заказ хранится 3 дня. Потом отменится.</p>
-            <form id="coForm" style="display:flex;flex-direction:column;gap:10px">
-                <div>
-                    <label style="font-size:0.9rem;font-weight:600;color:#555;display:block;margin-bottom:6px">
-                        Когда заберёте? <span style="font-weight:400;color:#888">(можно не указывать)</span>
-                    </label>
-                    <div style="display:flex;gap:8px">
-                        <select id="coPickupDate" style="flex:1;padding:9px 10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem;color:#333;background:#fff">
-                            <option value="">— дата —</option>
-                        </select>
-                        <select id="coPickupTime" style="flex:1;padding:9px 10px;border:1px solid #ddd;border-radius:5px;font-size:0.95rem;color:#333;background:#fff">
-                            <option value="">— время —</option>
-                        </select>
-                    </div>
-                </div>
-                <textarea name="comment" placeholder="Примечание к заказу (не обязательно)" style="padding:10px;border:1px solid #ddd;border-radius:5px;min-height:70px;resize:vertical"></textarea>
-                <button type="submit" class="btn btn-accent">Подтвердить заказ</button>
-                <button type="button" class="btn" style="background:#888" onclick="this.closest('[style*=fixed]').remove()">Отмена</button>
-            </form>
+function renderCart() {
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const el = document.getElementById('cartContent');
+    if (cart.length === 0) {
+        el.innerHTML = `<div class="cart-empty">
+            <div class="cart-empty__icon">🛒</div>
+            <h3>Корзина пуста</h3>
+            <p>Добавьте товары из каталога</p>
+            <a href="/catalog" class="btn btn--lg">К каталогу</a>
         </div>`;
-        document.body.appendChild(modal);
-        modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
-        _initPicker('coPickupDate', 'coPickupTime');
-
-        modal.querySelector('#coForm').onsubmit = async (e) => {
-            e.preventDefault();
-            const fd = new FormData(e.target);
-            const items = cart.map(i => ({ product_id: i.id, quantity: i.quantity }));
-            const btn = e.target.querySelector('button[type=submit]');
-            btn.disabled = true; btn.textContent = 'Отправка...';
-            const pickupAt = document.getElementById('coPickupTime')?.value || null;
-            try {
-                const r = await fetch('/api/orders', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-                    body: JSON.stringify({ comment: fd.get('comment') || null, pickup_at: pickupAt, items })
-                });
-                const d = await r.json();
-                if (!r.ok) throw new Error(d.error || 'Ошибка');
-                alert('Заказ оформлен!');
-                localStorage.setItem('cart', '[]');
-                modal.remove();
-                location.href = '/profile';
-            } catch (err) { alert(err.message); }
-            finally { btn.disabled = false; btn.textContent = 'Подтвердить'; }
-        };
+        return;
     }
+    const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
+    el.innerHTML = cart.map((item, idx) => `
+        <div class="cart-row">
+            <img class="cart-row__img" src="${item.image || ''}" alt="" onerror="this.style.display='none'">
+            <div class="cart-row__info">
+                <div class="cart-row__name"><a href="/product/${item.id}">${item.name}</a></div>
+                <div class="cart-row__price">${item.price} ₽ / шт.</div>
+                <div class="qty">
+                    <button onclick="changeQty(${idx}, -1)" aria-label="Уменьшить">−</button>
+                    <span>${item.quantity}</span>
+                    <button onclick="changeQty(${idx}, 1)" aria-label="Увеличить">+</button>
+                </div>
+            </div>
+            <div class="cart-row__total">${(item.price * item.quantity).toLocaleString('ru-RU')} ₽</div>
+            <button class="cart-row__del" onclick="removeItem(${idx})" title="Удалить" aria-label="Удалить">✕</button>
+        </div>
+    `).join('') + `
+        <div class="cart-summary">
+            <div>
+                <div class="cart-summary__total">Итого: ${total.toLocaleString('ru-RU')} ₽</div>
+                <div class="cart-summary__hint">Заберёте в течение 48 часов после оформления</div>
+            </div>
+            <button class="btn btn--lg" onclick="checkout()">Оформить заказ</button>
+        </div>`;
+}
 
+function changeQty(idx, delta) {
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    if (idx < 0 || idx >= cart.length) return;
+    if (delta > 0) {
+        const item = cart[idx];
+        fetch('/api/products/' + item.id)
+            .then(r => r.json())
+            .then(product => {
+                const stock = parseInt(product.Stock || product.products_stock || 0);
+                if (item.quantity >= stock) {
+                    alert('На складе больше нет этого товара. Доступно всего ' + stock + ' шт.');
+                    return;
+                }
+                item.quantity += delta;
+                localStorage.setItem('cart', JSON.stringify(cart));
+                renderCart();
+            })
+            .catch(() => alert('Не удалось проверить наличие товара'));
+        return;
+    }
+    cart[idx].quantity += delta;
+    if (cart[idx].quantity <= 0) cart.splice(idx, 1);
+    localStorage.setItem('cart', JSON.stringify(cart));
     renderCart();
-    </script>
+}
+
+function removeItem(idx) {
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    cart.splice(idx, 1);
+    localStorage.setItem('cart', JSON.stringify(cart));
+    renderCart();
+}
+
+const _PM = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
+function _closeH(d) {
+    if (d.getMonth()===0 && (d.getDate()===1 || d.getDate()===2)) return -1;
+    return (d.getDay()===0 || d.getDay()===6) ? 16 : 18;
+}
+function _initPicker(dateId, timeId) {
+    const now = new Date();
+    const expDay = new Date(now); expDay.setDate(expDay.getDate()+3);
+    const max = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate(), 3, 0, 0);
+    const dEl = document.getElementById(dateId), tEl = document.getElementById(timeId);
+    if (!dEl || !tEl) return;
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const maxDay = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate());
+    const tomorrow = new Date(today.getTime() + 86400000);
+    dEl.innerHTML = '<option value="">— дата —</option>';
+    for (let d = new Date(today); d <= maxDay; d = new Date(d.getTime()+86400000)) {
+        if (_closeH(d) < 0) continue;
+        const o = document.createElement('option');
+        o.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+        const pre = d.toDateString()===today.toDateString() ? 'Сегодня, '
+            : d.toDateString()===tomorrow.toDateString() ? 'Завтра, ' : '';
+        o.textContent = pre + d.getDate() + ' ' + _PM[d.getMonth()];
+        dEl.appendChild(o);
+    }
+    dEl.onchange = () => _fillTimes(dateId, timeId, now, max);
+    tEl.innerHTML = '<option value="">— время —</option>';
+}
+function _fillTimes(dateId, timeId, now, max) {
+    const dEl = document.getElementById(dateId), tEl = document.getElementById(timeId);
+    if (!dEl || !tEl) return;
+    tEl.innerHTML = '<option value="">— время —</option>';
+    const v = dEl.value; if (!v) return;
+    const dayDate = new Date(v+'T00:00:00');
+    const closeH = _closeH(dayDate);
+    if (closeH < 0) {
+        const o=document.createElement('option'); o.textContent='закрыто'; o.disabled=true; tEl.appendChild(o); return;
+    }
+    const minOk = new Date(now.getTime()+10*60*1000);
+    for (let h=9; h<24; h++) for (let m=0; m<60; m+=30) {
+        if (h*60+m > closeH*60) { m=60; continue; }
+        const hh=String(h).padStart(2,'0'), mm=String(m).padStart(2,'0');
+        const slot = new Date(v+'T'+hh+':'+mm+':00');
+        if (slot<=minOk || slot>max) continue;
+        const o = document.createElement('option');
+        o.value = slot.toISOString();
+        o.textContent = hh+':'+mm;
+        tEl.appendChild(o);
+    }
+}
+
+function openModal() {
+    const m = document.createElement('div');
+    m.className = 'modal open';
+    m.innerHTML = `<div class="modal__content">
+        <button class="modal__close" onclick="this.closest('.modal').remove()" aria-label="Закрыть">✕</button>
+        <h2>Оформление заказа</h2>
+        <p style="background:var(--c-warn-bg);color:var(--c-warn);border:1px solid #fde2b8;padding:10px 14px;border-radius:var(--r-md);font-size:var(--fs-sm);margin-bottom:var(--sp-4)">
+            ⏳ Заказ хранится 3 дня. Потом автоматически отменится.
+        </p>
+        <form id="coForm">
+            <div class="form-row">
+                <label>Когда заберёте? <span style="color:var(--c-muted);font-weight:400">(необязательно)</span></label>
+                <div style="display:flex;gap:8px">
+                    <select id="coPickupDate" class="filter-input" style="flex:1">
+                        <option value="">— дата —</option>
+                    </select>
+                    <select id="coPickupTime" class="filter-input" style="flex:1">
+                        <option value="">— время —</option>
+                    </select>
+                </div>
+            </div>
+            <div class="form-row">
+                <label>Примечание к заказу <span style="color:var(--c-muted);font-weight:400">(необязательно)</span></label>
+                <textarea name="comment" placeholder="Например: позвоните за 30 минут"></textarea>
+            </div>
+            <button type="submit" class="btn btn--accent btn--block">Подтвердить заказ</button>
+        </form>
+    </div>`;
+    document.body.appendChild(m);
+    m.addEventListener('click', e => { if (e.target === m) m.remove(); });
+    _initPicker('coPickupDate', 'coPickupTime');
+
+    m.querySelector('#coForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const token = localStorage.getItem('auth_token');
+        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        const fd = new FormData(e.target);
+        const items = cart.map(i => ({ product_id: i.id, quantity: i.quantity }));
+        const btn = e.target.querySelector('button[type=submit]');
+        btn.disabled = true; btn.textContent = 'Отправка...';
+        const pickupAt = document.getElementById('coPickupTime')?.value || null;
+        try {
+            const r = await fetch('/api/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+                body: JSON.stringify({ comment: fd.get('comment') || null, pickup_at: pickupAt, items })
+            });
+            const d = await r.json();
+            if (!r.ok) throw new Error(d.error || 'Ошибка');
+            localStorage.setItem('cart', '[]');
+            m.remove();
+            alert('✅ Заказ оформлен! Сейчас перейдём в личный кабинет.');
+            location.href = '/profile';
+        } catch (err) {
+            alert(err.message);
+            btn.disabled = false; btn.textContent = 'Подтвердить заказ';
+        }
+    };
+    return m;
+}
+
+function checkout() {
+    const token = localStorage.getItem('auth_token');
+    if (!token) { alert('Нужно войти для оформления заказа'); location.href = '/login?redirect=/cart'; return; }
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    if (cart.length === 0) { alert('Корзина пуста'); return; }
+    openModal();
+}
+
+renderCart();
+</script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
