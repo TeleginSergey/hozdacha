@@ -375,9 +375,99 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   display: grid;
   gap: var(--sp-4);
 }
-.products-grid { grid-template-columns: repeat(5, 1fr); }
-.promotions-grid { grid-template-columns: repeat(3, 1fr); }
-.features-grid { grid-template-columns: repeat(3, 1fr); }
+.products-grid { display: grid; gap: var(--sp-4); grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-items: stretch; }
+.promotions-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+.features-grid { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+
+/* Каталог */
+.catalog-layout { display: grid; grid-template-columns: 280px 1fr; gap: var(--sp-5); align-items: start; }
+@media (max-width: 900px) { .catalog-layout { grid-template-columns: 1fr; } }
+.catalog-main { min-width: 0; }
+.catalog-topbar {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--sp-3);
+  align-items: center;
+  margin-bottom: var(--sp-4);
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+  box-shadow: var(--shadow-sm);
+}
+@media (max-width: 768px) {
+  .catalog-topbar { grid-template-columns: 1fr; }
+}
+.catalog-breadcrumb { font-size: var(--fs-sm); color: var(--c-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.catalog-breadcrumb .breadcrumb-item { color: var(--c-text-soft); }
+.catalog-breadcrumb .breadcrumb-item.active { color: var(--c-text); font-weight: 600; }
+.catalog-breadcrumb .breadcrumb-sep { color: var(--c-muted); }
+.catalog-breadcrumb .breadcrumb-item:hover { color: var(--c-primary); cursor: pointer; }
+
+.sidebar-open-btn { display: none; }
+@media (max-width: 900px) { .sidebar-open-btn { display: inline-flex; } }
+
+.sidebar-overlay {
+  position: fixed; inset: 0;
+  background: rgba(20, 40, 25, 0.45);
+  backdrop-filter: blur(2px);
+  z-index: 99;
+  display: none;
+}
+@media (max-width: 900px) {
+  .catalog-sidebar:not(.collapsed) ~ .sidebar-overlay { display: block; }
+  .catalog-sidebar { position: fixed; top: 0; left: 0; z-index: 100; height: 100vh; width: 280px; max-width: 85vw; transform: translateX(-100%); transition: transform 0.25s; }
+  .catalog-sidebar:not(.collapsed) { transform: translateX(0); }
+}
+
+.catalog-sidebar {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-4);
+  position: sticky;
+  top: 88px;
+  max-height: calc(100vh - 110px);
+  overflow-y: auto;
+}
+.sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-3); }
+.sidebar-header h3 { font-size: var(--fs-md); font-weight: 700; }
+.sidebar-toggle {
+  width: 30px; height: 30px; border-radius: 8px; border: none;
+  background: var(--c-bg-soft); color: var(--c-text-soft); cursor: pointer;
+  display: none;
+}
+@media (max-width: 900px) { .sidebar-toggle { display: grid; place-items: center; } }
+
+.sidebar-search { margin-bottom: var(--sp-3); }
+.sidebar-search input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1.5px solid var(--c-border);
+  border-radius: var(--r-md);
+  background: var(--c-bg);
+  font-size: var(--fs-sm);
+}
+.sidebar-search input:focus { outline: none; border-color: var(--c-primary); background: #fff; }
+
+.category-tree { font-size: var(--fs-sm); }
+.tree-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: var(--r-sm);
+  cursor: pointer; transition: background var(--t-fast);
+  color: var(--c-text-soft);
+}
+.tree-item:hover { background: var(--c-bg-soft); color: var(--c-text); }
+.tree-item.active { background: var(--c-primary-light); color: var(--c-primary); font-weight: 600; }
+.tree-icon { width: 16px; color: var(--c-muted); font-size: 10px; transition: transform 0.2s; }
+.tree-item.expanded > .tree-icon { transform: rotate(90deg); }
+.tree-icon.leaf { color: transparent; }
+.tree-children { overflow: hidden; max-height: 0; transition: max-height 0.25s; padding-left: 12px; }
+.tree-children:not(.collapsed) { padding-left: 12px; }
+.tree-loading { color: var(--c-muted); font-size: var(--fs-sm); padding: 8px 0; }
+
+.no-products, .error-message { text-align: center; padding: var(--sp-7) var(--sp-5); color: var(--c-muted); }
+.error-message { color: var(--c-danger); background: #fdecea; border: 1px solid #f5c6c6; border-radius: var(--r-md); }
 
 .product-card {
   background: var(--c-card);
