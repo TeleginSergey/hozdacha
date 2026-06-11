@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -113,6 +114,10 @@ func (s *MoyskladSyncService) upsertPromotion(
 		return nil, false, fmt.Errorf("get by moysklad id: %w", err)
 	}
 
+	// Явно проставляем временные метки, иначе при первой вставке в БД
+	// полетят zero-значения, что раньше ломало SELECT'ы со scany
+	// (cannot scan NULL into *time.Time для promotions_updated_at).
+	now := time.Now()
 	moyID := d.ID
 	promo := &db.Promotion{
 		Title:      d.Name,
@@ -120,6 +125,11 @@ func (s *MoyskladSyncService) upsertPromotion(
 		Active:     d.Active,
 		MoyskladID: &moyID,
 	}
+	if existing == nil {
+		// Новой записи — обе метки в now, чтобы поле UpdatedAt не было пустым.
+		promo.CreatedAt = now
+	}
+	promo.UpdatedAt = now
 
 	if existing == nil {
 		inserted, err := s.promotionQuery.Insert(ctx, promo)
