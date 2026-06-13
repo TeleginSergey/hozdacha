@@ -94,10 +94,15 @@ func (h *ProductHandler) GetProducts(c *gin.Context) {
 		total = 0
 	}
 
+	// has_more: true, если есть ещё товары после текущей страницы.
+	// Используется фронтом для бесконечной ленты вместо классической пагинации.
+	hasMore := offset+len(products) < total
+
 	c.JSON(http.StatusOK, gin.H{
 		"products": products,
 		"total":    total,
 		"count":    len(products),
+		"has_more": hasMore,
 	})
 }
 
@@ -169,10 +174,13 @@ func (h *ProductHandler) SearchProducts(c *gin.Context) {
 		total = 0
 	}
 
+	hasMore := offset+len(products) < total
+
 	c.JSON(http.StatusOK, gin.H{
 		"products": products,
 		"total":    total,
 		"count":    len(products),
+		"has_more": hasMore,
 	})
 }
 

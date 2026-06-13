@@ -118,12 +118,17 @@ func (s *MoyskladSyncService) upsertPromotion(
 	// полетят zero-значения, что раньше ломало SELECT'ы со scany
 	// (cannot scan NULL into *time.Time для promotions_updated_at).
 	now := time.Now()
+	resDay := ReservationDate(now)
+	validUntil := EndOfMoscowDay(resDay)
 	moyID := d.ID
 	promo := &db.Promotion{
 		Title:      d.Name,
 		Discount:   d.Discount,
 		Active:     d.Active,
 		MoyskladID: &moyID,
+		Kind:       db.PromotionKindDay,
+		ValidFrom:  &now,
+		ValidUntil: &validUntil,
 	}
 	if existing == nil {
 		// Новой записи — обе метки в now, чтобы поле UpdatedAt не было пустым.

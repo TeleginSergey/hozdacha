@@ -9,6 +9,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/TeleginSergey/hozdacha/internal/db"
+	"github.com/TeleginSergey/hozdacha/internal/services"
 )
 
 // PromotionPricer применяет приоритетные акции к товарам:
@@ -70,6 +71,7 @@ func (p *PromotionPricer) Apply(ctx context.Context, products []*db.Product) {
 		p.logger.Warn("failed to load product-level promotions", zap.Error(err))
 		productPromos = map[int64]*db.Promotion{}
 	}
+	productPromos = filterPromotionsMap(productPromos, time.Now())
 
 	// Готовим расширенный набор категорий: к каждой добавляем всех предков,
 	// чтобы акция на родителя действовала на потомков.
@@ -95,6 +97,7 @@ func (p *PromotionPricer) Apply(ctx context.Context, products []*db.Product) {
 		p.logger.Warn("failed to load category-level promotions", zap.Error(err))
 		categoryPromos = map[int64]*db.Promotion{}
 	}
+	categoryPromos = filterPromotionsMap(categoryPromos, time.Now())
 
 	for _, prod := range products {
 		if prod == nil {
@@ -189,6 +192,19 @@ func (p *PromotionPricer) getAncestorMap(ctx context.Context) map[int64][]int64 
 	p.ancestors = m
 	p.ancestorsExp = time.Now().Add(p.ancestorTTL)
 	return p.ancestors
+}
+
+func filterPromotionsMap(src map[int64]*db.Promotion, now time.Time) map[int64]*db.Promotion {
+	if len(src) == 0 {
+		return src
+	}
+	out := make(map[int64]*db.Promotion, len(src))
+	for id, promo := range src {
+		if services.PromotionAppliesForReservation(promo, now) {
+			out[id] = promo
+		}
+	}
+	return out
 }
 
 // InvalidateCategoryCache сбрасывает закэшированную карту предков (вызывать при изменении дерева категорий).
