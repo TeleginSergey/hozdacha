@@ -184,6 +184,14 @@
 
 .promo-list-card__desc--empty { min-height: 3.6em; }
 
+.promo-list-card__note {
+    margin-top: 4px;
+    font-size: var(--fs-xs);
+    color: var(--c-accent, #c45c26);
+    font-weight: 600;
+    line-height: 1.4;
+}
+
 .promo-list-card__foot {
   display: flex;
   align-items: center;
