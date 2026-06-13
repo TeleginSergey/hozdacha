@@ -1191,6 +1191,14 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
 .pagination__btn--active:hover { color: #fff; background: var(--c-primary-dark); }
 .pagination__info { color: var(--c-muted); font-size: var(--fs-sm); padding: 0 var(--sp-3); }
 
+.scroll-sentinel { height: 1px; width: 100%; }
+.scroll-loader {
+  text-align: center;
+  padding: var(--sp-4);
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+}
+
 /* ---------- Filters bar (admin) ---------- */
 .filters-bar {
   display: flex;

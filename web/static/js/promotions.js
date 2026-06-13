@@ -1,6 +1,9 @@
-// Страница /promotions — список всех действующих акций с фильтром и кликабельными CTA.
+// Страница /promotions — бесконечная лента: секции акций + товары внутри каждой.
 (function() {
     'use strict';
+
+    const FEED_PAGE_SIZE = 5;
+    const PRODUCT_BATCH = 20;
 
     function escapeHtml(text) {
         if (text === null || text === undefined) return '';
@@ -15,127 +18,179 @@
         return undefined;
     }
 
-    function promotionHref(promo) {
-        const productId = pickField(promo, 'FirstProductID', 'first_product_id');
-        const categoryId = pickField(promo, 'FirstCategoryID', 'first_category_id');
-        if (productId) return '/product/' + productId;
-        if (categoryId) return '/catalog?category_id=' + categoryId;
-        return '/catalog';
+    function promoId(promo) {
+        return pickField(promo, 'ID', 'promotions_id_pk') || pickField(promo, 'id', 'id');
     }
 
-    function promotionKind(promo) {
-        const productCount = parseInt(pickField(promo, 'ProductCount', 'product_count') || 0);
-        const categoryCount = parseInt(pickField(promo, 'CategoryCount', 'category_count') || 0);
-        if (productCount > 0) return 'product';
-        if (categoryCount > 0) return 'category';
-        return 'all';
-    }
-
-    function renderCard(promo) {
+    function renderSectionHeader(promo) {
         const title = escapeHtml(pickField(promo, 'Title', 'promotions_title') || 'Акция');
-        const desc = pickField(promo, 'Description', 'promotions_description')
-            ? escapeHtml(pickField(promo, 'Description', 'promotions_description'))
-            : '';
+        const desc = pickField(promo, 'Description', 'promotions_description');
         const discount = parseFloat(pickField(promo, 'Discount', 'promotions_discount') || 0);
-        const productCount = parseInt(pickField(promo, 'ProductCount', 'product_count') || 0);
-        const categoryCount = parseInt(pickField(promo, 'CategoryCount', 'category_count') || 0);
         const note = pickField(promo, 'ReservationNote', 'reservation_note') || '';
-        const kind = promotionKind(promo);
-        const href = promotionHref(promo);
-        const ctaLabel = productCount > 0
-            ? 'К товарам · ' + productCount
-            : (categoryCount > 0 ? 'В категорию' : 'Смотреть товары');
-        const kindLabel = productCount > 0 ? 'На товары' : 'На категории';
+        const productCount = parseInt(pickField(promo, 'ProductCount', 'product_count') || 0);
 
-        return `
-            <a class="promo-list-card" href="${href}" data-kind="${kind}">
-                <div class="promo-list-card__top">
-                    ${discount > 0 ? `<span class="promo-list-card__discount">−${Math.round(discount)}%</span>` : ''}
-                    <span class="promo-list-card__tag">${kindLabel}</span>
-                </div>
-                <h3 class="promo-list-card__title">${title}</h3>
-                ${desc ? `<p class="promo-list-card__desc">${desc}</p>` : '<p class="promo-list-card__desc promo-list-card__desc--empty">&nbsp;</p>'}
-                ${note ? `<div class="promo-list-card__note">${escapeHtml(note)}</div>` : ''}
-                <div class="promo-list-card__foot">
-                    ${productCount > 0 ? `<span class="promo-list-card__meta">${productCount} ${productCount === 1 ? 'товар' : (productCount < 5 ? 'товара' : 'товаров')}</span>` : ''}
-                    ${categoryCount > 0 ? `<span class="promo-list-card__meta">${categoryCount} ${categoryCount === 1 ? 'категория' : (categoryCount < 5 ? 'категории' : 'категорий')}</span>` : ''}
-                    <span class="promo-list-card__cta">${ctaLabel}
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                    </span>
-                </div>
-            </a>`;
+        return ''
+            + '<div class="promo-feed-section__head">'
+            +   '<div class="promo-feed-section__title-row">'
+            +     (discount > 0 ? '<span class="promo-feed-section__discount">−' + Math.round(discount) + '%</span>' : '')
+            +     '<h2 class="promo-feed-section__title">' + title + '</h2>'
+            +   '</div>'
+            +   (desc ? '<p class="promo-feed-section__desc">' + escapeHtml(desc) + '</p>' : '')
+            +   (note ? '<div class="promo-feed-section__note">' + escapeHtml(note) + '</div>' : '')
+            +   (productCount > 0 ? '<div class="promo-feed-section__meta">' + productCount + ' '
+                + (productCount === 1 ? 'товар' : (productCount < 5 ? 'товара' : 'товаров')) + '</div>' : '')
+            + '</div>';
     }
 
-    function applyFilter(promos, filter) {
-        if (filter === 'all') return promos;
-        return promos.filter(p => promotionKind(p) === filter);
+    function renderProductCards(products) {
+        if (!window.ProductCard) return '';
+        return products.map(function(p) {
+            return window.ProductCard.render(window.ProductCard.read(p));
+        }).join('');
     }
 
-    function renderList(promos, filter) {
-        const list = document.getElementById('promotionsList');
-        if (!list) return;
-        const filtered = applyFilter(promos, filter);
-        if (filtered.length === 0) {
-            list.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">🎁</div><h3>Акций по выбранному фильтру нет</h3><p>Попробуйте выбрать «Все» или загляните позже.</p></div>';
-            return;
-        }
-        list.innerHTML = filtered.map(renderCard).join('');
+    function createSection(promo) {
+        const id = promoId(promo);
+        const section = document.createElement('section');
+        section.className = 'promo-feed-section';
+        section.dataset.promoId = String(id);
+        section.innerHTML = renderSectionHeader(promo)
+            + '<div class="grid products-grid promo-feed-section__grid"></div>'
+            + '<div class="scroll-sentinel promo-feed-section__sentinel" aria-hidden="true"></div>'
+            + '<div class="scroll-loader promo-feed-section__loader" hidden>Загрузка товаров…</div>';
+        return section;
     }
 
-    function setupFilter(promos) {
-        const filter = document.getElementById('promoFilter');
-        if (!filter) return;
-        const hasProduct = promos.some(p => promotionKind(p) === 'product');
-        const hasCategory = promos.some(p => promotionKind(p) === 'category');
-        if (hasProduct || hasCategory) {
-            filter.style.display = 'inline-flex';
-        }
-        const buttons = filter.querySelectorAll('.promo-filter__btn');
-        buttons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                buttons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                renderList(promos, btn.dataset.filter || 'all');
-            });
-        });
-    }
+    function initSectionProducts(section) {
+        const promoIdVal = section.dataset.promoId;
+        const grid = section.querySelector('.promo-feed-section__grid');
+        const sentinel = section.querySelector('.promo-feed-section__sentinel');
+        const loader = section.querySelector('.promo-feed-section__loader');
+        const state = { offset: 0, hasMore: true, loading: false };
 
-    async function loadPromotions() {
-        const list = document.getElementById('promotionsList');
-        const count = document.getElementById('promoCount');
-        try {
-            const resp = await fetch('/api/promotions');
-            const data = await resp.json();
-            const promos = (data && data.promotions) || [];
-            if (count) {
-                if (promos.length === 0) {
-                    count.textContent = 'Сейчас акций нет';
-                } else {
-                    const word = (n) => {
-                        const m10 = n % 10, m100 = n % 100;
-                        if (m10 === 1 && m100 !== 11) return 'акция';
-                        if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'акции';
-                        return 'акций';
-                    };
-                    count.textContent = promotionsRu(promos.length, word);
+        async function loadMore() {
+            if (!state.hasMore || state.loading) return;
+            state.loading = true;
+            if (loader) loader.hidden = false;
+            try {
+                const resp = await fetch('/api/promotions/' + promoIdVal + '/products?limit=' + PRODUCT_BATCH + '&offset=' + state.offset);
+                const data = await resp.json();
+                const products = (data && data.products) || [];
+                if (products.length > 0) {
+                    grid.insertAdjacentHTML('beforeend', renderProductCards(products));
+                    state.offset += products.length;
                 }
+                state.hasMore = !!(data && data.has_more);
+                if (!state.hasMore && sentinel) {
+                    sentinel.style.display = 'none';
+                }
+                if (state.offset === 0 && products.length === 0) {
+                    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Товаров по этой акции пока нет</p></div>';
+                }
+            } catch (e) {
+                console.error('Failed to load promotion products:', e);
+                if (state.offset === 0) {
+                    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Не удалось загрузить товары</p></div>';
+                }
+                state.hasMore = false;
+            } finally {
+                state.loading = false;
+                if (loader) loader.hidden = true;
             }
-            if (promos.length === 0) {
-                list.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">🎁</div><h3>Сейчас акций нет</h3><p>Загляните позже — мы готовим новые предложения.</p></div>';
+        }
+
+        if (window.InfiniteScroll) {
+            window.InfiniteScroll.observe(sentinel, loadMore);
+        }
+        loadMore();
+    }
+
+    const feedState = {
+        page: 1,
+        hasMore: true,
+        loading: false,
+        disconnect: null,
+        total: 0,
+    };
+
+    async function loadFeedPage() {
+        if (!feedState.hasMore || feedState.loading) return;
+        const feed = document.getElementById('promotionsFeed');
+        const sentinel = document.getElementById('promotionsFeedSentinel');
+        const loader = document.getElementById('promotionsFeedLoader');
+        if (!feed) return;
+
+        feedState.loading = true;
+        if (loader) loader.hidden = false;
+
+        try {
+            const resp = await fetch('/api/promotions/feed?page=' + feedState.page + '&page_size=' + FEED_PAGE_SIZE);
+            const data = await resp.json();
+            const items = (data && data.items) || [];
+
+            if (feedState.page === 1 && items.length === 0) {
+                feed.innerHTML = '<div class="empty-state" style="grid-column:1/-1">'
+                    + '<div class="empty-state__icon">🎁</div>'
+                    + '<h3>Сейчас акций нет</h3>'
+                    + '<p>Загляните позже — мы готовим новые предложения.</p>'
+                    + '</div>';
+                feedState.hasMore = false;
+                if (sentinel) sentinel.style.display = 'none';
+                updateCount(0, data && data.reservation_note);
                 return;
             }
-            renderList(promos, 'all');
-            setupFilter(promos);
+
+            items.forEach(function(promo) {
+                const section = createSection(promo);
+                feed.appendChild(section);
+                initSectionProducts(section);
+            });
+
+            feedState.page += 1;
+            feedState.hasMore = !!(data && data.has_more);
+            feedState.total = (data && data.total) || feedState.total;
+            updateCount(feedState.total, data && data.reservation_note);
+
+            if (!feedState.hasMore && sentinel) {
+                sentinel.style.display = 'none';
+            }
         } catch (e) {
-            console.error('Failed to load promotions:', e);
-            if (list) list.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Не удалось загрузить акции</p></div>';
-            if (count) count.textContent = '';
+            console.error('Failed to load promotions feed:', e);
+            if (feedState.page === 1) {
+                feed.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Не удалось загрузить акции</p></div>';
+            }
+            feedState.hasMore = false;
+        } finally {
+            feedState.loading = false;
+            if (loader) loader.hidden = true;
         }
     }
 
-    function promotionsRu(n, wordFn) {
-        return 'Найдено: ' + n + ' ' + wordFn(n);
+    function updateCount(total, globalNote) {
+        const count = document.getElementById('promoCount');
+        if (!count) return;
+        if (total === 0) {
+            count.textContent = 'Сейчас акций нет';
+            return;
+        }
+        const word = function(n) {
+            const m10 = n % 10, m100 = n % 100;
+            if (m10 === 1 && m100 !== 11) return 'акция';
+            if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return 'акции';
+            return 'акций';
+        };
+        let text = 'Найдено: ' + total + ' ' + word(total);
+        if (globalNote) {
+            text += ' · ' + globalNote;
+        }
+        count.textContent = text;
     }
 
-    document.addEventListener('DOMContentLoaded', loadPromotions);
+    document.addEventListener('DOMContentLoaded', function() {
+        const sentinel = document.getElementById('promotionsFeedSentinel');
+        if (window.InfiniteScroll && sentinel) {
+            feedState.disconnect = window.InfiniteScroll.observe(sentinel, loadFeedPage);
+        }
+        loadFeedPage();
+    });
 })();
