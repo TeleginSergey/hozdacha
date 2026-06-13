@@ -1,0 +1,283 @@
+/* =========================================
+   ХозДача — страница /promotions
+   ========================================= */
+
+/* ---------- Hero ---------- */
+.promo-hero {
+  position: relative;
+  border-radius: var(--r-xl);
+  padding: var(--sp-7) var(--sp-6);
+  background:
+    radial-gradient(circle at 85% 20%, rgba(255, 255, 255, 0.18), transparent 55%),
+    linear-gradient(135deg, #b03425 0%, #d9542f 55%, #f08a3a 100%);
+  color: #fff;
+  overflow: hidden;
+  margin-bottom: var(--sp-7);
+  box-shadow: var(--shadow-lg);
+}
+
+.promo-hero__bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.promo-hero__bubble {
+  position: absolute;
+  font-weight: 900;
+  color: rgba(255, 255, 255, 0.12);
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+
+.promo-hero__bubble--1 { top: 8%; right: 6%; font-size: 140px; }
+.promo-hero__bubble--2 { top: 50%; right: 16%; font-size: 90px; }
+.promo-hero__bubble--3 { bottom: 4%; right: 30%; font-size: 70px; }
+.promo-hero__bubble--4 { top: 30%; right: 38%; font-size: 50px; }
+
+.promo-hero__content { position: relative; max-width: 620px; }
+
+.promo-hero__eyebrow {
+  display: inline-block;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: var(--r-pill);
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: var(--sp-4);
+}
+
+.promo-hero h1 {
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  margin-bottom: var(--sp-3);
+}
+
+.promo-hero p {
+  font-size: var(--fs-lg);
+  opacity: 0.92;
+  margin-bottom: var(--sp-5);
+  max-width: 520px;
+}
+
+.promo-hero__actions { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.promo-hero__actions .btn { background: #fff; color: #b03425; }
+.promo-hero__actions .btn:hover { background: #fff5ec; color: #b03425; transform: translateY(-1px); }
+
+/* ---------- Filter ---------- */
+.promo-filter {
+  display: inline-flex;
+  gap: 4px;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-pill);
+  padding: 4px;
+}
+
+.promo-filter__btn {
+  padding: 7px 16px;
+  border-radius: var(--r-pill);
+  border: none;
+  background: transparent;
+  color: var(--c-text-soft);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+  cursor: pointer;
+  transition: all var(--t-fast);
+}
+
+.promo-filter__btn:hover { background: var(--c-bg-soft); color: var(--c-text); }
+.promo-filter__btn.active { background: var(--c-primary); color: #fff; }
+
+/* ---------- Список промо-карточек ---------- */
+.promotions-list {
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+
+.promo-list-card {
+  position: relative;
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+  text-decoration: none;
+  color: inherit;
+  transition: all var(--t);
+  overflow: hidden;
+}
+
+.promo-list-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--c-danger), #f08a3a);
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+
+.promo-list-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--c-border-strong);
+}
+
+.promo-list-card:hover::before { opacity: 1; }
+
+.promo-list-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+
+.promo-list-card__discount {
+  display: inline-block;
+  font-size: var(--fs-3xl);
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--c-danger), #f08a3a);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.promo-list-card__tag {
+  font-size: var(--fs-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--c-primary);
+  background: var(--c-primary-light);
+  padding: 4px 10px;
+  border-radius: var(--r-pill);
+}
+
+.promo-list-card__title {
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--c-text);
+  letter-spacing: -0.01em;
+}
+
+.promo-list-card__desc {
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 3.6em;
+}
+
+.promo-list-card__desc--empty { min-height: 3.6em; }
+
+.promo-list-card__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--c-border);
+  flex-wrap: wrap;
+}
+
+.promo-list-card__meta {
+  font-size: var(--fs-xs);
+  color: var(--c-muted);
+  font-weight: 500;
+}
+
+.promo-list-card__meta + .promo-list-card__meta::before {
+  content: '·';
+  margin: 0 4px;
+  color: var(--c-border-strong);
+}
+
+.promo-list-card__cta {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--c-primary);
+  transition: gap var(--t-fast);
+}
+
+.promo-list-card:hover .promo-list-card__cta { gap: 8px; }
+.promo-list-card__cta svg { transition: transform var(--t-fast); }
+.promo-list-card:hover .promo-list-card__cta svg { transform: translateX(2px); }
+
+/* ---------- CTA-блок под списком ---------- */
+.promo-cta__card {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-lg);
+  padding: var(--sp-5);
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+}
+
+.promo-cta__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--c-primary), var(--c-accent));
+  color: #fff;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
+}
+
+.promo-cta__icon svg { width: 28px; height: 28px; }
+
+.promo-cta__title {
+  font-size: var(--fs-xl);
+  font-weight: 800;
+  margin-bottom: 4px;
+  letter-spacing: -0.01em;
+}
+
+.promo-cta__desc {
+  color: var(--c-muted);
+  font-size: var(--fs-sm);
+  max-width: 520px;
+}
+
+.promo-cta__card > div { flex: 1; min-width: 220px; }
+.promo-cta__card > .btn { white-space: nowrap; }
+
+/* ---------- Адаптив ---------- */
+@media (max-width: 768px) {
+  .promo-hero { padding: 36px 24px; border-radius: var(--r-lg); }
+  .promo-hero h1 { font-size: 30px; }
+  .promo-hero__bubble--1 { font-size: 80px; }
+  .promo-hero__bubble--2, .promo-hero__bubble--3, .promo-hero__bubble--4 { display: none; }
+
+  .promotions-list { grid-template-columns: 1fr; }
+
+  .section-head { flex-direction: column; align-items: flex-start; gap: var(--sp-3); }
+  .promo-filter { align-self: flex-start; flex-wrap: wrap; }
+  .promo-filter__btn { padding: 6px 12px; font-size: var(--fs-xs); }
+
+  .promo-cta__card { flex-direction: column; align-items: flex-start; }
+  .promo-cta__card > .btn { width: 100%; }
+}
