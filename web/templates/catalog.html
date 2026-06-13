@@ -79,7 +79,8 @@
                     </div>
                 </section>
 
-                <div class="pagination" id="paginationContainer"></div>
+                <div id="catalogScrollSentinel" class="scroll-sentinel" aria-hidden="true"></div>
+                <div id="catalogScrollLoader" class="scroll-loader" hidden>Загрузка…</div>
             </div>
         </div>
     </div>
@@ -174,7 +175,9 @@ function updateCartFab() {
 document.addEventListener('DOMContentLoaded', () => { checkAuthState(); updateCartFab(); });
 window.addEventListener('storage', updateCartFab);
 </script>
-<script src="/static/js/catalog.js?v=15"></script>
+<script src="/static/js/infinite-scroll.js?v=1"></script>
+<script src="/static/js/product-card.js?v=1"></script>
+<script src="/static/js/catalog.js?v=16"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>

@@ -63,21 +63,13 @@
         <section class="section">
             <div class="section-head">
                 <div>
-                    <h2>Все действующие акции</h2>
+                    <h2>Акции со скидками</h2>
                     <p id="promoCount">Загрузка…</p>
                 </div>
-                <div class="promo-filter" id="promoFilter" style="display:none">
-                    <button class="promo-filter__btn active" data-filter="all">Все</button>
-                    <button class="promo-filter__btn" data-filter="product">На товары</button>
-                    <button class="promo-filter__btn" data-filter="category">На категории</button>
-                </div>
             </div>
-            <div class="grid promotions-list" id="promotionsList">
-                <div class="empty-state" style="grid-column:1/-1">
-                    <div class="empty-state__icon">🎁</div>
-                    <p>Загружаем акции…</p>
-                </div>
-            </div>
+            <div id="promotionsFeed" class="promo-feed"></div>
+            <div id="promotionsFeedSentinel" class="scroll-sentinel" aria-hidden="true"></div>
+            <div id="promotionsFeedLoader" class="scroll-loader" hidden>Загрузка акций…</div>
         </section>
 
         <section class="section promo-cta">
@@ -127,7 +119,9 @@
     </div>
 </footer>
 
-<script src="/static/js/promotions.js?v=1"></script>
+<script src="/static/js/infinite-scroll.js?v=1"></script>
+<script src="/static/js/product-card.js?v=1"></script>
+<script src="/static/js/promotions.js?v=2"></script>
 <script>
 (function() {
     function checkAuthState() {

@@ -164,6 +164,49 @@ func (u *ProductUsecase) GetProductByID(ctx context.Context, id int64) (*db.Prod
 	return product, nil
 }
 
+// GetProductsByIDs возвращает активные товары в порядке ids с актуальными остатками и акциями.
+func (u *ProductUsecase) GetProductsByIDs(ctx context.Context, ids []int64) ([]*db.Product, error) {
+	if len(ids) == 0 {
+		return []*db.Product{}, nil
+	}
+
+	products, err := u.repo.GetByIDs(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	byID := make(map[int64]*db.Product, len(products))
+	idList := make([]int64, 0, len(products))
+	for _, p := range products {
+		if p == nil || !p.Active {
+			continue
+		}
+		byID[p.ID] = p
+		idList = append(idList, p.ID)
+	}
+
+	var availableMap map[int64]int
+	if u.stockCache != nil && len(idList) > 0 {
+		availableMap, _ = u.stockCache.BatchGetAvailableStocks(ctx, idList, u.repo)
+	}
+	u.applyStockBuffer(ctx, products, availableMap)
+
+	ordered := make([]*db.Product, 0, len(ids))
+	for _, id := range ids {
+		p, ok := byID[id]
+		if !ok {
+			continue
+		}
+		if avail, ok := availableMap[p.ID]; ok && avail >= 0 {
+			p.Stock = avail
+		}
+		ordered = append(ordered, p)
+	}
+
+	u.applyPromotions(ctx, ordered)
+	return ordered, nil
+}
+
 func (u *ProductUsecase) SearchProducts(ctx context.Context, q string, categoryID *int64, limit, offset int) ([]*db.Product, error) {
 	if limit <= 0 {
 		return []*db.Product{}, nil

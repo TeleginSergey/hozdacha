@@ -83,6 +83,8 @@
             <div class="grid products-grid" id="productsGrid">
                 <div class="product-card" style="grid-column:1/-1;background:transparent;border:none;box-shadow:none;display:block;padding:60px 20px;text-align:center;color:var(--c-muted)">Загрузка товаров…</div>
             </div>
+            <div id="homeProductsSentinel" class="scroll-sentinel" aria-hidden="true"></div>
+            <div id="homeProductsLoader" class="scroll-loader" hidden>Загрузка…</div>
         </section>
 
         <section class="section">
@@ -157,7 +159,9 @@
     </div>
 </footer>
 
-<script src="/static/js/main.js?v=3"></script>
+<script src="/static/js/infinite-scroll.js?v=1"></script>
+<script src="/static/js/product-card.js?v=1"></script>
+<script src="/static/js/main.js?v=4"></script>
 <script>
 (function() {
     function checkAuthState() {
