@@ -13,11 +13,13 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/db"
 	"github.com/TeleginSergey/hozdacha/internal/middleware"
 	"github.com/TeleginSergey/hozdacha/internal/services"
+	"github.com/TeleginSergey/hozdacha/internal/usecase"
 )
 
 type PromotionHandler struct {
 	promotionQuery     db.PromotionQuery
 	promotionLinkQuery db.PromotionLinkQuery
+	productUC          *usecase.ProductUsecase
 	logger             *zap.Logger
 }
 
@@ -33,6 +35,10 @@ func NewPromotionHandler(promotionQuery db.PromotionQuery, logger *zap.Logger) *
 // отдают только поля самой акции.
 func (h *PromotionHandler) SetPromotionLinkQuery(links db.PromotionLinkQuery) {
 	h.promotionLinkQuery = links
+}
+
+func (h *PromotionHandler) SetProductUsecase(uc *usecase.ProductUsecase) {
+	h.productUC = uc
 }
 
 // promotionCard — DTO для публичной выдачи акций: добавляет first_product_id /
@@ -267,13 +273,14 @@ func (h *PromotionHandler) GetPromotionProducts(c *gin.Context) {
 	pageIDs := productIDs[offset:end]
 
 	products := make([]*db.Product, 0, len(pageIDs))
-	for _, pid := range pageIDs {
-		// Берём «сырой» продукт по id, без usecase-обёртки — feed отдаёт много товаров,
-		// дополнительные расчёты (EffectivePrice) клиент применит на своей стороне.
-		// PromotionPricer в /api/products уже учтён, тут нам нужен только список.
-		// Используем прямой запрос через db pool, но проще — список через GetByIDs
-		// у PromotionLinkQuery нет, поэтому используем общий productQuery.
-		_ = pid
+	if h.productUC != nil && len(pageIDs) > 0 {
+		loaded, err := h.productUC.GetProductsByIDs(ctx, pageIDs)
+		if err != nil {
+			h.logger.Warn("failed to load promotion products", zap.Int64("promotion_id", id), zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить товары акции"})
+			return
+		}
+		products = loaded
 	}
 
 	c.JSON(http.StatusOK, gin.H{

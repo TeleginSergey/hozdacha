@@ -76,34 +76,68 @@
         }
     }
 
-    async function loadProducts() {
+    const productState = { offset: 0, hasMore: true, loading: false, limit: 20 };
+
+    async function loadProducts(append) {
         const grid = document.getElementById('productsGrid');
+        const sentinel = document.getElementById('homeProductsSentinel');
+        const loader = document.getElementById('homeProductsLoader');
         if (!grid) return;
+        if (productState.loading) return;
+        if (append && !productState.hasMore) return;
+
+        productState.loading = true;
+        if (append && loader) loader.hidden = false;
+
         try {
-            const response = await fetch('/api/products?limit=10');
+            const response = await fetch('/api/products?limit=' + productState.limit + '&offset=' + productState.offset);
             const data = await response.json();
             const raw = (data && data.products) || [];
-            if (raw.length > 0) {
-                if (window.ProductCard) {
-                    grid.innerHTML = raw.map(p => window.ProductCard.read(p)).map(p => window.ProductCard.render(p)).join('');
+
+            if (raw.length > 0 && window.ProductCard) {
+                const html = raw.map(function(p) {
+                    return window.ProductCard.render(window.ProductCard.read(p));
+                }).join('');
+                if (append) {
+                    grid.insertAdjacentHTML('beforeend', html);
                 } else {
-                    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Загрузка…</p></div>';
+                    grid.innerHTML = html;
                 }
-            } else {
+                productState.offset += raw.length;
+                productState.hasMore = data.has_more !== undefined ? !!data.has_more : raw.length >= productState.limit;
+            } else if (!append) {
                 grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1">'
                     + '<div class="empty-state__icon">📦</div>'
                     + '<h3>Товаров пока нет</h3>'
                     + '<p>Скоро здесь появятся новинки</p>'
                     + '</div>';
+                productState.hasMore = false;
+            } else {
+                productState.hasMore = false;
             }
+
+            if (!productState.hasMore && sentinel) sentinel.style.display = 'none';
         } catch (error) {
             console.error('Error loading products:', error);
-            grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Не удалось загрузить товары</p></div>';
+            if (!append) {
+                grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><p>Не удалось загрузить товары</p></div>';
+            }
+            productState.hasMore = false;
+        } finally {
+            productState.loading = false;
+            if (loader) loader.hidden = true;
         }
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', function() {
         loadPromotions();
-        loadProducts();
+        loadProducts(false).then(function() {
+            const sentinel = document.getElementById('homeProductsSentinel');
+            if (window.InfiniteScroll && sentinel) {
+                window.InfiniteScroll.observe(sentinel, function() {
+                    return loadProducts(true);
+                });
+            }
+        });
     });
 })();
