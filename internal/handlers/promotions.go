@@ -20,6 +20,7 @@ type PromotionHandler struct {
 	promotionQuery     db.PromotionQuery
 	promotionLinkQuery db.PromotionLinkQuery
 	productUC          *usecase.ProductUsecase
+	catalogUC          *usecase.PromotionCatalogUsecase
 	logger             *zap.Logger
 }
 
@@ -39,6 +40,10 @@ func (h *PromotionHandler) SetPromotionLinkQuery(links db.PromotionLinkQuery) {
 
 func (h *PromotionHandler) SetProductUsecase(uc *usecase.ProductUsecase) {
 	h.productUC = uc
+}
+
+func (h *PromotionHandler) SetPromotionCatalogUsecase(uc *usecase.PromotionCatalogUsecase) {
+	h.catalogUC = uc
 }
 
 // promotionCard — DTO для публичной выдачи акций: добавляет first_product_id /
@@ -288,6 +293,62 @@ func (h *PromotionHandler) GetPromotionProducts(c *gin.Context) {
 		"count":    len(products),
 		"total":    total,
 		"has_more": end < total,
+	})
+}
+
+// GetPromotionalProducts — GET /api/promotions/products
+// Единый каталог акционных товаров (прямые + из категорий) с поиском и фильтром.
+func (h *PromotionHandler) GetPromotionalProducts(c *gin.Context) {
+	if h.catalogUC == nil {
+		c.JSON(http.StatusOK, gin.H{
+			"products":          []*db.Product{},
+			"total":             0,
+			"has_more":          false,
+			"categories":        []usecase.PromotionCatalogCategory{},
+			"promotions":        []usecase.PromotionCatalogPromo{},
+			"reservation_note":  "",
+			"reservation_target": "",
+		})
+		return
+	}
+
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "24"))
+	if limit <= 0 || limit > 60 {
+		limit = 24
+	}
+	offset, _ := strconv.Atoi(c.DefaultQuery("offset", "0"))
+	if offset < 0 {
+		offset = 0
+	}
+
+	search := middleware.SanitizeString(c.Query("q"), 100)
+
+	var categoryID *int64
+	if cidStr := c.Query("category_id"); cidStr != "" {
+		if cid, err := strconv.ParseInt(cidStr, 10, 64); err == nil && cid > 0 {
+			categoryID = &cid
+		}
+	}
+	kind := c.DefaultQuery("kind", "all")
+
+	result, err := h.catalogUC.ListProducts(c.Request.Context(), search, categoryID, kind, limit, offset)
+	if err != nil {
+		h.logger.Error("Failed to list promotional products", zap.Error(err))
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить акционные товары"})
+		return
+	}
+
+	hasMore := offset+len(result.Products) < result.Total
+
+	c.JSON(http.StatusOK, gin.H{
+		"products":           result.Products,
+		"total":              result.Total,
+		"count":              len(result.Products),
+		"has_more":           hasMore,
+		"categories":         result.Categories,
+		"promotions":         result.Promotions,
+		"reservation_note":   result.ReservationNote,
+		"reservation_target": result.ReservationTarget,
 	})
 }
 

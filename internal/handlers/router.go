@@ -221,6 +221,7 @@ func SetupRouter(
 
 		// Акции (feed и products — до /:id, чтобы gin не перехватывал как id)
 		api.GET("/promotions/feed", promotionHandler.GetPromotionsFeed)
+		api.GET("/promotions/products", promotionHandler.GetPromotionalProducts)
 		api.GET("/promotions/:id/products", promotionHandler.GetPromotionProducts)
 		api.GET("/promotions", promotionHandler.GetActivePromotions)
 
