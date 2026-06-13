@@ -42,6 +42,7 @@ type OrderUsecase struct {
 	stockCache *cache.StockCache
 	moysklad   *moysklad.Client
 	events     db.OrderEventQuery
+	pricer     *PromotionPricer
 	logger     *zap.Logger
 }
 
@@ -61,6 +62,10 @@ func NewOrderUsecase(
 		events:     events,
 		logger:     logger,
 	}
+}
+
+func (u *OrderUsecase) SetPromotionPricer(p *PromotionPricer) {
+	u.pricer = p
 }
 
 // Локальные типы запроса повторяют структуру services.CreateOrderRequest,
@@ -96,6 +101,18 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 	// Локальный заказ без синхронизации с МойСклад приводит к расхождению остатков.
 	if u.moysklad != nil && !u.moysklad.HasOrderDefaults() {
 		return nil, fmt.Errorf("moysklad integration is not fully configured (missing organization/agent IDs)")
+	}
+
+	// Проверяем окно акций: если в заказе есть товары с дневной акцией,
+	// которая уже не актуальна для текущего окна бронирования — блокируем.
+	if u.pricer != nil {
+		productIDs := make([]int64, 0, len(req.Items))
+		for _, item := range req.Items {
+			productIDs = append(productIDs, item.ProductID)
+		}
+		if err := u.pricer.CheckDayPromotionWindow(ctx, productIDs, time.Now()); err != nil {
+			return nil, err
+		}
 	}
 
 	var totalPrice float64
