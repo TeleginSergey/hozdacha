@@ -301,99 +301,131 @@
   font-weight: 600;
 }
 
-/* ---------- Категории-чипы (фильтр акционных категорий) ---------- */
-.promo-page__categories {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  flex: 1 1 100%;
-  order: 99; /* под основной панелью — отдельной строкой */
+/* ---------- Выбор категории: компактный дропдаун с поиском ---------- */
+.promo-catselect {
+  position: relative;
+  flex: 0 1 240px;
+  min-width: 180px;
 }
 
-.promo-cat-chip {
-  display: inline-flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
-  padding: 8px 14px;
+.promo-catselect__trigger {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 9px 12px;
   border-radius: var(--r-md);
-  background: var(--c-card);
+  background: var(--c-bg);
   border: 1px solid var(--c-border);
   font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--c-text);
   cursor: pointer;
-  transition: all var(--t-fast);
-  text-align: left;
-  line-height: 1.2;
-  min-height: 38px;
-  justify-content: center;
+  transition: border-color var(--t-fast), box-shadow var(--t-fast);
 }
 
-.promo-cat-chip:hover {
-  background: var(--c-bg-soft);
-  border-color: var(--c-border-strong);
-  color: var(--c-text);
-}
-
-.promo-cat-chip.active {
-  background: var(--c-primary);
+.promo-catselect__trigger:hover { border-color: var(--c-border-strong); }
+.promo-catselect.is-open .promo-catselect__trigger {
   border-color: var(--c-primary);
-  color: #fff;
+  box-shadow: 0 0 0 3px rgba(46, 138, 78, 0.12);
 }
 
-.promo-cat-chip.active .promo-cat-chip__promo {
-  color: #fff;
-}
+.promo-catselect__trigger > svg:first-child { color: var(--c-muted); flex-shrink: 0; }
 
-.promo-cat-chip.active .promo-cat-chip__title {
-  color: #fff;
-}
-
-.promo-cat-chip.active .promo-cat-chip__tag {
-  background: rgba(255, 255, 255, 0.18);
-  color: #fff;
-}
-
-.promo-cat-chip__name {
-  font-weight: 700;
-  font-size: var(--fs-sm);
+.promo-catselect__label {
+  flex: 1;
+  text-align: left;
   white-space: nowrap;
-  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--c-muted);
+  font-weight: 600;
+}
+.promo-catselect__label.is-selected { color: var(--c-primary); }
+
+.promo-catselect__caret { flex-shrink: 0; color: var(--c-muted); transition: transform var(--t-fast); }
+.promo-catselect.is-open .promo-catselect__caret { transform: rotate(180deg); }
+
+.promo-catselect__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 40;
+  width: min(320px, 88vw);
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg, 0 12px 32px rgba(0, 0, 0, 0.14));
+  overflow: hidden;
+}
+
+.promo-catselect__search {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--c-border);
+}
+.promo-catselect__search svg { color: var(--c-muted); flex-shrink: 0; }
+.promo-catselect__search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: var(--fs-sm);
+  outline: none;
+  min-width: 0;
+}
+
+.promo-catselect__list {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.promo-catopt {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--r-sm);
+  background: transparent;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--c-text);
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--t-fast);
+}
+.promo-catopt:hover { background: var(--c-bg-soft); }
+.promo-catopt.active { background: rgba(46, 138, 78, 0.1); color: var(--c-primary); font-weight: 700; }
+
+.promo-catopt__name {
+  flex: 1;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.promo-cat-chip__promo {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+.promo-catopt__badge {
+  flex-shrink: 0;
   font-size: var(--fs-xs);
-  font-weight: 500;
-  color: var(--c-muted);
-}
-
-.promo-cat-chip__discount {
   font-weight: 800;
   color: var(--c-danger);
-}
-
-.promo-cat-chip__title {
-  font-weight: 600;
-  color: var(--c-text-soft);
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.promo-cat-chip__tag {
-  font-size: var(--fs-xs);
-  color: var(--c-muted);
-  background: var(--c-bg-soft);
-  padding: 1px 6px;
+  background: rgba(220, 53, 69, 0.1);
+  padding: 1px 7px;
   border-radius: var(--r-pill);
-  text-transform: lowercase;
+}
+
+.promo-catopt__check { flex-shrink: 0; color: var(--c-primary); opacity: 0; }
+.promo-catopt.active .promo-catopt__check { opacity: 1; }
+
+.promo-catopt__empty {
+  padding: 14px 12px;
+  text-align: center;
+  font-size: var(--fs-sm);
+  color: var(--c-muted);
 }
 
 /* ---------- Промо-чипы (общий список акций) ---------- */
@@ -446,8 +478,8 @@
   .promo-page__search { flex: 1 1 auto; }
   .promo-page__select { width: 100%; }
   .promo-filter { align-self: flex-start; }
-  .promo-page__categories { order: 99; }
-  .promo-cat-chip { width: 100%; }
+  .promo-catselect { flex: 1 1 auto; min-width: 0; }
+  .promo-catselect__panel { width: 100%; }
 }
 
 /* ---------- Бесконечная лента акций с товарами ---------- */

@@ -10,6 +10,7 @@
         loading: false,
         query: '',
         categoryId: '',
+        catFilter: '',
         kind: 'all',
         categories: [],
         promotions: [],
@@ -61,7 +62,7 @@
 
         if (data && data.categories) {
             state.categories = data.categories;
-            renderCategoryChips();
+            renderCategoryUI();
         }
         if (data && data.promotions) {
             state.promotions = data.promotions;
@@ -69,36 +70,102 @@
         }
     }
 
-    function renderCategoryChips() {
-        const wrap = document.getElementById('promoCategoryChips');
-        if (!wrap) return;
+    // Возвращает понятное имя выбранной категории для подписи триггера.
+    function categoryNameById(catId) {
+        const found = state.categories.find(function(c) { return String(c.id) === String(catId); });
+        return found ? found.name : '';
+    }
+
+    // Обновляет подпись на кнопке-триггере дропдауна.
+    function updateCategoryLabel() {
+        const label = document.getElementById('promoCatLabel');
+        if (!label) return;
+        if (!state.categoryId) {
+            label.textContent = 'Все категории';
+            label.classList.remove('is-selected');
+        } else {
+            label.textContent = categoryNameById(state.categoryId) || 'Категория';
+            label.classList.add('is-selected');
+        }
+    }
+
+    // Рендерит список категорий внутри выпадающей панели с учётом строки поиска.
+    function renderCategoryOptions() {
+        const list = document.getElementById('promoCatList');
+        if (!list) return;
         const current = state.categoryId;
+        const filter = state.catFilter.trim().toLowerCase();
 
-        // Базовая кнопка «Все категории».
-        const allBtn = '<button class="promo-cat-chip' + (current === '' ? ' active' : '') + '"'
-            + ' type="button" data-category-id="">Все категории</button>';
-
-        // Каждая категория с подсказкой «−30% · Скидка саженцы · Категория» из привязанных акций.
-        const catButtons = state.categories.map(function(cat) {
-            const sel = String(cat.id) === current ? ' active' : '';
-            const promos = Array.isArray(cat.promos) ? cat.promos : [];
-            let promoLine = '';
-            if (promos.length > 0) {
-                const top = promos[0];
-                const kindLabel = top.kind === 'category' ? 'Категория' : (top.kind === 'mixed' ? 'Смешанная' : 'Товары');
-                promoLine = '<span class="promo-cat-chip__promo">'
-                    + '<span class="promo-cat-chip__discount">−' + Math.round(top.discount || 0) + '%</span>'
-                    + '<span class="promo-cat-chip__title">' + escapeHtml(top.title || 'Акция') + '</span>'
-                    + '<span class="promo-cat-chip__tag">' + kindLabel + '</span>'
-                    + '</span>';
+        function optionRow(catId, name, promos, isAll) {
+            const sel = String(catId) === String(current) ? ' active' : '';
+            let badge = '';
+            const arr = Array.isArray(promos) ? promos : [];
+            if (arr.length > 0) {
+                const top = arr[0];
+                badge = '<span class="promo-catopt__badge">−' + Math.round(top.discount || 0) + '%</span>';
             }
-            return '<button class="promo-cat-chip' + sel + '" type="button" data-category-id="' + cat.id + '">'
-                + '<span class="promo-cat-chip__name">' + escapeHtml(cat.name) + '</span>'
-                + promoLine
+            const check = '<svg class="promo-catopt__check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="15" height="15" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>';
+            return '<button class="promo-catopt' + sel + '" type="button" role="option" data-category-id="' + (catId === '' ? '' : catId) + '"'
+                + (sel ? ' aria-selected="true"' : '') + '>'
+                + '<span class="promo-catopt__name">' + escapeHtml(name) + '</span>'
+                + badge
+                + check
                 + '</button>';
+        }
+
+        let html = '';
+        // «Все категории» показываем всегда (и без фильтра, и если совпадает с запросом).
+        if (!filter || 'все категории'.indexOf(filter) !== -1) {
+            html += optionRow('', 'Все категории', null, true);
+        }
+
+        const matched = state.categories.filter(function(cat) {
+            if (!filter) return true;
+            return String(cat.name || '').toLowerCase().indexOf(filter) !== -1;
+        });
+
+        html += matched.map(function(cat) {
+            return optionRow(cat.id, cat.name, cat.promos, false);
         }).join('');
 
-        wrap.innerHTML = allBtn + catButtons;
+        if (!matched.length && filter && 'все категории'.indexOf(filter) === -1) {
+            html += '<div class="promo-catopt__empty">Категория не найдена</div>';
+        }
+
+        list.innerHTML = html;
+    }
+
+    // Полное обновление UI категорий (подпись + список).
+    function renderCategoryUI() {
+        updateCategoryLabel();
+        renderCategoryOptions();
+    }
+
+    function openCatPanel() {
+        const panel = document.getElementById('promoCatPanel');
+        const trigger = document.getElementById('promoCatTrigger');
+        const select = document.getElementById('promoCatSelect');
+        if (!panel || !trigger) return;
+        panel.hidden = false;
+        trigger.setAttribute('aria-expanded', 'true');
+        if (select) select.classList.add('is-open');
+        const search = document.getElementById('promoCatSearch');
+        if (search) { search.value = state.catFilter; setTimeout(function() { search.focus(); }, 0); }
+    }
+
+    function closeCatPanel() {
+        const panel = document.getElementById('promoCatPanel');
+        const trigger = document.getElementById('promoCatTrigger');
+        const select = document.getElementById('promoCatSelect');
+        if (!panel || !trigger) return;
+        panel.hidden = true;
+        trigger.setAttribute('aria-expanded', 'false');
+        if (select) select.classList.remove('is-open');
+    }
+
+    function isCatPanelOpen() {
+        const panel = document.getElementById('promoCatPanel');
+        return panel && !panel.hidden;
     }
 
     function renderPromoChips() {
@@ -192,15 +259,10 @@
         loadProducts(false);
     }
 
-    function setCategory(catId) {
+    function setCategory(catId, opts) {
         state.categoryId = catId != null ? String(catId) : '';
-        // Подсветка активной кнопки.
-        const wrap = document.getElementById('promoCategoryChips');
-        if (wrap) {
-            wrap.querySelectorAll('.promo-cat-chip').forEach(function(btn) {
-                btn.classList.toggle('active', (btn.dataset.categoryId || '') === state.categoryId);
-            });
-        }
+        renderCategoryUI();
+        if (!(opts && opts.keepOpen)) closeCatPanel();
         resetList();
         loadProducts(false);
     }
@@ -208,7 +270,10 @@
     function setupFilters() {
         const searchBtn = document.getElementById('promoSearchBtn');
         const searchInput = document.getElementById('promoSearchInput');
-        const categoryChips = document.getElementById('promoCategoryChips');
+        const catSelect = document.getElementById('promoCatSelect');
+        const catTrigger = document.getElementById('promoCatTrigger');
+        const catList = document.getElementById('promoCatList');
+        const catSearch = document.getElementById('promoCatSearch');
         const kindFilter = document.getElementById('promoKindFilter');
         const resetBtn = document.getElementById('promoResetBtn');
 
@@ -218,13 +283,41 @@
                 if (e.key === 'Enter') applyFilters();
             });
         }
-        if (categoryChips) {
-            categoryChips.addEventListener('click', function(e) {
-                const btn = e.target.closest('.promo-cat-chip');
-                if (!btn) return;
-                setCategory(btn.dataset.categoryId || '');
+
+        // Выпадающий список категорий: открытие/закрытие.
+        if (catTrigger) {
+            catTrigger.addEventListener('click', function(e) {
+                e.stopPropagation();
+                if (isCatPanelOpen()) closeCatPanel();
+                else openCatPanel();
             });
         }
+        // Выбор категории из списка.
+        if (catList) {
+            catList.addEventListener('click', function(e) {
+                const opt = e.target.closest('.promo-catopt');
+                if (!opt) return;
+                setCategory(opt.dataset.categoryId || '');
+            });
+        }
+        // Живой поиск внутри дропдауна.
+        if (catSearch) {
+            catSearch.addEventListener('input', function() {
+                state.catFilter = catSearch.value || '';
+                renderCategoryOptions();
+            });
+            catSearch.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape') { closeCatPanel(); catTrigger && catTrigger.focus(); }
+            });
+        }
+        // Закрытие по клику вне и по Escape.
+        document.addEventListener('click', function(e) {
+            if (!isCatPanelOpen()) return;
+            if (catSelect && !catSelect.contains(e.target)) closeCatPanel();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape' && isCatPanelOpen()) closeCatPanel();
+        });
         if (kindFilter) {
             kindFilter.querySelectorAll('.promo-filter__btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {
@@ -241,15 +334,18 @@
         if (resetBtn) {
             resetBtn.addEventListener('click', function() {
                 if (searchInput) searchInput.value = '';
+                if (catSearch) catSearch.value = '';
                 state.query = '';
                 state.categoryId = '';
-                setCategory('');
+                state.catFilter = '';
                 state.kind = 'all';
                 if (kindFilter) {
                     kindFilter.querySelectorAll('.promo-filter__btn').forEach(function(b) {
                         b.classList.toggle('active', (b.dataset.kind || 'all') === 'all');
                     });
                 }
+                renderCategoryUI();
+                closeCatPanel();
                 resetList();
                 loadProducts(false);
             });
