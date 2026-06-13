@@ -584,7 +584,7 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
 .product-card__stock--low { color: var(--c-warn); background: var(--c-warn-bg); }
 .product-card__stock--out { color: var(--c-danger); background: #fdecea; }
 
-/* Promo card */
+/* Promo card (главная) */
 .promo-card {
   background: var(--c-card);
   border-radius: var(--r-lg);
@@ -593,21 +593,66 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   display: flex;
   flex-direction: column;
   gap: 10px;
+  text-decoration: none;
+  color: inherit;
+  position: relative;
+  overflow: hidden;
   transition: all var(--t);
 }
-.promo-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+.promo-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--c-danger), #f08a3a);
+  opacity: 0;
+  transition: opacity var(--t-fast);
+}
+.promo-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); border-color: var(--c-border-strong); }
+.promo-card:hover::before { opacity: 1; }
+.promo-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
 .promo-card__percent {
   display: inline-block;
   font-size: var(--fs-3xl);
   font-weight: 800;
-  background: linear-gradient(135deg, var(--c-danger), #e25b3a);
+  background: linear-gradient(135deg, var(--c-danger), #f08a3a);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
   line-height: 1;
+  letter-spacing: -0.02em;
 }
-.promo-card__title { font-size: var(--fs-lg); font-weight: 700; }
-.promo-card__desc { color: var(--c-muted); font-size: var(--fs-sm); }
+.promo-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--c-primary);
+  transition: gap var(--t-fast);
+}
+.promo-card:hover .promo-card__cta { gap: 8px; }
+.promo-card__cta svg { transition: transform var(--t-fast); }
+.promo-card:hover .promo-card__cta svg { transform: translateX(2px); }
+.promo-card__title { font-size: var(--fs-lg); font-weight: 700; line-height: 1.3; }
+.promo-card__desc { color: var(--c-muted); font-size: var(--fs-sm); line-height: 1.5; }
+.promo-card__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: auto;
+  padding-top: var(--sp-2);
+  border-top: 1px solid var(--c-border);
+  font-size: var(--fs-xs);
+  color: var(--c-muted);
+  font-weight: 500;
+}
+.promo-card__meta { color: var(--c-muted); }
 
 /* Features */
 .feature {

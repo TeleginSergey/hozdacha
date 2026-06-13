@@ -33,6 +33,11 @@ type PromotionLinkQuery interface {
 	ListProductIDs(ctx context.Context, promotionID int64) ([]int64, error)
 	ListCategoryIDs(ctx context.Context, promotionID int64) ([]int64, error)
 
+	// Чтение связей пакета акций одним запросом — для публичной выдачи с фронтом
+	// (нужно построить ссылку «к товару» / «в категорию»).
+	ListProductIDsForPromotions(ctx context.Context, promotionIDs []int64) (map[int64][]int64, error)
+	ListCategoryIDsForPromotions(ctx context.Context, promotionIDs []int64) (map[int64][]int64, error)
+
 	// Активные акции для пакета товаров/категорий — для расчёта эффективной цены.
 	// Возвращает максимальный (лучший для покупателя) discount по product_id / category_id.
 	BestActiveProductPromotions(ctx context.Context, productIDs []int64) (map[int64]*Promotion, error)
@@ -137,6 +142,68 @@ func (p *promotionLinkQuery) ListProductIDs(ctx context.Context, promotionID int
 
 func (p *promotionLinkQuery) ListCategoryIDs(ctx context.Context, promotionID int64) ([]int64, error) {
 	return p.listIDs(ctx, PromotionCategoriesTable, PromotionLinkCategoryID, promotionID)
+}
+
+// ListProductIDsForPromotions возвращает одним запросом мапу promotion_id -> []product_id
+// для переданного набора акций. Используется, чтобы отдавать клиенту достаточно
+// информации для построения корректной ссылки на товар/категорию.
+func (p *promotionLinkQuery) ListProductIDsForPromotions(ctx context.Context, promotionIDs []int64) (map[int64][]int64, error) {
+	result := make(map[int64][]int64)
+	if len(promotionIDs) == 0 {
+		return result, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	qb, args, err := p.sq.Select(PromotionLinkPromotionID, PromotionLinkProductID).
+		From(PromotionProductsTable).
+		Where(squirrel.Eq{PromotionLinkPromotionID: promotionIDs}).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+	type row struct {
+		PromotionID int64 `db:"promotion_id"`
+		ProductID   int64 `db:"product_id"`
+	}
+	var rows []row
+	if err := pgxscan.Select(ctx, p.runner, &rows, qb, args...); err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	for _, r := range rows {
+		result[r.PromotionID] = append(result[r.PromotionID], r.ProductID)
+	}
+	return result, nil
+}
+
+// ListCategoryIDsForPromotions — категорийный аналог ListProductIDsForPromotions.
+func (p *promotionLinkQuery) ListCategoryIDsForPromotions(ctx context.Context, promotionIDs []int64) (map[int64][]int64, error) {
+	result := make(map[int64][]int64)
+	if len(promotionIDs) == 0 {
+		return result, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	qb, args, err := p.sq.Select(PromotionLinkPromotionID, PromotionLinkCategoryID).
+		From(PromotionCategoriesTable).
+		Where(squirrel.Eq{PromotionLinkPromotionID: promotionIDs}).
+		ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build query: %w", err)
+	}
+	type row struct {
+		PromotionID int64 `db:"promotion_id"`
+		CategoryID  int64 `db:"category_id"`
+	}
+	var rows []row
+	if err := pgxscan.Select(ctx, p.runner, &rows, qb, args...); err != nil {
+		return nil, fmt.Errorf("failed to execute query: %w", err)
+	}
+	for _, r := range rows {
+		result[r.PromotionID] = append(result[r.PromotionID], r.CategoryID)
+	}
+	return result, nil
 }
 
 // bestActivePromotionsByLink — общая логика для product- и category-уровневых выборок.
