@@ -175,6 +175,15 @@ func NewApp() (*App, error) {
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo, logger)
 	promotionHandler.SetPromotionLinkQuery(promotionLinkRepo)
 	promotionHandler.SetProductUsecase(productUC)
+	promotionCatalogUC := usecase.NewPromotionCatalogUsecase(
+		promotionRepo,
+		promotionLinkRepo,
+		productUC,
+		productRepo,
+		categoryRepoForPricer,
+		logger,
+	)
+	promotionHandler.SetPromotionCatalogUsecase(promotionCatalogUC)
 	orderHandler := handlers.NewOrderHandlerWithUsecase(orderUC, cartUC, userRepo, logger)
 	moyskladSyncHandler := handlers.NewMoyskladSyncHandler(moyskladSyncService, logger)
 	cartHandler := handlers.NewCartHandler(cartUC, logger)

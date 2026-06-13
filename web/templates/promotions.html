@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}}</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-    <link rel="stylesheet" href="/static/css/promotions.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=20">
+    <link rel="stylesheet" href="/static/css/promotions.css?v=2">
 </head>
 <body>
 
@@ -60,16 +60,40 @@
             </div>
         </section>
 
-        <section class="section">
-            <div class="section-head">
+        <section class="section promo-page">
+            <div class="promo-page__toolbar">
+                <div class="promo-page__search">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                    <input type="search" id="promoSearchInput" placeholder="Поиск товара в акциях…" autocomplete="off">
+                    <button class="btn btn--sm" id="promoSearchBtn" type="button">Найти</button>
+                </div>
+                <select id="promoCategoryFilter" class="promo-page__select" aria-label="Категория">
+                    <option value="">Все категории</option>
+                </select>
+                <div class="promo-filter" id="promoKindFilter">
+                    <button class="promo-filter__btn active" type="button" data-kind="all">Все</button>
+                    <button class="promo-filter__btn" type="button" data-kind="product">На товары</button>
+                    <button class="promo-filter__btn" type="button" data-kind="category">На категории</button>
+                </div>
+                <button class="btn btn--outline btn--sm" id="promoResetBtn" type="button">Сбросить</button>
+            </div>
+
+            <div id="promoReservationNote" class="promo-page__note" hidden></div>
+
+            <div id="promoChips" class="promo-chips" hidden></div>
+
+            <div class="section-head promo-page__head">
                 <div>
-                    <h2>Акции со скидками</h2>
+                    <h2>Акционные товары</h2>
                     <p id="promoCount">Загрузка…</p>
                 </div>
             </div>
-            <div id="promotionsFeed" class="promo-feed"></div>
-            <div id="promotionsFeedSentinel" class="scroll-sentinel" aria-hidden="true"></div>
-            <div id="promotionsFeedLoader" class="scroll-loader" hidden>Загрузка акций…</div>
+
+            <div class="grid products-grid" id="promoProductsGrid">
+                <div class="promo-page__loading" style="grid-column:1/-1">Загрузка товаров…</div>
+            </div>
+            <div id="promoProductsSentinel" class="scroll-sentinel" aria-hidden="true"></div>
+            <div id="promoProductsLoader" class="scroll-loader" hidden>Загрузка…</div>
         </section>
 
         <section class="section promo-cta">
@@ -121,7 +145,7 @@
 
 <script src="/static/js/infinite-scroll.js?v=1"></script>
 <script src="/static/js/product-card.js?v=1"></script>
-<script src="/static/js/promotions.js?v=2"></script>
+<script src="/static/js/promotions.js?v=3"></script>
 <script>
 (function() {
     function checkAuthState() {

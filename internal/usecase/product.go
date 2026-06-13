@@ -21,6 +21,9 @@ type ProductRepository interface {
 	CountActive(ctx context.Context) (int, error)
 	CountByCategory(ctx context.Context, categoryID int64) (int, error)
 	CountSearch(ctx context.Context, query string, categoryID *int64) (int, error)
+	ListIDsByCategoryTrees(ctx context.Context, categoryIDs []int64) ([]int64, error)
+	FilterPromotionalIDs(ctx context.Context, ids []int64, search string, categoryID *int64) ([]int64, error)
+	ListCategoriesForProductIDs(ctx context.Context, ids []int64) ([]db.ProductCategoryRef, error)
 	Insert(ctx context.Context, product *db.Product) (*db.Product, error)
 	Update(ctx context.Context, product *db.Product, id int64) (*db.Product, error)
 	Delete(ctx context.Context, id int64) error
