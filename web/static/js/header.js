@@ -19,6 +19,8 @@
             active = nav.querySelector('a[data-nav="catalog"]');
         } else if (path.indexOf('/promotions') === 0) {
             active = nav.querySelector('a[data-nav="promotions"]');
+        } else if (path.indexOf('/contacts') === 0) {
+            active = nav.querySelector('a[data-nav="contacts"]');
         } else if (path.indexOf('/cart') === 0) {
             active = nav.querySelector('a[data-nav="cart"]');
         }

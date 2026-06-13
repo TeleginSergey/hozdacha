@@ -54,8 +54,9 @@
             <div class="grid products-grid" id="productsGrid">
                 <div class="product-card" style="grid-column:1/-1;background:transparent;border:none;box-shadow:none;display:block;padding:60px 20px;text-align:center;color:var(--c-muted)">Загрузка товаров…</div>
             </div>
-            <div id="homeProductsSentinel" class="scroll-sentinel" aria-hidden="true"></div>
-            <div id="homeProductsLoader" class="scroll-loader" hidden>Загрузка…</div>
+            <div style="text-align:center;margin-top:28px">
+                <a href="/catalog" class="btn btn--outline btn--lg">Смотреть весь каталог</a>
+            </div>
         </section>
 
         <section class="section">
@@ -115,6 +116,7 @@
                 <h4>Покупателям</h4>
                 <a href="/catalog">Каталог</a>
                 <a href="/promotions">Акции</a>
+                <a href="/contacts">Контакты</a>
                 <a href="/cart">Корзина</a>
                 <a href="/orders">Мои заказы</a>
                 <a href="/profile">Личный кабинет</a>
@@ -130,10 +132,9 @@
     </div>
 </footer>
 
-<script src="/static/js/header.js?v=1"></script>
-<script src="/static/js/infinite-scroll.js?v=1"></script>
+<script src="/static/js/header.js?v=2"></script>
 <script src="/static/js/product-card.js?v=1"></script>
-<script src="/static/js/main.js?v=4"></script>
+<script src="/static/js/main.js?v=5"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
