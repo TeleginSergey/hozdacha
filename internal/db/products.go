@@ -78,6 +78,9 @@ type ProductQuery interface {
 	CountActive(ctx context.Context) (int, error)
 	CountByCategory(ctx context.Context, categoryID int64) (int, error)
 	CountSearch(ctx context.Context, query string, categoryID *int64) (int, error)
+	ListIDsByCategoryTrees(ctx context.Context, categoryIDs []int64) ([]int64, error)
+	FilterPromotionalIDs(ctx context.Context, ids []int64, search string, categoryID *int64) ([]int64, error)
+	ListCategoriesForProductIDs(ctx context.Context, ids []int64) ([]ProductCategoryRef, error)
 	Insert(ctx context.Context, product *Product) (*Product, error)
 	Update(ctx context.Context, product *Product, id int64) (*Product, error)
 	Delete(ctx context.Context, id int64) error
@@ -494,4 +497,105 @@ func (p *productQuery) CountSearch(ctx context.Context, query string, categoryID
 		return 0, fmt.Errorf("failed to execute query: %w", err)
 	}
 	return count, nil
+}
+
+// ProductCategoryRef — категория для фильтра на странице акций.
+type ProductCategoryRef struct {
+	ID   int64  `db:"categories_id_pk"`
+	Name string `db:"categories_name"`
+}
+
+// ListIDsByCategoryTrees возвращает ID активных товаров из указанных категорий и их подкатегорий.
+func (p *productQuery) ListIDsByCategoryTrees(ctx context.Context, categoryIDs []int64) ([]int64, error) {
+	if len(categoryIDs) == 0 {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	sql := `WITH RECURSIVE roots AS (
+		SELECT unnest($1::bigint[]) AS id
+	),
+	category_tree AS (
+		SELECT id FROM roots
+		UNION ALL
+		SELECT c.` + CategoriesID + `
+		FROM ` + CategoriesTable + ` c
+		JOIN category_tree ct ON c.` + CategoriesParentID + ` = ct.id
+	)
+	SELECT ` + ProductsID + ` FROM ` + ProductsTable + `
+	WHERE ` + ProductsActive + ` = true
+	  AND ` + ProductsStatus + ` = 'active'
+	  AND ` + ProductsCategoryID + ` IN (SELECT id FROM category_tree)`
+
+	var ids []int64
+	if err := pgxscan.Select(ctx, p.runner, &ids, sql, categoryIDs); err != nil {
+		return nil, fmt.Errorf("ListIDsByCategoryTrees: %w", err)
+	}
+	return ids, nil
+}
+
+// FilterPromotionalIDs фильтрует набор ID по поиску и категории (с подкатегориями).
+func (p *productQuery) FilterPromotionalIDs(ctx context.Context, ids []int64, search string, categoryID *int64) ([]int64, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	search = strings.TrimSpace(search)
+	args := []interface{}{ids}
+	sql := `SELECT ` + ProductsID + ` FROM ` + ProductsTable + `
+	WHERE ` + ProductsActive + ` = true
+	  AND ` + ProductsStatus + ` = 'active'
+	  AND ` + ProductsID + ` = ANY($1)`
+	argN := 2
+
+	if search != "" {
+		pattern := "%" + search + "%"
+		sql += ` AND (` + ProductsName + ` ILIKE $` + fmt.Sprint(argN) + ` OR ` + ProductsDescription + ` ILIKE $` + fmt.Sprint(argN) + `)`
+		args = append(args, pattern)
+		argN++
+	}
+
+	if categoryID != nil && *categoryID > 0 {
+		sql += ` AND ` + ProductsCategoryID + ` IN (
+			WITH RECURSIVE category_tree AS (
+				SELECT ` + CategoriesID + ` AS id FROM ` + CategoriesTable + ` WHERE ` + CategoriesID + ` = $` + fmt.Sprint(argN) + `
+				UNION ALL
+				SELECT c.` + CategoriesID + ` FROM ` + CategoriesTable + ` c
+				JOIN category_tree ct ON c.` + CategoriesParentID + ` = ct.id
+			)
+			SELECT id FROM category_tree
+		)`
+		args = append(args, *categoryID)
+	}
+
+	var filtered []int64
+	if err := pgxscan.Select(ctx, p.runner, &filtered, sql, args...); err != nil {
+		return nil, fmt.Errorf("FilterPromotionalIDs: %w", err)
+	}
+	return filtered, nil
+}
+
+// ListCategoriesForProductIDs — уникальные категории для набора товаров (для фильтра UI).
+func (p *productQuery) ListCategoriesForProductIDs(ctx context.Context, ids []int64) ([]ProductCategoryRef, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	sql := `SELECT DISTINCT c.` + CategoriesID + `, c.` + CategoriesName + `
+	FROM ` + ProductsTable + ` p
+	JOIN ` + CategoriesTable + ` c ON c.` + CategoriesID + ` = p.` + ProductsCategoryID + `
+	WHERE p.` + ProductsID + ` = ANY($1)
+	  AND p.` + ProductsCategoryID + ` IS NOT NULL
+	ORDER BY c.` + CategoriesName + ` ASC`
+
+	var rows []ProductCategoryRef
+	if err := pgxscan.Select(ctx, p.runner, &rows, sql, ids); err != nil {
+		return nil, fmt.Errorf("ListCategoriesForProductIDs: %w", err)
+	}
+	return rows, nil
 }

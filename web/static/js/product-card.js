@@ -66,6 +66,8 @@
                 stock: stock,
                 effectivePrice: hasPromo ? parseFloat(effective) : null,
                 discountPercent: hasPromo ? parseFloat(discountPercent || 0) : 0,
+                promotionTitle: pickField(product, 'PromotionTitle', 'promotion_title') || '',
+                promotionType: pickField(product, 'PromotionType', 'promotion_type') || '',
             };
         },
 
@@ -80,6 +82,9 @@
             const finalPrice = p.effectivePrice !== null ? p.effectivePrice : p.price;
             const badge = p.effectivePrice !== null
                 ? '<span class="product-card__badge">−' + Math.round(p.discountPercent) + '%</span>'
+                : '';
+            const promoLabel = (opts.showPromoLabel && p.promotionTitle)
+                ? '<div class="product-card__promo-label">' + escapeHtml(p.promotionTitle) + '</div>'
                 : '';
             const media = image
                 ? '<img src="' + image + '" alt="' + name + '" loading="lazy" '
@@ -108,6 +113,7 @@
                 +   '<div class="product-card__media">' + media + badge + '</div>'
                 +   '<div class="product-card__body">'
                 +     '<div class="product-card__title">' + name + '</div>'
+                +     promoLabel
                 +     (desc ? '<div class="product-card__desc">' + desc + '…</div>' : '')
                 +     priceRow
                 +     '<span class="' + stockClass(p.stock) + '">' + stockLabel(p.stock) + '</span>'
