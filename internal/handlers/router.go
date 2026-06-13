@@ -73,6 +73,13 @@ func SetupRouter(
 		})
 	})
 
+	// Отдельная страница со всеми акциями.
+	router.GET("/promotions", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "promotions.html", gin.H{
+			"title": "Акции — ХозДача",
+		})
+	})
+
 	// Детальная страница товара (используем общую функцию)
 	router.GET("/product/:id", func(c *gin.Context) {
 		productHandler.RenderProductPage(c)

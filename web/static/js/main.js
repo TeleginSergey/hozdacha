@@ -1,6 +1,7 @@
 // ХозДача — общие скрипты главной страницы.
 // Бэкенд отдаёт товары и акции в camelCase: Name, Price, ImageURL, Stock, ID,
-// EffectivePrice, DiscountPercent, PromotionTitle, PromotionType, promotions_title и т.д.
+// EffectivePrice, DiscountPercent, PromotionTitle, PromotionType,
+// FirstProductID, FirstCategoryID, ProductCount, CategoryCount и т.д.
 function escapeHtml(text) {
     if (text === null || text === undefined) return '';
     const map = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' };
@@ -93,6 +94,53 @@ function renderProductCard(p) {
         </a>`;
 }
 
+// Куда вести пользователя при клике на промо-карточку: на конкретный товар,
+// либо в категорию, либо (если связей нет) на общую страницу акций.
+function promotionHref(promo) {
+    const productId = pickField(promo, 'FirstProductID', 'first_product_id');
+    const categoryId = pickField(promo, 'FirstCategoryID', 'first_category_id');
+    if (productId) return '/product/' + productId;
+    if (categoryId) return '/catalog?category_id=' + categoryId;
+    return '/promotions';
+}
+
+function renderPromoCard(promo) {
+    const title = escapeHtml(pickField(promo, 'Title', 'promotions_title') || 'Акция');
+    const desc = pickField(promo, 'Description', 'promotions_description');
+    const descHtml = desc ? `<p class="promo-card__desc">${escapeHtml(desc)}</p>` : '';
+    const discount = parseFloat(pickField(promo, 'Discount', 'promotions_discount') || 0);
+    const productCount = parseInt(pickField(promo, 'ProductCount', 'product_count') || 0);
+    const categoryCount = parseInt(pickField(promo, 'CategoryCount', 'category_count') || 0);
+    const href = promotionHref(promo);
+
+    let meta = '';
+    if (productCount > 0) {
+        const word = productCount === 1 ? 'товар'
+            : (productCount < 5 ? 'товара' : 'товаров');
+        meta = `<span class="promo-card__meta">${productCount} ${word}</span>`;
+    } else if (categoryCount > 0) {
+        const word = categoryCount === 1 ? 'категория'
+            : (categoryCount < 5 ? 'категории' : 'категорий');
+        meta = `<span class="promo-card__meta">${categoryCount} ${word}</span>`;
+    }
+    const cta = productCount > 0
+        ? 'К товарам'
+        : (categoryCount > 0 ? 'В категорию' : 'Подробнее');
+
+    return `
+        <a class="promo-card" href="${href}">
+            <div class="promo-card__head">
+                ${discount > 0 ? `<span class="promo-card__percent">−${Math.round(discount)}%</span>` : ''}
+                <span class="promo-card__cta">${cta}
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
+                </span>
+            </div>
+            <div class="promo-card__title">${title}</div>
+            ${descHtml}
+            ${meta ? `<div class="promo-card__foot">${meta}</div>` : ''}
+        </a>`;
+}
+
 async function loadPromotions() {
     const grid = document.getElementById('promotionsGrid');
     if (!grid) return;
@@ -101,22 +149,9 @@ async function loadPromotions() {
         const data = await response.json();
         const promos = (data && data.promotions) || [];
         if (promos.length > 0) {
-            grid.innerHTML = promos.map(promo => {
-                // Поля API: promotions_title, promotions_description, promotions_discount, promotions_image_url
-                const title = escapeHtml(promo.promotions_title || promo.Title || 'Акция');
-                const desc = (promo.promotions_description || promo.Description)
-                    ? escapeHtml(promo.promotions_description || promo.Description)
-                    : '';
-                const discount = parseFloat(promo.promotions_discount || promo.Discount || 0);
-                return `
-                <div class="promo-card">
-                    ${discount > 0 ? `<span class="promo-card__percent">−${Math.round(discount)}%</span>` : ''}
-                    <div class="promo-card__title">${title}</div>
-                    ${desc ? `<p class="promo-card__desc">${desc}</p>` : ''}
-                </div>`;
-            }).join('');
+            grid.innerHTML = promos.map(renderPromoCard).join('');
         } else {
-            grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">🎁</div><h3>Сейчас акций нет</h3><p>Загляните позже — мы готовим новые предложения</p></div>';
+            grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1"><div class="empty-state__icon">🎁</div><h3>Сейчас акций нет</h3><p>Загляните позже — мы готовим новые предложения</p><a href="/catalog" class="btn btn--outline btn--sm">Открыть каталог</a></div>';
         }
     } catch (error) {
         console.error('Error loading promotions:', error);

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -13,8 +14,9 @@ import (
 )
 
 type PromotionHandler struct {
-	promotionQuery db.PromotionQuery
-	logger         *zap.Logger
+	promotionQuery     db.PromotionQuery
+	promotionLinkQuery db.PromotionLinkQuery
+	logger             *zap.Logger
 }
 
 func NewPromotionHandler(promotionQuery db.PromotionQuery, logger *zap.Logger) *PromotionHandler {
@@ -22,6 +24,23 @@ func NewPromotionHandler(promotionQuery db.PromotionQuery, logger *zap.Logger) *
 		promotionQuery: promotionQuery,
 		logger:         logger,
 	}
+}
+
+// SetPromotionLinkQuery опционально подключает репозиторий связей акций.
+// Без него ручки GetActivePromotions / GetAllPromotions отдают только поля самой акции.
+func (h *PromotionHandler) SetPromotionLinkQuery(links db.PromotionLinkQuery) {
+	h.promotionLinkQuery = links
+}
+
+// promotionCard — DTO для публичной выдачи акций: добавляет first_product_id /
+// first_category_id и счётчики связей, чтобы фронт мог построить корректную ссылку
+// на товар/категорию/страницу акций.
+type promotionCard struct {
+	db.Promotion
+	FirstProductID  *int64 `json:"first_product_id,omitempty"`
+	FirstCategoryID *int64 `json:"first_category_id,omitempty"`
+	ProductCount    int    `json:"product_count"`
+	CategoryCount   int    `json:"category_count"`
 }
 
 func (h *PromotionHandler) GetActivePromotions(c *gin.Context) {
@@ -32,7 +51,8 @@ func (h *PromotionHandler) GetActivePromotions(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"promotions": promotions})
+	cards := h.buildCards(c.Request.Context(), promotions)
+	c.JSON(http.StatusOK, gin.H{"promotions": cards})
 }
 
 func (h *PromotionHandler) GetAllPromotions(c *gin.Context) {
@@ -43,7 +63,60 @@ func (h *PromotionHandler) GetAllPromotions(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"promotions": promotions})
+	cards := h.buildCards(c.Request.Context(), promotions)
+	c.JSON(http.StatusOK, gin.H{"promotions": cards})
+}
+
+// buildCards навешивает на каждую акцию first_product_id / first_category_id, чтобы
+// фронт мог построить ссылку «перейти к товару» или «перейти в категорию».
+// Если репозиторий связей не подключён, акции всё равно отдаются (с пустыми доп. полями).
+func (h *PromotionHandler) buildCards(ctx context.Context, promotions []*db.Promotion) []promotionCard {
+	cards := make([]promotionCard, 0, len(promotions))
+	if len(promotions) == 0 {
+		return cards
+	}
+
+	ids := make([]int64, 0, len(promotions))
+	for _, p := range promotions {
+		if p == nil {
+			continue
+		}
+		ids = append(ids, p.ID)
+	}
+
+	var productMap map[int64][]int64
+	var categoryMap map[int64][]int64
+	if h.promotionLinkQuery != nil && len(ids) > 0 {
+		if pm, err := h.promotionLinkQuery.ListProductIDsForPromotions(ctx, ids); err == nil {
+			productMap = pm
+		} else {
+			h.logger.Warn("failed to load promotion product links", zap.Error(err))
+		}
+		if cm, err := h.promotionLinkQuery.ListCategoryIDsForPromotions(ctx, ids); err == nil {
+			categoryMap = cm
+		} else {
+			h.logger.Warn("failed to load promotion category links", zap.Error(err))
+		}
+	}
+
+	for _, p := range promotions {
+		if p == nil {
+			continue
+		}
+		card := promotionCard{Promotion: *p}
+		if plist, ok := productMap[p.ID]; ok && len(plist) > 0 {
+			first := plist[0]
+			card.FirstProductID = &first
+			card.ProductCount = len(plist)
+		}
+		if clist, ok := categoryMap[p.ID]; ok && len(clist) > 0 {
+			first := clist[0]
+			card.FirstCategoryID = &first
+			card.CategoryCount = len(clist)
+		}
+		cards = append(cards, card)
+	}
+	return cards
 }
 
 func (h *PromotionHandler) GetPromotion(c *gin.Context) {

@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ХозДача — товары для дома и дачи</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=19">
-    <link rel="stylesheet" href="/static/css/promotions.css?v=1">
+    <title>{{.title}}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/promotions.css">
 </head>
 <body>
 
@@ -18,9 +18,9 @@
             <span>ХозДача</span>
         </a>
         <nav class="main-nav">
-            <a href="/" class="active">Главная</a>
+            <a href="/">Главная</a>
             <a href="/catalog">Каталог</a>
-            <a href="/promotions">Акции</a>
+            <a href="/promotions" class="active">Акции</a>
             <a href="/cart">Корзина</a>
         </nav>
         <div class="header-actions" id="userArea">
@@ -43,14 +43,19 @@
 <main>
     <div class="container">
 
-        <section class="hero">
-            <div class="hero__content">
-                <span class="hero__eyebrow">ХозДача · с любовью к дому</span>
-                <h1>Всё для дома и дачи — в одном месте</h1>
-                <p>Бронируйте товары, забирайте в удобное время. Без лишних звонков и ожиданий. Актуальные остатки и честные цены каждый день.</p>
-                <div class="hero__actions">
-                    <a href="/catalog" class="btn btn--lg" style="background:#fff;color:var(--c-primary)">Перейти в каталог</a>
-                    <a href="/promotions" class="btn btn--outline btn--lg" style="color:#fff;border-color:rgba(255,255,255,0.6)">Смотреть акции</a>
+        <section class="promo-hero">
+            <div class="promo-hero__bg" aria-hidden="true">
+                <span class="promo-hero__bubble promo-hero__bubble--1">%</span>
+                <span class="promo-hero__bubble promo-hero__bubble--2">%</span>
+                <span class="promo-hero__bubble promo-hero__bubble--3">%</span>
+                <span class="promo-hero__bubble promo-hero__bubble--4">%</span>
+            </div>
+            <div class="promo-hero__content">
+                <span class="promo-hero__eyebrow">Только сейчас</span>
+                <h1>Акции и&nbsp;скидки</h1>
+                <p>Лучшие предложения месяца — на товары и целые категории. Зафиксируйте цену и заберите товар в течение 3 дней.</p>
+                <div class="promo-hero__actions">
+                    <a href="/catalog" class="btn btn--lg">В каталог</a>
                 </div>
             </div>
         </section>
@@ -58,68 +63,33 @@
         <section class="section">
             <div class="section-head">
                 <div>
-                    <h2>Акции и спецпредложения</h2>
-                    <p>Лучшие цены месяца — обновляются автоматически</p>
+                    <h2>Все действующие акции</h2>
+                    <p id="promoCount">Загрузка…</p>
                 </div>
-                <a href="/promotions" class="section-link">Все акции
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                </a>
-            </div>
-            <div class="grid promotions-grid" id="promotionsGrid">
-                <div class="promo-card" style="grid-column:1/-1;text-align:center;color:var(--c-muted)">Загрузка акций…</div>
-            </div>
-        </section>
-
-        <section class="section">
-            <div class="section-head">
-                <div>
-                    <h2>Популярные товары</h2>
-                    <p>Самые бронируемые позиции этой недели</p>
+                <div class="promo-filter" id="promoFilter" style="display:none">
+                    <button class="promo-filter__btn active" data-filter="all">Все</button>
+                    <button class="promo-filter__btn" data-filter="product">На товары</button>
+                    <button class="promo-filter__btn" data-filter="category">На категории</button>
                 </div>
-                <a href="/catalog" class="section-link">Весь каталог
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
-                </a>
             </div>
-            <div class="grid products-grid" id="productsGrid">
-                <div class="product-card" style="grid-column:1/-1;background:transparent;border:none;box-shadow:none;display:block;padding:60px 20px;text-align:center;color:var(--c-muted)">Загрузка товаров…</div>
+            <div class="grid promotions-list" id="promotionsList">
+                <div class="empty-state" style="grid-column:1/-1">
+                    <div class="empty-state__icon">🎁</div>
+                    <p>Загружаем акции…</p>
+                </div>
             </div>
         </section>
 
-        <section class="section">
-            <div class="section-head">
+        <section class="section promo-cta">
+            <div class="promo-cta__card">
+                <div class="promo-cta__icon" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                </div>
                 <div>
-                    <h2>Почему ХозДача</h2>
-                    <p>Простой и честный сервис</p>
+                    <div class="promo-cta__title">Бронь действует 3 дня</div>
+                    <p class="promo-cta__desc">Добавляйте акционные товары в корзину — цена и количество зафиксируются на 72 часа. Без звонков и уточнений.</p>
                 </div>
-            </div>
-            <div class="grid features-grid">
-                <div class="feature">
-                    <div class="feature__icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                    </div>
-                    <div>
-                        <div class="feature__title">Бронь на 72 часа (3 дня)</div>
-                        <p class="feature__desc">Зафиксируйте цену и количество. Заберите, когда удобно — без звонков и уточнений.</p>
-                    </div>
-                </div>
-                <div class="feature">
-                    <div class="feature__icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
-                    </div>
-                    <div>
-                        <div class="feature__title">Самовывоз рядом</div>
-                        <p class="feature__desc">Выбирайте удобное время — мы подготовим заказ и будем ждать в указанный час.</p>
-                    </div>
-                </div>
-                <div class="feature">
-                    <div class="feature__icon">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                    </div>
-                    <div>
-                        <div class="feature__title">Всё по-честному</div>
-                        <p class="feature__desc">Никаких сюрпризов на кассе: цена и наличие в каталоге всегда совпадают с тем, что вы заберёте.</p>
-                    </div>
-                </div>
+                <a href="/catalog" class="btn">Перейти к покупкам</a>
             </div>
         </section>
 
@@ -157,7 +127,7 @@
     </div>
 </footer>
 
-<script src="/static/js/main.js?v=3"></script>
+<script src="/static/js/promotions.js?v=1"></script>
 <script>
 (function() {
     function checkAuthState() {
