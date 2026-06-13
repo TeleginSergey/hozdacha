@@ -301,6 +301,102 @@
   font-weight: 600;
 }
 
+/* ---------- Категории-чипы (фильтр акционных категорий) ---------- */
+.promo-page__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  flex: 1 1 100%;
+  order: 99; /* под основной панелью — отдельной строкой */
+}
+
+.promo-cat-chip {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 8px 14px;
+  border-radius: var(--r-md);
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--c-text);
+  cursor: pointer;
+  transition: all var(--t-fast);
+  text-align: left;
+  line-height: 1.2;
+  min-height: 38px;
+  justify-content: center;
+}
+
+.promo-cat-chip:hover {
+  background: var(--c-bg-soft);
+  border-color: var(--c-border-strong);
+  color: var(--c-text);
+}
+
+.promo-cat-chip.active {
+  background: var(--c-primary);
+  border-color: var(--c-primary);
+  color: #fff;
+}
+
+.promo-cat-chip.active .promo-cat-chip__promo {
+  color: #fff;
+}
+
+.promo-cat-chip.active .promo-cat-chip__title {
+  color: #fff;
+}
+
+.promo-cat-chip.active .promo-cat-chip__tag {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.promo-cat-chip__name {
+  font-weight: 700;
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.promo-cat-chip__promo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--c-muted);
+}
+
+.promo-cat-chip__discount {
+  font-weight: 800;
+  color: var(--c-danger);
+}
+
+.promo-cat-chip__title {
+  font-weight: 600;
+  color: var(--c-text-soft);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.promo-cat-chip__tag {
+  font-size: var(--fs-xs);
+  color: var(--c-muted);
+  background: var(--c-bg-soft);
+  padding: 1px 6px;
+  border-radius: var(--r-pill);
+  text-transform: lowercase;
+}
+
+/* ---------- Промо-чипы (общий список акций) ---------- */
 .promo-chips {
   display: flex;
   flex-wrap: wrap;
@@ -350,6 +446,8 @@
   .promo-page__search { flex: 1 1 auto; }
   .promo-page__select { width: 100%; }
   .promo-filter { align-self: flex-start; }
+  .promo-page__categories { order: 99; }
+  .promo-cat-chip { width: 100%; }
 }
 
 /* ---------- Бесконечная лента акций с товарами ---------- */

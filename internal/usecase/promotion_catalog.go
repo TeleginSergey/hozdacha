@@ -42,23 +42,34 @@ func NewPromotionCatalogUsecase(
 }
 
 type PromotionCatalogCategory struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
+	ID    int64                       `json:"id"`
+	Name  string                      `json:"name"`
+	Promo []PromotionCatalogPromoRef  `json:"promos,omitempty"`
 }
 
-type PromotionCatalogPromo struct {
+// PromotionCatalogPromoRef — короткая ссылка на акцию в карточке категории.
+type PromotionCatalogPromoRef struct {
 	ID       int64   `json:"id"`
 	Title    string  `json:"title"`
 	Discount float64 `json:"discount"`
-	Kind     string  `json:"kind"` // product | category
+	Kind     string  `json:"kind"`
+}
+
+type PromotionCatalogPromo struct {
+	ID          int64   `json:"id"`
+	Title       string  `json:"title"`
+	Discount    float64 `json:"discount"`
+	Kind        string  `json:"kind"` // product | category
+	CategoryIDs []int64 `json:"category_ids,omitempty"`
+	ProductIDs  []int64 `json:"product_ids,omitempty"`
 }
 
 type PromotionCatalogResult struct {
-	Products         []*db.Product
-	Total            int
-	Categories       []PromotionCatalogCategory
-	Promotions       []PromotionCatalogPromo
-	ReservationNote  string
+	Products          []*db.Product
+	Total             int
+	Categories        []PromotionCatalogCategory
+	Promotions        []PromotionCatalogPromo
+	ReservationNote   string
 	ReservationTarget string
 }
 
@@ -101,6 +112,11 @@ func (u *PromotionCatalogUsecase) ListProducts(
 		return res, nil
 	}
 
+	// Категории для фильтра строим из привязок самих активных акций
+	// (а не из категорий товаров), чтобы в UI показывались только категории,
+	// на которые реально есть хотя бы одна акция на странице.
+	res.Categories = u.buildCategoriesFromPromos(ctx, res.Promotions)
+
 	search = strings.TrimSpace(search)
 	filteredIDs, err := u.productRepo.FilterPromotionalIDs(ctx, candidateIDs, search, categoryID)
 	if err != nil {
@@ -116,21 +132,6 @@ func (u *PromotionCatalogUsecase) ListProducts(
 
 	promoProducts := filterProductsWithPromotion(allProducts)
 	promoProducts = filterByPromotionKind(promoProducts, kind)
-
-	// Категории для фильтра — из всего акционного каталога, не только текущей выборки.
-	if catSourceIDs, err := u.productRepo.FilterPromotionalIDs(ctx, candidateIDs, "", nil); err == nil && len(catSourceIDs) > 0 {
-		if catProducts, err := u.productUC.GetProductsByIDs(ctx, catSourceIDs); err == nil {
-			cats, err := u.productRepo.ListCategoriesForProductIDs(ctx, idsOf(filterProductsWithPromotion(catProducts)))
-			if err != nil {
-				u.logger.Warn("failed to load promo categories", zap.Error(err))
-			} else {
-				res.Categories = make([]PromotionCatalogCategory, 0, len(cats))
-				for _, c := range cats {
-					res.Categories = append(res.Categories, PromotionCatalogCategory{ID: c.ID, Name: c.Name})
-				}
-			}
-		}
-	}
 
 	sort.SliceStable(promoProducts, func(i, j int) bool {
 		di := discountOf(promoProducts[i])
@@ -152,6 +153,119 @@ func (u *PromotionCatalogUsecase) ListProducts(
 	res.Products = promoProducts[offset:end]
 
 	return res, nil
+}
+
+// buildCategoriesFromPromos собирает список категорий, к которым привязана хотя бы одна
+// активная акция. Каждой категории выставляются «её» акции (по убыванию скидки) —
+// это нужно фронту, чтобы рядом с названием категории показать «−30% Скидка саженцы».
+func (u *PromotionCatalogUsecase) buildCategoriesFromPromos(
+	ctx context.Context,
+	promos []PromotionCatalogPromo,
+) []PromotionCatalogCategory {
+	if len(promos) == 0 {
+		return nil
+	}
+
+	// Соберём уникальные ID категорий, к которым привязаны акции.
+	catIDSet := make(map[int64]struct{})
+	productCatSet := make(map[int64]struct{})
+
+	for _, p := range promos {
+		for _, cid := range p.CategoryIDs {
+			catIDSet[cid] = struct{}{}
+		}
+		for _, pid := range p.ProductIDs {
+			productCatSet[pid] = struct{}{}
+		}
+	}
+
+	// Для акций, привязанных к товарам (kind=product/mixed), определим категории
+	// этих товаров — чтобы такие акции тоже группировались по категориям.
+	productIDs := make([]int64, 0, len(productCatSet))
+	for pid := range productCatSet {
+		productIDs = append(productIDs, pid)
+	}
+	if len(productIDs) > 0 && u.productRepo != nil {
+		if products, err := u.productUC.GetProductsByIDs(ctx, productIDs); err == nil {
+			for _, p := range products {
+				if p == nil || p.CategoryID == nil {
+					continue
+				}
+				catIDSet[*p.CategoryID] = struct{}{}
+			}
+		}
+	}
+
+	// Загружаем имена категорий одним запросом, чтобы не плодить round-trip'ы.
+	nameByID := make(map[int64]string, len(catIDSet))
+	if u.categories != nil {
+		if all, err := u.categories.ListAll(ctx); err == nil {
+			for _, c := range all {
+				if c != nil {
+					nameByID[c.ID] = c.Name
+				}
+			}
+		}
+	}
+
+	type bucket struct {
+		cat    PromotionCatalogCategory
+		promos []PromotionCatalogPromoRef
+	}
+	order := make([]int64, 0, len(catIDSet))
+	buckets := make(map[int64]*bucket, len(catIDSet))
+
+	getOrCreate := func(cid int64) *bucket {
+		if b, ok := buckets[cid]; ok {
+			return b
+		}
+		b := &bucket{cat: PromotionCatalogCategory{ID: cid, Name: nameByID[cid]}}
+		buckets[cid] = b
+		order = append(order, cid)
+		return b
+	}
+
+	for _, p := range promos {
+		ref := PromotionCatalogPromoRef{
+			ID:       p.ID,
+			Title:    p.Title,
+			Discount: p.Discount,
+			Kind:     p.Kind,
+		}
+		// Акция привязана к категориям напрямую — кладём в каждую.
+		for _, cid := range p.CategoryIDs {
+			getOrCreate(cid).promos = append(getOrCreate(cid).promos, ref)
+		}
+		// Акция привязана к товарам — раскладываем по категориям этих товаров.
+		if len(p.ProductIDs) > 0 {
+			if products, err := u.productUC.GetProductsByIDs(ctx, p.ProductIDs); err == nil {
+				for _, prod := range products {
+					if prod == nil || prod.CategoryID == nil {
+						continue
+					}
+					getOrCreate(*prod.CategoryID).promos = append(getOrCreate(*prod.CategoryID).promos, ref)
+				}
+			}
+		}
+	}
+
+	out := make([]PromotionCatalogCategory, 0, len(order))
+	for _, cid := range order {
+		b := buckets[cid]
+		bcopy := b.cat
+		sort.SliceStable(b.promos, func(i, j int) bool {
+			if b.promos[i].Discount != b.promos[j].Discount {
+				return b.promos[i].Discount > b.promos[j].Discount
+			}
+			return b.promos[i].Title < b.promos[j].Title
+		})
+		bcopy.Promo = b.promos
+		out = append(out, bcopy)
+	}
+	sort.SliceStable(out, func(i, j int) bool {
+		return out[i].Name < out[j].Name
+	})
+	return out
 }
 
 func buildPromoSummaries(ctx context.Context, links db.PromotionLinkQuery, promotions []*db.Promotion) []PromotionCatalogPromo {
@@ -176,10 +290,12 @@ func buildPromoSummaries(ctx context.Context, links db.PromotionLinkQuery, promo
 			kind = "mixed"
 		}
 		out = append(out, PromotionCatalogPromo{
-			ID:       p.ID,
-			Title:    p.Title,
-			Discount: p.Discount,
-			Kind:     kind,
+			ID:          p.ID,
+			Title:       p.Title,
+			Discount:    p.Discount,
+			Kind:        kind,
+			CategoryIDs: categoryMap[p.ID],
+			ProductIDs:  productMap[p.ID],
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool {

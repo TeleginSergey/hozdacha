@@ -61,7 +61,7 @@
 
         if (data && data.categories) {
             state.categories = data.categories;
-            populateCategoryFilter();
+            renderCategoryChips();
         }
         if (data && data.promotions) {
             state.promotions = data.promotions;
@@ -69,16 +69,36 @@
         }
     }
 
-    function populateCategoryFilter() {
-        const select = document.getElementById('promoCategoryFilter');
-        if (!select) return;
+    function renderCategoryChips() {
+        const wrap = document.getElementById('promoCategoryChips');
+        if (!wrap) return;
         const current = state.categoryId;
-        let html = '<option value="">Все категории</option>';
-        state.categories.forEach(function(cat) {
-            const sel = String(cat.id) === current ? ' selected' : '';
-            html += '<option value="' + cat.id + '"' + sel + '>' + escapeHtml(cat.name) + '</option>';
-        });
-        select.innerHTML = html;
+
+        // Базовая кнопка «Все категории».
+        const allBtn = '<button class="promo-cat-chip' + (current === '' ? ' active' : '') + '"'
+            + ' type="button" data-category-id="">Все категории</button>';
+
+        // Каждая категория с подсказкой «−30% · Скидка саженцы · Категория» из привязанных акций.
+        const catButtons = state.categories.map(function(cat) {
+            const sel = String(cat.id) === current ? ' active' : '';
+            const promos = Array.isArray(cat.promos) ? cat.promos : [];
+            let promoLine = '';
+            if (promos.length > 0) {
+                const top = promos[0];
+                const kindLabel = top.kind === 'category' ? 'Категория' : (top.kind === 'mixed' ? 'Смешанная' : 'Товары');
+                promoLine = '<span class="promo-cat-chip__promo">'
+                    + '<span class="promo-cat-chip__discount">−' + Math.round(top.discount || 0) + '%</span>'
+                    + '<span class="promo-cat-chip__title">' + escapeHtml(top.title || 'Акция') + '</span>'
+                    + '<span class="promo-cat-chip__tag">' + kindLabel + '</span>'
+                    + '</span>';
+            }
+            return '<button class="promo-cat-chip' + sel + '" type="button" data-category-id="' + cat.id + '">'
+                + '<span class="promo-cat-chip__name">' + escapeHtml(cat.name) + '</span>'
+                + promoLine
+                + '</button>';
+        }).join('');
+
+        wrap.innerHTML = allBtn + catButtons;
     }
 
     function renderPromoChips() {
@@ -167,9 +187,20 @@
 
     function applyFilters() {
         const searchInput = document.getElementById('promoSearchInput');
-        const categorySelect = document.getElementById('promoCategoryFilter');
         state.query = (searchInput && searchInput.value || '').trim();
-        state.categoryId = (categorySelect && categorySelect.value) || '';
+        resetList();
+        loadProducts(false);
+    }
+
+    function setCategory(catId) {
+        state.categoryId = catId != null ? String(catId) : '';
+        // Подсветка активной кнопки.
+        const wrap = document.getElementById('promoCategoryChips');
+        if (wrap) {
+            wrap.querySelectorAll('.promo-cat-chip').forEach(function(btn) {
+                btn.classList.toggle('active', (btn.dataset.categoryId || '') === state.categoryId);
+            });
+        }
         resetList();
         loadProducts(false);
     }
@@ -177,7 +208,7 @@
     function setupFilters() {
         const searchBtn = document.getElementById('promoSearchBtn');
         const searchInput = document.getElementById('promoSearchInput');
-        const categorySelect = document.getElementById('promoCategoryFilter');
+        const categoryChips = document.getElementById('promoCategoryChips');
         const kindFilter = document.getElementById('promoKindFilter');
         const resetBtn = document.getElementById('promoResetBtn');
 
@@ -187,8 +218,12 @@
                 if (e.key === 'Enter') applyFilters();
             });
         }
-        if (categorySelect) {
-            categorySelect.addEventListener('change', applyFilters);
+        if (categoryChips) {
+            categoryChips.addEventListener('click', function(e) {
+                const btn = e.target.closest('.promo-cat-chip');
+                if (!btn) return;
+                setCategory(btn.dataset.categoryId || '');
+            });
         }
         if (kindFilter) {
             kindFilter.querySelectorAll('.promo-filter__btn').forEach(function(btn) {
@@ -206,9 +241,9 @@
         if (resetBtn) {
             resetBtn.addEventListener('click', function() {
                 if (searchInput) searchInput.value = '';
-                if (categorySelect) categorySelect.value = '';
                 state.query = '';
                 state.categoryId = '';
+                setCategory('');
                 state.kind = 'all';
                 if (kindFilter) {
                     kindFilter.querySelectorAll('.promo-filter__btn').forEach(function(b) {

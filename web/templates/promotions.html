@@ -67,9 +67,9 @@
                     <input type="search" id="promoSearchInput" placeholder="Поиск товара в акциях…" autocomplete="off">
                     <button class="btn btn--sm" id="promoSearchBtn" type="button">Найти</button>
                 </div>
-                <select id="promoCategoryFilter" class="promo-page__select" aria-label="Категория">
-                    <option value="">Все категории</option>
-                </select>
+                <div class="promo-page__categories" id="promoCategoryChips" aria-label="Категории акций" role="group">
+                    <button class="promo-cat-chip active" type="button" data-category-id="">Все категории</button>
+                </div>
                 <div class="promo-filter" id="promoKindFilter">
                     <button class="promo-filter__btn active" type="button" data-kind="all">Все</button>
                     <button class="promo-filter__btn" type="button" data-kind="product">На товары</button>
