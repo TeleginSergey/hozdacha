@@ -109,8 +109,10 @@ func NewApp() (*App, error) {
 	userUC := usecase.NewUserUsecase(userRepo, logger, cfg.JWT.Secret)
 	productUC := usecase.NewProductUsecase(productRepo, stockCache, cfg.Moysklad.StockBuffer, logger)
 	categoryRepoForPricer := &db.CategoryQuery{DB: database}
-	productUC.SetPromotionPricer(usecase.NewPromotionPricer(promotionLinkRepo, categoryRepoForPricer, logger))
+	promotionPricer := usecase.NewPromotionPricer(promotionLinkRepo, categoryRepoForPricer, logger)
+	productUC.SetPromotionPricer(promotionPricer)
 	orderUC := usecase.NewOrderUsecase(orderRepo, productRepo, stockCache, moyskladClient, orderEventRepo, logger)
+	orderUC.SetPromotionPricer(promotionPricer)
 	categoryRepo := &db.CategoryQuery{DB: database}
 	moyskladSyncService := services.NewMoyskladSyncService(
 		moyskladClient,

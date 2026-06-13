@@ -57,7 +57,19 @@ func SetupRouter(
 	// Статические файлы
 	router.Static("/static", "./web/static")
 	router.SetFuncMap(templateFuncs)
-	router.LoadHTMLGlob("web/templates/*")
+	// Подключаем страничные шаблоны + partials (общий хедер и т.п.).
+	// Чтобы partials/header.html был доступен через {{ template "header.html" . }}
+	// внутри страничных шаблонов, оба глоба регистрируются на одном наборе шаблонов.
+	pageGlob := template.New("pages").Funcs(templateFuncs)
+	pageGlob, errGlob := pageGlob.ParseGlob("web/templates/*.html")
+	if errGlob != nil {
+		logger.Fatal("failed to parse page templates", zap.Error(errGlob))
+	}
+	pageGlob, errGlob = pageGlob.ParseGlob("web/templates/**/*.html")
+	if errGlob != nil {
+		logger.Fatal("failed to parse partial templates", zap.Error(errGlob))
+	}
+	router.SetHTMLTemplate(pageGlob)
 
 	// Главная страница
 	router.GET("/", func(c *gin.Context) {

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"fmt"
 	"math"
 	"sync"
 	"time"
@@ -213,4 +214,27 @@ func (p *PromotionPricer) InvalidateCategoryCache() {
 	p.ancestors = nil
 	p.ancestorsExp = time.Time{}
 	p.mu.Unlock()
+}
+
+// CheckDayPromotionWindow возвращает ошибку если хотя бы один товар из списка
+// имеет активную «дневную» акцию (kind=day), которая уже не входит в текущее
+// окно бронирования. Для ненастроенного pricer ошибки не возвращает.
+func (p *PromotionPricer) CheckDayPromotionWindow(ctx context.Context, productIDs []int64, now time.Time) error {
+	if p == nil || len(productIDs) == 0 {
+		return nil
+	}
+	promos, err := p.links.BestActiveProductPromotions(ctx, productIDs)
+	if err != nil {
+		return nil // не блокируем заказ при ошибке запроса акций
+	}
+	for _, promo := range promos {
+		if promo == nil || promo.Kind != db.PromotionKindDay {
+			continue
+		}
+		if !services.PromotionAppliesForReservation(promo, now) {
+			_, note := services.ReservationTarget(now)
+			return fmt.Errorf("promotion_window_closed: %s", note)
+		}
+	}
+	return nil
 }
