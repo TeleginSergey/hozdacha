@@ -34,6 +34,9 @@ const (
 	//   "manual"  — создана вручную в админке, без автоматического истечения;
 	//   "permanent" — бессрочная, отключается только руками.
 	PromotionsKind = "promotions_kind"
+	PromotionsValidFrom  = "promotions_valid_from"
+	PromotionsValidUntil = "promotions_valid_until"
+	PromotionsLocked     = "promotions_locked"
 )
 
 const (
@@ -53,6 +56,9 @@ type Promotion struct {
 	EndDate     *time.Time `db:"promotions_end_date" insert:"promotions_end_date" update:"promotions_end_date"`
 	MoyskladID  *string    `db:"promotions_moysklad_id" insert:"promotions_moysklad_id" update:"promotions_moysklad_id"`
 	Kind        string     `db:"promotions_kind" insert:"promotions_kind" update:"promotions_kind"`
+	ValidFrom   *time.Time `db:"promotions_valid_from" insert:"promotions_valid_from" update:"promotions_valid_from"`
+	ValidUntil  *time.Time `db:"promotions_valid_until" insert:"promotions_valid_until" update:"promotions_valid_until"`
+	Locked      bool       `db:"promotions_locked" insert:"promotions_locked" update:"promotions_locked"`
 	CreatedAt   time.Time  `db:"promotions_created_at"`
 	UpdatedAt   time.Time  `db:"promotions_updated_at" update:"promotions_updated_at"`
 }

@@ -39,6 +39,7 @@
         const discount = parseFloat(pickField(promo, 'Discount', 'promotions_discount') || 0);
         const productCount = parseInt(pickField(promo, 'ProductCount', 'product_count') || 0);
         const categoryCount = parseInt(pickField(promo, 'CategoryCount', 'category_count') || 0);
+        const note = pickField(promo, 'ReservationNote', 'reservation_note') || '';
         const kind = promotionKind(promo);
         const href = promotionHref(promo);
         const ctaLabel = productCount > 0
@@ -54,6 +55,7 @@
                 </div>
                 <h3 class="promo-list-card__title">${title}</h3>
                 ${desc ? `<p class="promo-list-card__desc">${desc}</p>` : '<p class="promo-list-card__desc promo-list-card__desc--empty">&nbsp;</p>'}
+                ${note ? `<div class="promo-list-card__note">${escapeHtml(note)}</div>` : ''}
                 <div class="promo-list-card__foot">
                     ${productCount > 0 ? `<span class="promo-list-card__meta">${productCount} ${productCount === 1 ? 'товар' : (productCount < 5 ? 'товара' : 'товаров')}</span>` : ''}
                     ${categoryCount > 0 ? `<span class="promo-list-card__meta">${categoryCount} ${categoryCount === 1 ? 'категория' : (categoryCount < 5 ? 'категории' : 'категорий')}</span>` : ''}
