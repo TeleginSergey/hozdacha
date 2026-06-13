@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Контакты — ХозДача · Мелкооптовый склад в Сергаче</title>
+    <link rel="stylesheet" href="/static/css/style.css?v=19">
+    <style>
+        .contacts-hero {
+            background: linear-gradient(135deg, var(--c-primary), #2f8f4e);
+            color: #fff;
+            border-radius: 20px;
+            padding: 44px 36px;
+            margin-bottom: 28px;
+        }
+        .contacts-hero h1 { margin: 0 0 10px; font-size: clamp(26px, 4vw, 38px); }
+        .contacts-hero p { margin: 0; max-width: 640px; opacity: .92; line-height: 1.55; }
+        .contacts-hero__badge {
+            display: inline-block;
+            font-size: 13px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+            background: rgba(255,255,255,.16);
+            padding: 6px 14px;
+            border-radius: 999px;
+            margin-bottom: 16px;
+        }
+
+        .contacts-grid {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+            gap: 24px;
+            align-items: stretch;
+        }
+        @media (max-width: 860px) { .contacts-grid { grid-template-columns: 1fr; } }
+
+        .contact-card {
+            background: #fff;
+            border: 1px solid var(--c-border, #e6e6e6);
+            border-radius: 18px;
+            padding: 28px;
+            box-shadow: 0 6px 24px rgba(0,0,0,.04);
+        }
+        .contact-block { display: flex; gap: 14px; padding: 16px 0; border-bottom: 1px solid #f0f0f0; }
+        .contact-block:last-child { border-bottom: none; }
+        .contact-block__icon {
+            flex: 0 0 42px; width: 42px; height: 42px;
+            border-radius: 12px;
+            background: rgba(46, 138, 78, .1);
+            color: var(--c-primary);
+            display: grid; place-items: center;
+        }
+        .contact-block__label { font-size: 13px; color: var(--c-muted); margin: 0 0 4px; }
+        .contact-block__value { font-size: 17px; font-weight: 600; margin: 0; line-height: 1.4; }
+        .contact-block__value a { color: inherit; text-decoration: none; }
+        .contact-block__value a:hover { color: var(--c-primary); }
+        .contact-sub { font-size: 14px; color: var(--c-muted); margin: 4px 0 0; }
+
+        .map-card {
+            border-radius: 18px;
+            overflow: hidden;
+            border: 1px solid var(--c-border, #e6e6e6);
+            box-shadow: 0 6px 24px rgba(0,0,0,.04);
+            min-height: 360px;
+            display: flex;
+            flex-direction: column;
+            background: #fff;
+        }
+        .map-card iframe { width: 100%; height: 100%; min-height: 360px; border: 0; flex: 1; }
+        .map-card__foot {
+            padding: 14px 18px;
+            display: flex; justify-content: space-between; align-items: center; gap: 12px;
+            flex-wrap: wrap;
+            border-top: 1px solid #f0f0f0;
+        }
+        .map-card__foot span { font-size: 14px; color: var(--c-muted); }
+
+        .tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+        .tag {
+            font-size: 13px; font-weight: 500;
+            background: rgba(46, 138, 78, .08);
+            color: var(--c-primary);
+            padding: 6px 12px; border-radius: 999px;
+        }
+
+        .social-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 10px; }
+        .social-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 9px 16px; border-radius: 12px;
+            font-weight: 600; font-size: 14px; text-decoration: none; color: #fff;
+        }
+        .social-btn--vk { background: #0077ff; }
+        .social-btn--ok { background: #ee8208; }
+        .social-btn svg { width: 18px; height: 18px; }
+
+        .route-card {
+            background: #fff;
+            border: 1px solid var(--c-border, #e6e6e6);
+            border-radius: 18px;
+            padding: 26px 28px;
+            margin-top: 24px;
+        }
+        .route-steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; margin-top: 14px; }
+        .route-step { display: flex; gap: 12px; align-items: flex-start; }
+        .route-step__num {
+            flex: 0 0 30px; width: 30px; height: 30px; border-radius: 50%;
+            background: var(--c-primary); color: #fff; font-weight: 700;
+            display: grid; place-items: center; font-size: 14px;
+        }
+        .route-step p { margin: 0; font-size: 14px; line-height: 1.45; }
+        .route-step strong { display: block; margin-bottom: 2px; }
+    </style>
+</head>
+<body>
+
+{{ template "header.html" . }}
+
+<main>
+    <div class="container" style="padding-top:28px;padding-bottom:48px">
+
+        <section class="contacts-hero">
+            <span class="contacts-hero__badge">Мелкооптовый склад · г. Сергач</span>
+            <h1>Как нас найти</h1>
+            <p>Хозтовары, бытовая химия, товары для дома, электрика и всё для сада и огорода —
+               под одной крышей. Приезжайте за покупками или бронируйте онлайн с самовывозом.</p>
+        </section>
+
+        <div class="contacts-grid">
+
+            <!-- Левая колонка: реквизиты -->
+            <div class="contact-card">
+                <div class="contact-block">
+                    <span class="contact-block__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                    </span>
+                    <div>
+                        <p class="contact-block__label">Адрес</p>
+                        <p class="contact-block__value">г. Сергач, ул. Станционная, 17</p>
+                        <p class="contact-sub">Нижегородская область · рядом с вокзалом, кафе «Уют» и АЗС</p>
+                    </div>
+                </div>
+
+                <div class="contact-block">
+                    <span class="contact-block__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                    </span>
+                    <div>
+                        <p class="contact-block__label">Телефоны</p>
+                        <p class="contact-block__value"><a href="tel:+79601770270">8 960 177 02 70</a></p>
+                        <p class="contact-block__value" style="margin-top:4px"><a href="tel:+79506092702">8 950 609 27 02</a></p>
+                    </div>
+                </div>
+
+                <div class="contact-block">
+                    <span class="contact-block__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </span>
+                    <div>
+                        <p class="contact-block__label">Время работы</p>
+                        <p class="contact-block__value">Будни — до 18:00 · Выходные — до 16:00</p>
+                        <p class="contact-sub">Онлайн-брони акционных товаров принимаются в эти же часы.</p>
+                    </div>
+                </div>
+
+                <div class="contact-block">
+                    <span class="contact-block__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-7L9.5 4H4a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"></path></svg>
+                    </span>
+                    <div>
+                        <p class="contact-block__label">Что у нас есть</p>
+                        <div class="tags">
+                            <span class="tag">Хозтовары</span>
+                            <span class="tag">Бытовая химия</span>
+                            <span class="tag">Товары для дома</span>
+                            <span class="tag">Электрика</span>
+                            <span class="tag">Сад и огород</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="contact-block">
+                    <span class="contact-block__icon">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+                    </span>
+                    <div>
+                        <p class="contact-block__label">Мы в соцсетях</p>
+                        <div class="social-row">
+                            <a class="social-btn social-btn--vk" href="https://vk.com/search?c%5Bq%5D=%D0%9C%D0%B5%D0%BB%D0%BA%D0%BE%D0%BE%D0%BF%D1%82%D0%BE%D0%B2%D1%8B%D0%B9%20%D0%A1%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%A1%D0%B5%D1%80%D0%B3%D0%B0%D1%87&c%5Bsection%5D=communities" target="_blank" rel="noopener">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.8 17.3c-5.5 0-8.6-3.8-8.8-10h2.8c.1 4.6 2.1 6.5 3.7 6.9V7.3h2.6v4c1.6-.2 3.2-2 3.8-4h2.6c-.4 2.5-2.2 4.3-3.5 5 1.3.6 3.3 2.2 4.1 5h-2.9c-.6-1.9-2.1-3.4-4.1-3.6v3.6z"/></svg>
+                                ВКонтакте
+                            </a>
+                            <a class="social-btn social-btn--ok" href="https://ok.ru/dk?st.cmd=searchGlobal&st.query=%D0%9C%D0%B5%D0%BB%D0%BA%D0%BE%D0%BE%D0%BF%D1%82%D0%BE%D0%B2%D1%8B%D0%B9%20%D0%A1%D0%BA%D0%BB%D0%B0%D0%B4%20%D0%A1%D0%B5%D1%80%D0%B3%D0%B0%D1%87" target="_blank" rel="noopener">
+                                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a4.2 4.2 0 1 0 0 8.4A4.2 4.2 0 0 0 12 2zm0 5.8a1.6 1.6 0 1 1 0-3.2 1.6 1.6 0 0 1 0 3.2zm2.7 5.7a8 8 0 0 1-2 .8l1.9 1.9a1.3 1.3 0 0 1-1.8 1.8L12 16l-1.8 1.8A1.3 1.3 0 0 1 8.4 16l1.9-1.9a8 8 0 0 1-2-.8 1.3 1.3 0 1 1 1.4-2.2 5 5 0 0 0 4.6 0 1.3 1.3 0 1 1 1.4 2.2z"/></svg>
+                                Одноклассники
+                            </a>
+                        </div>
+                        <p class="contact-sub" style="margin-top:8px">Группа «Мелкооптовый Склад г. Сергач»</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Правая колонка: карта -->
+            <div class="map-card">
+                <iframe
+                    src="https://yandex.ru/map-widget/v1/?mode=search&text=%D0%A1%D0%B5%D1%80%D0%B3%D0%B0%D1%87%2C%20%D1%83%D0%BB.%20%D0%A1%D1%82%D0%B0%D0%BD%D1%86%D0%B8%D0%BE%D0%BD%D0%BD%D0%B0%D1%8F%2C%2017&z=16"
+                    allowfullscreen="true"
+                    loading="lazy"
+                    title="Карта: г. Сергач, ул. Станционная, 17"></iframe>
+                <div class="map-card__foot">
+                    <span>Откройте маршрут в приложении карт</span>
+                    <a class="btn btn--sm" href="https://yandex.ru/maps/?text=%D0%A1%D0%B5%D1%80%D0%B3%D0%B0%D1%87%2C%20%D1%83%D0%BB.%20%D0%A1%D1%82%D0%B0%D0%BD%D1%86%D0%B8%D0%BE%D0%BD%D0%BD%D0%B0%D1%8F%2C%2017" target="_blank" rel="noopener">Построить маршрут</a>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Как добраться -->
+        <div class="route-card">
+            <h2 style="margin:0">Ориентиры</h2>
+            <p class="contact-sub">Нас легко найти по дороге от вокзала</p>
+            <div class="route-steps">
+                <div class="route-step">
+                    <span class="route-step__num">1</span>
+                    <p><strong>Ж/д вокзал</strong>От вокзала двигайтесь по ул. Станционной.</p>
+                </div>
+                <div class="route-step">
+                    <span class="route-step__num">2</span>
+                    <p><strong>Кафе «Уют»</strong>Ориентир по пути — следуйте дальше прямо.</p>
+                </div>
+                <div class="route-step">
+                    <span class="route-step__num">3</span>
+                    <p><strong>АЗС</strong>Сразу за заправкой — наш мелкооптовый склад.</p>
+                </div>
+                <div class="route-step">
+                    <span class="route-step__num">4</span>
+                    <p><strong>Станционная, 17</strong>Вход со стороны улицы. Добро пожаловать!</p>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</main>
+
+<footer class="site-footer">
+    <div class="container">
+        <div class="site-footer__grid">
+            <div class="site-footer__about">
+                <a href="/" class="brand">
+                    <span class="brand__mark" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    </span>
+                    <span>ХозДача</span>
+                </a>
+                <p>Товары для дома и дачи с бронированием и самовывозом. Синхронизация с МойСклад в реальном времени.</p>
+            </div>
+            <div>
+                <h4>Покупателям</h4>
+                <a href="/catalog">Каталог</a>
+                <a href="/promotions">Акции</a>
+                <a href="/contacts">Контакты</a>
+                <a href="/cart">Корзина</a>
+                <a href="/orders">Мои заказы</a>
+                <a href="/profile">Личный кабинет</a>
+            </div>
+            <div>
+                <h4>Помощь</h4>
+                <a href="/login">Войти</a>
+                <a href="/register">Регистрация</a>
+                <a href="/forgot-password">Забыли пароль</a>
+            </div>
+        </div>
+        <div class="site-footer__bottom">© <span class="footer-year"></span> ХозДача. Все права защищены.</div>
+    </div>
+</footer>
+
+<script src="/static/js/header.js?v=2"></script>
+<script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
+</body>
+</html>

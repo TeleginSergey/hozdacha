@@ -92,6 +92,13 @@ func SetupRouter(
 		})
 	})
 
+	// Контакты и как нас найти.
+	router.GET("/contacts", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "contacts.html", gin.H{
+			"title": "Контакты — ХозДача",
+		})
+	})
+
 	// Детальная страница товара (используем общую функцию)
 	router.GET("/product/:id", func(c *gin.Context) {
 		productHandler.RenderProductPage(c)

@@ -76,7 +76,9 @@
         }
     }
 
-    const productState = { offset: 0, hasMore: true, loading: false, limit: 20 };
+    // На главной — витрина «зазывалка»: ограниченная подборка популярных товаров
+    // без бесконечной подгрузки (полный список — в /catalog).
+    const productState = { offset: 0, hasMore: true, loading: false, limit: 8 };
 
     async function loadProducts(append) {
         const grid = document.getElementById('productsGrid');
@@ -131,13 +133,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
         loadPromotions();
-        loadProducts(false).then(function() {
-            const sentinel = document.getElementById('homeProductsSentinel');
-            if (window.InfiniteScroll && sentinel) {
-                window.InfiniteScroll.observe(sentinel, function() {
-                    return loadProducts(true);
-                });
-            }
-        });
+        // Только первая страница — без подписки на бесконечную прокрутку.
+        loadProducts(false);
     });
 })();
