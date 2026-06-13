@@ -8,29 +8,7 @@
 </head>
 <body>
 
-<header class="site-header">
-    <div class="container site-header__inner">
-        <a href="/" class="brand">
-            <span class="brand__mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
-            <span>ХозДача</span>
-        </a>
-        <nav class="main-nav">
-            <a href="/">Главная</a>
-            <a href="/catalog">Каталог</a>
-            <a href="/profile" class="active">Кабинет</a>
-        </nav>
-        <div class="header-actions" id="userArea">
-            <div class="auth-buttons" id="authButtons" style="display:none">
-                <a href="/register" class="btn btn--outline btn--sm">Регистрация</a>
-                <a href="/login" class="btn btn--sm">Вход</a>
-            </div>
-            <a href="/profile" id="userMenu" class="user-menu">
-                <span class="user-avatar" id="avatarLetter">U</span>
-                <span class="user-greeting" id="userGreeting"></span>
-            </a>
-        </div>
-    </div>
-</header>
+{{ template "header.html" . }}
 
 <main>
     <div class="container" style="max-width:800px">
@@ -77,6 +55,7 @@
     </div>
 </footer>
 
+<script src="/static/js/header.js?v=1"></script>
 <script>
 const token = localStorage.getItem('auth_token');
 if (!token) location.href = '/login';

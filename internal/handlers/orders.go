@@ -102,6 +102,18 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 			})
 			return
 		}
+		// Окно акций закрыто — дневная акция уже не действует.
+		if strings.HasPrefix(err.Error(), "promotion_window_closed:") {
+			msg := strings.TrimPrefix(err.Error(), "promotion_window_closed: ")
+			h.logger.Info("Order rejected: promotion window closed",
+				zap.Int64("user_id", userID.(int64)),
+				zap.Error(err))
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "promotion_window_closed",
+				"message": "Окно акции закрыто. " + msg + ". Акционные товары можно бронировать только в рабочее время: по будням до 18:00, по выходным до 16:00.",
+			})
+			return
+		}
 		// МойСклад не настроен — не создаём заказ вообще.
 		if strings.Contains(err.Error(), "moysklad integration is not fully configured") {
 			h.logger.Error("Order rejected: Moysklad not configured", zap.Error(err))

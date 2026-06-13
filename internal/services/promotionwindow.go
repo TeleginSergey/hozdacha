@@ -32,6 +32,12 @@ func isBeforeReservationCutoff(msk time.Time) bool {
 	return msk.Before(cutoffTime)
 }
 
+// IsOpenForReservationDay — «магазин открыт в выбранный день для самовывоза».
+// Возвращает false только для 1 и 2 января (праздничные дни).
+func IsOpenForReservationDay(d time.Time) bool {
+	return reservationCutoffHour(d) >= 0
+}
+
 // ReservationTarget определяет, на какую дату (по Москве) сейчас нужно
 // рекламировать акцию как «актуальную для брони»:
 //   - до 18:00 (будни) / 16:00 (выходные) → "today"
@@ -104,6 +110,14 @@ func FilterPromotionsForReservation(promotions []*db.Promotion, now time.Time) [
 		}
 	}
 	return out
+}
+
+// IsReservationWindowOpen — открыто ли окно бронирования в текущий момент.
+// Используется в CreateOrder для блокировки заказа акционных товаров в нерабочее время
+// (после закрытия магазина «сегодняшняя» акция перестаёт быть актуальной).
+// Возвращает true, если сейчас (по Москве) ещё не наступил час закрытия.
+func IsReservationWindowOpen(now time.Time) bool {
+	return isBeforeReservationCutoff(now.In(moscowLocation))
 }
 
 func sameMoscowDay(a, b time.Time) bool {
