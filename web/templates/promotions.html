@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}}</title>
     <link rel="stylesheet" href="/static/css/style.css?v=20">
-    <link rel="stylesheet" href="/static/css/promotions.css?v=2">
+    <link rel="stylesheet" href="/static/css/promotions.css?v=3">
 </head>
 <body>
 
@@ -38,8 +38,19 @@
                     <input type="search" id="promoSearchInput" placeholder="Поиск товара в акциях…" autocomplete="off">
                     <button class="btn btn--sm" id="promoSearchBtn" type="button">Найти</button>
                 </div>
-                <div class="promo-page__categories" id="promoCategoryChips" aria-label="Категории акций" role="group">
-                    <button class="promo-cat-chip active" type="button" data-category-id="">Все категории</button>
+                <div class="promo-catselect" id="promoCatSelect">
+                    <button class="promo-catselect__trigger" id="promoCatTrigger" type="button" aria-haspopup="listbox" aria-expanded="false">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                        <span class="promo-catselect__label" id="promoCatLabel">Все категории</span>
+                        <svg class="promo-catselect__caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                    </button>
+                    <div class="promo-catselect__panel" id="promoCatPanel" hidden>
+                        <div class="promo-catselect__search">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="search" id="promoCatSearch" placeholder="Найти категорию…" autocomplete="off">
+                        </div>
+                        <div class="promo-catselect__list" id="promoCatList" role="listbox" aria-label="Категории акций"></div>
+                    </div>
                 </div>
                 <div class="promo-filter" id="promoKindFilter">
                     <button class="promo-filter__btn active" type="button" data-kind="all">Все</button>
@@ -93,12 +104,13 @@
                     </span>
                     <span>ХозДача</span>
                 </a>
-                <p>Товары для дома и дачи с бронированием и самовывозом. Синхронизация с МойСклад в реальном времени.</p>
+                <p>Хозтовары, бытовая химия, товары для дома, электрика и всё для сада и огорода — под одной крышей. Приезжайте за покупками или бронируйте онлайн с самовывозом.</p>
             </div>
             <div>
                 <h4>Покупателям</h4>
                 <a href="/catalog">Каталог</a>
                 <a href="/promotions">Акции</a>
+                <a href="/contacts">Контакты</a>
                 <a href="/cart">Корзина</a>
                 <a href="/orders">Мои заказы</a>
                 <a href="/profile">Личный кабинет</a>
@@ -117,7 +129,7 @@
 <script src="/static/js/header.js?v=2"></script>
 <script src="/static/js/infinite-scroll.js?v=1"></script>
 <script src="/static/js/product-card.js?v=1"></script>
-<script src="/static/js/promotions.js?v=3"></script>
+<script src="/static/js/promotions.js?v=4"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
