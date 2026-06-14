@@ -414,11 +414,6 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   z-index: 99;
   display: none;
 }
-@media (max-width: 900px) {
-  .catalog-sidebar:not(.collapsed) ~ .sidebar-overlay { display: block; }
-  .catalog-sidebar { position: fixed; top: 0; left: 0; z-index: 100; height: 100vh; width: 280px; max-width: 85vw; transform: translateX(-100%); transition: transform 0.25s; }
-  .catalog-sidebar:not(.collapsed) { transform: translateX(0); }
-}
 
 .catalog-sidebar {
   background: var(--c-card);
@@ -429,6 +424,29 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   top: 88px;
   max-height: calc(100vh - 110px);
   overflow-y: auto;
+}
+
+/* Мобильный: сайдбар — выезжающая слева панель.
+   Важно: медиа-запрос идёт ПОСЛЕ базового .catalog-sidebar, иначе
+   position:sticky перебивал бы position:fixed и панель резервировала бы
+   высоту в потоке (тело каталога «уезжало» вниз). */
+@media (max-width: 900px) {
+  .catalog-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    height: 100vh;
+    height: 100dvh;
+    width: 280px;
+    max-width: 85vw;
+    max-height: none;
+    border-radius: 0;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+  }
+  .catalog-sidebar:not(.collapsed) { transform: translateX(0); }
+  .catalog-sidebar:not(.collapsed) ~ .sidebar-overlay { display: block; }
 }
 .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-3); }
 .sidebar-header h3 { font-size: var(--fs-md); font-weight: 700; }
@@ -737,6 +755,33 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   padding: 2px 9px;
   font-size: var(--fs-xs);
   font-weight: 700;
+}
+
+/* Плавающая кнопка «Категории» — статично закреплена на телефоне,
+   открывает/закрывает выезжающую слева панель категорий. */
+.cat-fab { display: none; }
+@media (max-width: 900px) {
+  .cat-fab {
+    position: fixed;
+    bottom: 24px;
+    left: 24px;
+    z-index: 40;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 18px;
+    background: var(--c-primary);
+    color: #fff;
+    border: none;
+    border-radius: var(--r-pill);
+    font-weight: 600;
+    font-size: var(--fs-sm);
+    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+    transition: transform var(--t-fast);
+  }
+  .cat-fab:active { transform: scale(0.96); }
+  .cat-fab svg { width: 18px; height: 18px; }
 }
 
 /* ---------- Auth (login/register) ---------- */
@@ -1376,8 +1421,8 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
 
   .site-header__inner { flex-wrap: wrap; gap: 10px; padding: 10px 0; }
   .brand { font-size: var(--fs-lg); }
-  .main-nav { order: 3; width: 100%; justify-content: center; margin-left: 0; gap: 2px; flex-wrap: wrap; }
-  .main-nav a { padding: 6px 10px; font-size: var(--fs-sm); }
+  .main-nav { order: 3; width: 100%; justify-content: center; margin-left: 0; gap: 4px 6px; flex-wrap: wrap; }
+  .main-nav a { padding: 7px 14px; font-size: var(--fs-sm); }
   .user-greeting { display: none; }
 
   /* --- Каталог: топбар и поиск --- */
