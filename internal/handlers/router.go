@@ -3,6 +3,8 @@ package handlers
 import (
 	"html/template"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -12,6 +14,23 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/middleware"
 	"github.com/TeleginSergey/hozdacha/internal/services"
 )
+
+// trustedProxies возвращает список доверенных прокси для router.SetTrustedProxies.
+// Берётся из TRUSTED_PROXIES (CIDR через запятую); по умолчанию — приватные диапазоны,
+// где живёт reverse-proxy (Traefik/Dokploy). Это заставляет c.ClientIP() брать реальный
+// IP из X-Forwarded-For, но игнорировать подделку заголовка клиентом.
+func trustedProxies() []string {
+	if raw := strings.TrimSpace(os.Getenv("TRUSTED_PROXIES")); raw != "" {
+		var out []string
+		for _, p := range strings.Split(raw, ",") {
+			if p = strings.TrimSpace(p); p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
+	}
+	return []string{"127.0.0.1/32", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
+}
 
 // templateFuncs — общие функции для всех HTML-шаблонов.
 var templateFuncs = template.FuncMap{
@@ -42,6 +61,12 @@ func SetupRouter(
 	logger *zap.Logger,
 ) *gin.Engine {
 	router := gin.Default()
+
+	// Доверяем только reverse-proxy (Traefik/Dokploy), иначе Gin доверяет всем и
+	// c.ClientIP() можно подменить через X-Forwarded-For, обойдя rate-limit.
+	if err := router.SetTrustedProxies(trustedProxies()); err != nil {
+		logger.Warn("failed to set trusted proxies", zap.Error(err))
+	}
 
 	// Добавляем health check service в контекст для middleware
 	router.Use(func(c *gin.Context) {
@@ -196,17 +221,20 @@ func SetupRouter(
 	// Публичные API
 	api := router.Group("/api")
 	{
-		// Аутентификация
+		// Аутентификация. Жёсткий rate-limit вешаем точечно на чувствительные
+		// эндпоинты (перебор кодов / спам), не трогая /profile и /verify, чтобы не
+		// блокировать легитимных пользователей за общим IP (CGNAT).
 		auth := api.Group("/auth")
+		authRL := middleware.AuthRateLimit()
 		{
-			auth.POST("/register", userHandler.Register)
-			auth.POST("/login", userHandler.Login)
+			auth.POST("/register", authRL, userHandler.Register)
+			auth.POST("/login", authRL, userHandler.Login)
 			auth.POST("/logout", middleware.AuthMiddleware(jwtSecret), userHandler.Logout)
-			auth.POST("/verify-email", middleware.AuthMiddleware(jwtSecret), userHandler.VerifyEmail)
-			auth.POST("/resend-code", userHandler.ResendVerificationCode)
-			auth.POST("/send-verification", userHandler.ResendVerificationCode) // Alias для совместимости с фронтом
-			auth.POST("/forgot-password", userHandler.ForgotPassword)
-			auth.POST("/reset-password", userHandler.ResetPassword)
+			auth.POST("/verify-email", authRL, middleware.AuthMiddleware(jwtSecret), userHandler.VerifyEmail)
+			auth.POST("/resend-code", authRL, userHandler.ResendVerificationCode)
+			auth.POST("/send-verification", authRL, userHandler.ResendVerificationCode) // Alias для совместимости с фронтом
+			auth.POST("/forgot-password", authRL, userHandler.ForgotPassword)
+			auth.POST("/reset-password", authRL, userHandler.ResetPassword)
 			// Profile endpoints require authentication
 			authProfile := auth.Group("/profile")
 			authProfile.Use(middleware.AuthMiddleware(jwtSecret))
