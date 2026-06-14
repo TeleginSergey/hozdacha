@@ -249,7 +249,9 @@ func (u *userQuery) GetByEmail(ctx context.Context, email string) (*User, error)
 	user := &User{}
 	qb, args, err := u.sq.Select(user.columns("")...).
 		From(UsersTable).
-		Where(squirrel.Eq{UsersEmail: email}).
+		// Email регистронезависим: сравниваем по нижнему регистру, чтобы найти
+		// и записи со смешанным регистром, заведённые до нормализации.
+		Where(squirrel.Expr("LOWER("+UsersEmail+") = LOWER(?)", email)).
 		ToSql()
 	if err != nil {
 		u.logger.Error("Failed to build query", zap.Error(err))
@@ -290,7 +292,8 @@ func (u *userQuery) ExistsByUsernameOrEmail(ctx context.Context, username, email
 		From(UsersTable).
 		Where(squirrel.Or{
 			squirrel.Eq{UsersUsername: username},
-			squirrel.Eq{UsersEmail: email},
+			// Email — регистронезависимо.
+			squirrel.Expr("LOWER("+UsersEmail+") = LOWER(?)", email),
 		}).
 		ToSql()
 	if err != nil {
@@ -623,7 +626,7 @@ func (u *userQuery) GetByEmailAndCode(ctx context.Context, email string, code st
 	qb, args, err := u.sq.Select(stomUserSelect.TagValues()...).
 		From(UsersTable).
 		Where(squirrel.And{
-			squirrel.Eq{UsersEmail: email},
+			squirrel.Expr("LOWER("+UsersEmail+") = LOWER(?)", email),
 			squirrel.Eq{UsersEmailVerificationCode: code},
 			squirrel.Gt{UsersVerificationExpiresAt: time.Now()},
 		}).
