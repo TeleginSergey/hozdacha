@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=25">
-    <link rel="stylesheet" href="/static/css/promotions.css?v=4">
+    <link rel="stylesheet" href="/static/css/style.css?v=26">
+    <link rel="stylesheet" href="/static/css/promotions.css?v=5">
 </head>
 <body>
 
@@ -43,7 +43,7 @@
                         <input type="search" id="promoMobileSearch" placeholder="Поиск в акциях…" autocomplete="off">
                     </div>
                 </div>
-                <div class="mobile-catbar__active" id="promoActiveFilters" hidden></div>
+                <div class="mobile-catbar__active js-promo-active" id="promoActiveFilters" hidden></div>
             </div>
             <div class="promo-page__toolbar">
                 <div class="promo-page__search">
@@ -71,6 +71,7 @@
                     <button class="promo-filter__btn" type="button" data-kind="category">На категории</button>
                 </div>
                 <button class="btn btn--outline btn--sm" id="promoResetBtn" type="button">Сбросить</button>
+                <div class="promo-active-filters js-promo-active" id="promoActiveFiltersDesktop" hidden></div>
             </div>
 
             <div id="promoReservationNote" class="promo-page__note" hidden></div>
@@ -156,7 +157,7 @@
 <script src="/static/js/header.js?v=3"></script>
 <script src="/static/js/infinite-scroll.js?v=1"></script>
 <script src="/static/js/product-card.js?v=1"></script>
-<script src="/static/js/promotions.js?v=8"></script>
+<script src="/static/js/promotions.js?v=9"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>

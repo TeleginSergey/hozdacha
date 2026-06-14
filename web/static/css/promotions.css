@@ -256,6 +256,16 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* Липкий тулбар поиска/фильтров на десктопе */
+@media (min-width: 769px) {
+  .promo-page__toolbar { position: sticky; top: 72px; z-index: 20; }
+}
+
+/* Десктопные чипы активных фильтров — отдельной строкой в тулбаре */
+.promo-active-filters { flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 8px; }
+.promo-active-filters[hidden] { display: none; }
+@media (max-width: 768px) { .promo-active-filters { display: none; } }
+
 .promo-page__search {
   display: flex;
   align-items: center;

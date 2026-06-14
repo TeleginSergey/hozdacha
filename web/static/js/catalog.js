@@ -707,10 +707,11 @@ function chooseCategory(id) {
     loadProducts();
 }
 
-// Активные фильтры в мобильной полосе: выбранная категория и/или поиск — чипы с крестиком.
+// Активные фильтры (выбранная категория и/или поиск) — чипы с крестиком.
+// Рендерим во все контейнеры: мобильная липкая полоса и десктопный топбар.
 function renderActiveFilters() {
-    const box = document.getElementById('catActiveFilters');
-    if (!box) return;
+    const boxes = document.querySelectorAll('.js-cat-active');
+    if (!boxes.length) return;
     const xSvg = '<span class="filter-chip__x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>';
     let html = '';
     if (activeCategoryId) {
@@ -722,8 +723,7 @@ function renderActiveFilters() {
     if (currentQuery) {
         html += `<button type="button" class="filter-chip" onclick="clearCatalogSearch()"><span>Поиск: ${escapeHtml(currentQuery)}</span>${xSvg}</button>`;
     }
-    box.innerHTML = html;
-    box.hidden = !html;
+    boxes.forEach(function(box) { box.innerHTML = html; box.hidden = !html; });
 }
 
 // Сброс только поискового запроса (крестик на чипе поиска).
