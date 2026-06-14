@@ -3,12 +3,12 @@ package handlers
 import (
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"go.uber.org/zap"
 
+	"github.com/TeleginSergey/hozdacha/internal/cache"
 	"github.com/TeleginSergey/hozdacha/internal/services"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
 )
@@ -18,47 +18,27 @@ type UserHandler struct {
 	emailService     *services.EmailService
 	blacklistService *services.TokenBlacklistService
 	logger           *zap.Logger
-	// codeAttempts — счётчик неверных попыток ввода кода по email (анти-брутфорс).
-	codeAttempts *attemptTracker
+	// rateStore — счётчики анти-брутфорса/тайминга (Redis при наличии, иначе in-memory).
+	rateStore *cache.RateStore
 }
 
 // maxCodeAttempts — после стольких неверных попыток код инвалидируется и нужен новый.
 const maxCodeAttempts = 5
 
-func NewUserHandler(userUC *usecase.UserUsecase, emailService *services.EmailService, blacklistService *services.TokenBlacklistService, logger *zap.Logger) *UserHandler {
+// codeAttemptsTTL — окно, в течение которого считаем попытки ввода кода.
+const codeAttemptsTTL = 15 * time.Minute
+
+func NewUserHandler(userUC *usecase.UserUsecase, emailService *services.EmailService, blacklistService *services.TokenBlacklistService, rateStore *cache.RateStore, logger *zap.Logger) *UserHandler {
+	if rateStore == nil {
+		rateStore = cache.NewRateStore(nil, logger)
+	}
 	return &UserHandler{
 		userUC:           userUC,
 		emailService:     emailService,
 		blacklistService: blacklistService,
 		logger:           logger,
-		codeAttempts:     newAttemptTracker(15 * time.Minute),
+		rateStore:        rateStore,
 	}
-}
-
-// Тайминг регистрации / входа по IP (защищен mutex от data race)
-var (
-	registrationMu       sync.RWMutex
-	registrationAttempts = make(map[string]int)
-	lastRegistrationTime = make(map[string]time.Time)
-)
-
-// Периодически чистим карты тайминга регистрации/входа, чтобы они не росли
-// бесконечно по уникальным IP (защита от утечки памяти / OOM-DoS).
-func init() {
-	go func() {
-		for {
-			time.Sleep(10 * time.Minute)
-			registrationMu.Lock()
-			now := time.Now()
-			for ip, t := range lastRegistrationTime {
-				if now.Sub(t) > time.Hour {
-					delete(lastRegistrationTime, ip)
-					delete(registrationAttempts, ip)
-				}
-			}
-			registrationMu.Unlock()
-		}
-	}()
 }
 
 func (h *UserHandler) Register(c *gin.Context) {
@@ -68,48 +48,18 @@ func (h *UserHandler) Register(c *gin.Context) {
 		return
 	}
 
-	// Защита от спама - проверяем IP
+	// Анти-спам по IP (счётчики в Redis при наличии — корректно при нескольких репликах):
+	// не чаще 1 раза в минуту и не более 3 регистраций в час.
+	ctx := c.Request.Context()
 	clientIP := c.ClientIP()
-
-	// Rate limiting: максимум 3 попытки в час с одного IP
-	const maxAttemptsPerHour = 3
-	const blockDuration = 1 * time.Hour
-	const minRegistrationInterval = 1 * time.Minute
-
-	// Ограничение по времени (не чаще 1 раза в минуту)
-	registrationMu.RLock()
-	lastTime, exists := lastRegistrationTime[clientIP]
-	registrationMu.RUnlock()
-
-	if exists {
-		if time.Since(lastTime) < minRegistrationInterval {
-			c.JSON(http.StatusTooManyRequests, gin.H{"error": "Подождите перед повторной попыткой"})
-			return
-		}
-
-		if time.Since(lastTime) < blockDuration {
-			registrationMu.Lock()
-			registrationAttempts[clientIP]++
-			attempts := registrationAttempts[clientIP]
-			registrationMu.Unlock()
-
-			if attempts > maxAttemptsPerHour {
-				h.logger.Warn("Too many registration attempts",
-					zap.String("ip", clientIP),
-					zap.Int("attempts", attempts))
-				c.JSON(http.StatusTooManyRequests, gin.H{
-					"error":       "Слишком много попыток. Попробуйте позже.",
-					"retry_after": int(time.Until(lastTime.Add(time.Hour)).Seconds()),
-				})
-				return
-			}
-
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "Подождите перед повторной регистрацией",
-				"retry_after": int(time.Until(lastTime.Add(time.Hour)).Seconds()),
-			})
-			return
-		}
+	if !h.rateStore.Allow(ctx, "reg:min:"+clientIP, 1, time.Minute) {
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Подождите перед повторной попыткой"})
+		return
+	}
+	if !h.rateStore.Allow(ctx, "reg:hour:"+clientIP, 3, time.Hour) {
+		h.logger.Warn("Too many registration attempts", zap.String("ip", clientIP))
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Слишком много попыток. Попробуйте позже."})
+		return
 	}
 
 	// Валидация
@@ -228,12 +178,6 @@ func (h *UserHandler) Register(c *gin.Context) {
 		}
 	}()
 
-	// Обновляем время регистрации
-	registrationMu.Lock()
-	lastRegistrationTime[clientIP] = time.Now()
-	registrationAttempts[clientIP] = 0
-	registrationMu.Unlock()
-
 	h.logger.Info("User registered, verification code sent",
 		zap.Int64("user_id", user.ID),
 		zap.String("username", user.Username),
@@ -258,26 +202,26 @@ func (h *UserHandler) Login(c *gin.Context) {
 		return
 	}
 
-	// Защита от брутфорса
+	// Защита от брутфорса: не чаще 1 запроса кода в 5 секунд с одного IP.
+	ctx := c.Request.Context()
 	clientIP := c.ClientIP()
-	registrationMu.RLock()
-	lastLogin, loginExists := lastRegistrationTime[clientIP]
-	registrationMu.RUnlock()
-	if loginExists && time.Since(lastLogin) < 5*time.Second {
+	if !h.rateStore.Allow(ctx, "login:throttle:"+clientIP, 1, 5*time.Second) {
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Слишком много попыток входа. Подождите."})
 		return
 	}
 
-	user, err := h.userUC.Login(c.Request.Context(), req)
-	registrationMu.Lock()
-	lastRegistrationTime[clientIP] = time.Now()
-	registrationMu.Unlock()
+	user, err := h.userUC.Login(ctx, req)
 	if err != nil {
+		// Нейтральный ответ: не раскрываем, существует ли аккаунт (анти-enumeration).
+		// Отвечаем так же, как при успехе, но код не отправляем.
 		h.logger.Warn("Login failed",
 			zap.String("email", req.Email),
 			zap.String("ip", clientIP),
 			zap.Error(err))
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Пользователь с такой почтой не найден. Зарегистрируйтесь."})
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Если аккаунт с такой почтой существует, мы отправили код на почту.",
+			"email":   strings.ToLower(strings.TrimSpace(req.Email)),
+		})
 		return
 	}
 
@@ -382,28 +326,29 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 
 	// Анти-брутфорс: лимит неверных попыток по email. После порога код
 	// инвалидируется, чтобы дальнейший перебор был бесполезен.
-	attemptKey := strings.ToLower(strings.TrimSpace(email))
-	if h.codeAttempts.get(attemptKey) >= maxCodeAttempts {
-		h.invalidateCode(c, attemptKey)
+	ctx := c.Request.Context()
+	attemptKey := "code_attempts:" + strings.ToLower(strings.TrimSpace(email))
+	if h.rateStore.Get(ctx, attemptKey) >= maxCodeAttempts {
+		h.invalidateCode(c, email)
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Слишком много попыток. Запросите новый код."})
 		return
 	}
 
 	// Проверяем код и активируем аккаунт
-	user, err := h.userUC.VerifyEmailByCode(c.Request.Context(), email, code)
+	user, err := h.userUC.VerifyEmailByCode(ctx, email, code)
 	if err != nil {
-		n := h.codeAttempts.inc(attemptKey)
+		n := h.rateStore.Incr(ctx, attemptKey, codeAttemptsTTL)
 		if n >= maxCodeAttempts {
-			h.invalidateCode(c, attemptKey)
+			h.invalidateCode(c, email)
 		}
 		h.logger.Warn("Email verification failed",
 			zap.String("email", email),
-			zap.Int("attempts", n),
+			zap.Int64("attempts", n),
 			zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный или просроченный код подтверждения"})
 		return
 	}
-	h.codeAttempts.reset(attemptKey)
+	h.rateStore.Reset(ctx, attemptKey)
 
 	// Генерируем JWT токен после успешной верификации
 	token, err := h.userUC.GenerateJWTToken(user.ID, user.Username, user.Email)
@@ -704,28 +649,29 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 	}
 
 	// Анти-брутфорс кода (как в VerifyEmail).
-	attemptKey := strings.ToLower(strings.TrimSpace(req.Email))
-	if h.codeAttempts.get(attemptKey) >= maxCodeAttempts {
-		h.invalidateCode(c, attemptKey)
+	ctx := c.Request.Context()
+	attemptKey := "code_attempts:" + strings.ToLower(strings.TrimSpace(req.Email))
+	if h.rateStore.Get(ctx, attemptKey) >= maxCodeAttempts {
+		h.invalidateCode(c, req.Email)
 		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Слишком много попыток. Запросите новый код."})
 		return
 	}
 
 	// Проверяем код
-	user, err := h.userUC.GetByEmailAndCode(c.Request.Context(), req.Email, req.Code)
+	user, err := h.userUC.GetByEmailAndCode(ctx, req.Email, req.Code)
 	if err != nil {
-		n := h.codeAttempts.inc(attemptKey)
+		n := h.rateStore.Incr(ctx, attemptKey, codeAttemptsTTL)
 		if n >= maxCodeAttempts {
-			h.invalidateCode(c, attemptKey)
+			h.invalidateCode(c, req.Email)
 		}
 		h.logger.Warn("Reset password - invalid code",
 			zap.String("email", req.Email),
-			zap.Int("attempts", n),
+			zap.Int64("attempts", n),
 			zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный или просроченный код"})
 		return
 	}
-	h.codeAttempts.reset(attemptKey)
+	h.rateStore.Reset(ctx, attemptKey)
 
 	if !strings.ContainsAny(req.NewPassword, "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль должен содержать хотя бы одну заглавную букву"})

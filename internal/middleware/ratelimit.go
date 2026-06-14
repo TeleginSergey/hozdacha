@@ -2,133 +2,54 @@ package middleware
 
 import (
 	"net/http"
-	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/TeleginSergey/hozdacha/internal/cache"
 )
 
-type rateLimiter struct {
-	visitors map[string]*visitor
-	mu       sync.RWMutex
-	rate     time.Duration
-	limit    int
-}
+// rateStore — общее хранилище счётчиков (Redis при наличии, иначе in-memory).
+// По умолчанию in-memory, чтобы middleware работал и без вызова SetRateStore.
+var rateStore = cache.NewRateStore(nil, nil)
 
-type visitor struct {
-	lastSeen time.Time
-	count    int
-}
-
-var limiter *rateLimiter
-
-func init() {
-	limiter = &rateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     time.Minute,
-		limit:    300, // 300 запросов в минуту (увеличено для пагинации товаров)
-	}
-
-	// Очистка старых записей каждые 5 минут
-	go func() {
-		for {
-			time.Sleep(5 * time.Minute)
-			limiter.cleanup()
-		}
-	}()
-}
-
-func (rl *rateLimiter) cleanup() {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	now := time.Now()
-	for ip, v := range rl.visitors {
-		if now.Sub(v.lastSeen) > 10*time.Minute {
-			delete(rl.visitors, ip)
-		}
+// SetRateStore подключает общее хранилище лимитов (вызывается из app при старте,
+// чтобы лимиты считались в Redis и были корректны при нескольких репликах).
+func SetRateStore(s *cache.RateStore) {
+	if s != nil {
+		rateStore = s
 	}
 }
 
-func (rl *rateLimiter) getVisitor(ip string) *visitor {
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	v, exists := rl.visitors[ip]
-	if !exists {
-		v = &visitor{
-			lastSeen: time.Now(),
-			count:    0,
-		}
-		rl.visitors[ip] = v
-	}
-	return v
+func limit(c *gin.Context, name string, n int, window time.Duration) bool {
+	return rateStore.Allow(c.Request.Context(), "rl:"+name+":"+c.ClientIP(), n, window)
 }
 
-func (rl *rateLimiter) allow(ip string) bool {
-	v := rl.getVisitor(ip)
-
-	rl.mu.Lock()
-	defer rl.mu.Unlock()
-
-	now := time.Now()
-	if now.Sub(v.lastSeen) > rl.rate {
-		v.count = 0
-		v.lastSeen = now
-	}
-
-	if v.count >= rl.limit {
-		return false
-	}
-
-	v.count++
-	v.lastSeen = now
-	return true
+func tooMany(c *gin.Context) {
+	c.JSON(http.StatusTooManyRequests, gin.H{
+		"error": "Too many requests. Please try again later.",
+	})
+	c.Abort()
 }
 
-// RateLimit middleware для ограничения количества запросов
+// RateLimit — общий лимит запросов (увеличен для пагинации товаров).
 func RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
-
-		if !limiter.allow(ip) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error": "Too many requests. Please try again later.",
-			})
-			c.Abort()
+		if !limit(c, "global", 300, time.Minute) {
+			tooMany(c)
 			return
 		}
-
 		c.Next()
 	}
 }
 
-// ProductRateLimit middleware для API товаров (более высокий лимит для пагинации)
+// ProductRateLimit — более высокий лимит для API товаров (пагинация).
 func ProductRateLimit() gin.HandlerFunc {
-	productLimiter := &rateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     time.Minute,
-		limit:    600, // 600 запросов в минуту для API товаров
-	}
-
-	go func() {
-		for {
-			time.Sleep(5 * time.Minute)
-			productLimiter.cleanup()
-		}
-	}()
-
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
-
-		if !productLimiter.allow(ip) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error": "Too many requests. Please try again later.",
-			})
-			c.Abort()
+		if !limit(c, "product", 600, time.Minute) {
+			tooMany(c)
 			return
 		}
-
 		c.Next()
 	}
 }
@@ -136,50 +57,22 @@ func ProductRateLimit() gin.HandlerFunc {
 // AuthRateLimit — жёсткий лимит для аутентификационных эндпоинтов
 // (login / verify / reset / register): гасит перебор кодов и спам.
 func AuthRateLimit() gin.HandlerFunc {
-	authLimiter := &rateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     time.Minute,
-		limit:    30, // 30 запросов в минуту на IP — с запасом для легитимного входа (и общих IP/CGNAT)
-	}
-
-	go func() {
-		for {
-			time.Sleep(5 * time.Minute)
-			authLimiter.cleanup()
-		}
-	}()
-
 	return func(c *gin.Context) {
-		if !authLimiter.allow(c.ClientIP()) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error": "Слишком много запросов. Попробуйте позже.",
-			})
-			c.Abort()
+		if !limit(c, "auth", 30, time.Minute) {
+			tooMany(c)
 			return
 		}
 		c.Next()
 	}
 }
 
-// StrictRateLimit для админ-панели
+// StrictRateLimit для админ-панели.
 func StrictRateLimit() gin.HandlerFunc {
-	adminLimiter := &rateLimiter{
-		visitors: make(map[string]*visitor),
-		rate:     time.Minute,
-		limit:    300, // 300 запросов в минуту для админки (≈5 в секунду — достаточно для нормальной работы)
-	}
-
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
-
-		if !adminLimiter.allow(ip) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error": "Too many requests. Please try again later.",
-			})
-			c.Abort()
+		if !limit(c, "admin", 300, time.Minute) {
+			tooMany(c)
 			return
 		}
-
 		c.Next()
 	}
 }
