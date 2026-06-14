@@ -248,10 +248,11 @@
         list.innerHTML = html;
     }
 
-    // Активные фильтры (категория / поиск) в липкой полосе — чипы с крестиком.
+    // Активные фильтры (категория / поиск) — чипы с крестиком.
+    // Рендерим во все контейнеры: мобильная липкая полоса и десктопный тулбар.
     function renderPromoActiveFilters() {
-        const box = document.getElementById('promoActiveFilters');
-        if (!box) return;
+        const boxes = document.querySelectorAll('.js-promo-active');
+        if (!boxes.length) return;
         const xSvg = '<span class="filter-chip__x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>';
         let html = '';
         if (state.categoryId) {
@@ -260,8 +261,7 @@
         if (state.query) {
             html += '<button type="button" class="filter-chip" data-clear="query"><span>Поиск: ' + escapeHtml(state.query) + '</span>' + xSvg + '</button>';
         }
-        box.innerHTML = html;
-        box.hidden = !html;
+        boxes.forEach(function(box) { box.innerHTML = html; box.hidden = !html; });
     }
 
     function openPromoDrawer() {
@@ -395,6 +395,7 @@
         state.query = (searchInput && searchInput.value || '').trim();
         resetList();
         loadProducts(false);
+        renderPromoActiveFilters();
     }
 
     function setCategory(catId, opts) {
@@ -494,9 +495,8 @@
             });
         }
 
-        // Крестики на активных фильтрах.
-        const activeBox = document.getElementById('promoActiveFilters');
-        if (activeBox) {
+        // Крестики на активных фильтрах (на всех контейнерах: моб. полоса + десктоп тулбар).
+        document.querySelectorAll('.js-promo-active').forEach(function(activeBox) {
             activeBox.addEventListener('click', function(e) {
                 const chip = e.target.closest('.filter-chip');
                 if (!chip) return;
@@ -512,7 +512,7 @@
                     renderPromoActiveFilters();
                 }
             });
-        }
+        });
         if (kindFilter) {
             kindFilter.querySelectorAll('.promo-filter__btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {

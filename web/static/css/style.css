@@ -412,10 +412,18 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   border-radius: var(--r-lg);
   padding: var(--sp-3);
   box-shadow: var(--shadow-sm);
+  /* Липкий поиск на десктопе — остаётся под шапкой при прокрутке ленты */
+  position: sticky;
+  top: 72px;
+  z-index: 20;
 }
 @media (max-width: 768px) {
   .catalog-topbar { grid-template-columns: 1fr; }
 }
+/* Десктопные чипы активных фильтров — отдельной строкой в топбаре */
+.catalog-active-filters { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; }
+.catalog-active-filters[hidden] { display: none; }
+
 .catalog-breadcrumb { font-size: var(--fs-sm); color: var(--c-muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .catalog-breadcrumb .breadcrumb-item { color: var(--c-text-soft); }
 .catalog-breadcrumb .breadcrumb-item.active { color: var(--c-text); font-weight: 600; }
@@ -775,6 +783,21 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   font-weight: 700;
 }
 
+/* Чип активного фильтра (категория/поиск) с крестиком — общий для десктопа и мобильного. */
+.filter-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 8px 6px 13px; border-radius: var(--r-pill);
+  border: 1px solid var(--c-primary); background: var(--c-primary-light);
+  color: var(--c-primary); font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+  transition: background var(--t-fast);
+}
+.filter-chip:hover { background: #dcebe0; }
+.filter-chip svg { width: 14px; height: 14px; }
+.filter-chip__x {
+  display: grid; place-items: center; width: 18px; height: 18px;
+  border-radius: 50%; background: rgba(74, 124, 89, 0.18);
+}
+
 /* ---------- Мобильная липкая полоса: кнопка категорий + поиск + активный фильтр ----------
    Используется на каталоге и акциях. На десктопе скрыта.
    Категории выбираются в выезжающей панели (.m-drawer / catalog-sidebar). */
@@ -821,17 +844,6 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   /* Активные фильтры (выбранная категория / поиск) — чипы с крестиком */
   .mobile-catbar__active { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
   .mobile-catbar__active[hidden] { display: none; }
-  .filter-chip {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 6px 8px 6px 13px; border-radius: var(--r-pill);
-    border: 1px solid var(--c-primary); background: var(--c-primary-light);
-    color: var(--c-primary); font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
-  }
-  .filter-chip svg { width: 14px; height: 14px; }
-  .filter-chip__x {
-    display: grid; place-items: center; width: 18px; height: 18px;
-    border-radius: 50%; background: rgba(74, 124, 89, 0.18);
-  }
 
   /* ----- Выезжающий drawer категорий (акции) ----- */
   .m-drawer {
