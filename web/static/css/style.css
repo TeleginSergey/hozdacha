@@ -471,7 +471,10 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
     transform: translateX(-100%);
     transition: transform 0.25s ease;
   }
-  .catalog-sidebar:not(.collapsed) { transform: translateX(0); }
+  /* В открытом состоянии убираем transform полностью: на iOS/WebKit fixed-элемент
+     с собственным transform начинает скроллиться со страницей («уезжает вверх»).
+     none → fixed работает корректно, анимация выезда сохраняется. */
+  .catalog-sidebar:not(.collapsed) { transform: none; }
   .catalog-sidebar:not(.collapsed) ~ .sidebar-overlay { display: block; }
 }
 .sidebar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--sp-3); }
@@ -856,7 +859,9 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
     transform: translateX(-100%); transition: transform 0.25s ease;
     overflow: hidden;
   }
-  .m-drawer.open { transform: translateX(0); }
+  /* none (а не translateX(0)): иначе на iOS/WebKit fixed-панель с собственным
+     transform скроллится вместе со страницей и «уезжает» вверх. */
+  .m-drawer.open { transform: none; }
   .m-drawer__head {
     display: flex; align-items: center; justify-content: space-between;
     padding: 16px; border-bottom: 1px solid var(--c-border);
