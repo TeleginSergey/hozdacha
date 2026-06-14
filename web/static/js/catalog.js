@@ -513,6 +513,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Загружаем категории
     loadCategories();
+
+    // Мобильная полоса: выбор категории по чипу + поиск.
+    const chipBar = document.getElementById('mobileCatChips');
+    if (chipBar) {
+        chipBar.addEventListener('click', function(e) {
+            const btn = e.target.closest('.catchip');
+            if (!btn) return;
+            chooseCategory(btn.dataset.id || '');
+        });
+    }
+    const mInput = document.getElementById('mSearchInput');
+    if (mInput) {
+        mInput.addEventListener('keydown', function(e) {
+            if (e.key !== 'Enter') return;
+            const main = document.getElementById('searchInput');
+            if (main) main.value = mInput.value;
+            searchProducts();
+        });
+    }
 });
 
 // =============================================================================
@@ -542,6 +561,7 @@ async function loadCategories() {
         }
 
         renderCategoryTree();
+        renderMobileChips();
     } catch (e) {
         console.error('Failed to load categories:', e);
     }
@@ -644,6 +664,7 @@ function selectTreeCategory(event, categoryId) {
     renderCategoryTree();
     updateBreadcrumb();
     updateSearchScope(activeCategoryId);
+    renderMobileChips();
 
     currentCategoryId = activeCategoryId;
     currentQuery = '';
@@ -652,6 +673,55 @@ function selectTreeCategory(event, categoryId) {
     const sentinel = document.getElementById('catalogScrollSentinel');
     if (sentinel) sentinel.style.display = 'block';
     loadProducts();
+}
+
+// Выбор категории из мобильной полосы чипов (плоский список: корни + подкатегории).
+function chooseCategory(id) {
+    const idStr = id ? String(id) : '';
+    if (idStr === '') {
+        activeCategoryId = '';
+        activeParentId = '';
+    } else {
+        const cat = allCategories.find(c => String(c.id) === idStr);
+        if (!cat) return;
+        activeCategoryId = idStr;
+        activeParentId = cat.parent_id ? String(cat.parent_id) : idStr;
+    }
+    renderCategoryTree();
+    updateBreadcrumb();
+    updateSearchScope(activeCategoryId);
+    renderMobileChips();
+
+    currentCategoryId = activeCategoryId;
+    currentQuery = '';
+    const main = document.getElementById('searchInput');
+    if (main) main.value = '';
+    const mInput = document.getElementById('mSearchInput');
+    if (mInput) mInput.value = '';
+    const sentinel = document.getElementById('catalogScrollSentinel');
+    if (sentinel) sentinel.style.display = 'block';
+    loadProducts();
+}
+
+// Рендер чипов категорий в мобильной полосе: «Все» + корневые и их подкатегории.
+function renderMobileChips() {
+    const bar = document.getElementById('mobileCatChips');
+    if (!bar) return;
+    const roots = childrenByParent.get('root') || [];
+    let html = `<button type="button" class="catchip${activeCategoryId === '' ? ' active' : ''}" data-id="">Все</button>`;
+    roots.forEach(root => {
+        const rActive = activeCategoryId === String(root.id);
+        html += `<button type="button" class="catchip${rActive ? ' active' : ''}" data-id="${root.id}">${escapeHtml(root.name)}</button>`;
+        const kids = childrenByParent.get(String(root.id)) || [];
+        kids.forEach(k => {
+            const kActive = activeCategoryId === String(k.id);
+            html += `<button type="button" class="catchip catchip--sub${kActive ? ' active' : ''}" data-id="${k.id}">${escapeHtml(k.name)}</button>`;
+        });
+    });
+    bar.innerHTML = html;
+
+    const active = bar.querySelector('.catchip.active');
+    if (active && active.scrollIntoView) active.scrollIntoView({ inline: 'center', block: 'nearest' });
 }
 
 function updateBreadcrumb() {
