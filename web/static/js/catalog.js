@@ -215,7 +215,22 @@ async function addToCart(id, name, price) {
         if (existingItem) {
             existingItem.quantity += 1;
         } else {
-            cart.push({ id, name, price, quantity: 1, image: product.ImageURL || product.products_image_url || '' });
+            // Сохраняем данные акции, чтобы показывать старую цену и скидку в корзине.
+            const base = parseFloat(product.Price ?? product.products_price ?? price);
+            const effRaw = product.EffectivePrice ?? product.effective_price;
+            const eff = (effRaw !== undefined && effRaw !== null) ? parseFloat(effRaw) : null;
+            const disc = parseFloat(product.DiscountPercent ?? product.discount_percent ?? 0);
+            const hasPromo = eff !== null && eff < base;
+            // Новые товары — наверх корзины (unshift), как в Ozon/WB.
+            cart.unshift({
+                id, name,
+                price: hasPromo ? eff : base,
+                oldPrice: hasPromo ? base : null,
+                discountPercent: hasPromo ? Math.round(disc) : 0,
+                quantity: 1,
+                image: product.ImageURL || product.products_image_url || '',
+                selected: true
+            });
         }
         saveCart();
         updateCartUI();

@@ -21,9 +21,29 @@
         }
         .cart-header-row .cart-clear-btn:hover { color: var(--c-danger); }
 
+        .cart-toolbar {
+          display: flex; align-items: center; justify-content: space-between; gap: var(--sp-3);
+          padding: 10px 14px; margin-bottom: var(--sp-3);
+          background: var(--c-card); border: 1px solid var(--c-border); border-radius: var(--r-md);
+        }
+        .cart-select-all {
+          display: inline-flex; align-items: center; gap: 10px;
+          font-size: var(--fs-sm); font-weight: 600; color: var(--c-text); cursor: pointer;
+        }
+        .cart-toolbar__remove {
+          background: none; border: none; color: var(--c-muted); cursor: pointer;
+          font-size: var(--fs-sm); padding: 4px 0;
+        }
+        .cart-toolbar__remove:hover:not(:disabled) { color: var(--c-danger); }
+        .cart-toolbar__remove:disabled { opacity: .4; cursor: default; }
+        .cart-check {
+          width: 20px; height: 20px; flex-shrink: 0; cursor: pointer;
+          accent-color: var(--c-primary); margin: 0;
+        }
+
         .cart-item-card {
           display: grid;
-          grid-template-columns: 120px 1fr auto;
+          grid-template-columns: auto 110px 1fr auto;
           gap: var(--sp-4);
           padding: var(--sp-4);
           background: var(--c-card);
@@ -32,10 +52,22 @@
           margin-bottom: var(--sp-3);
           transition: all var(--t-fast);
           position: relative;
+          align-items: center;
         }
+        .cart-item-card.is-unselected { opacity: .55; }
+        .cart-old { color: var(--c-muted); text-decoration: line-through; font-size: var(--fs-sm); }
+        .cart-disc {
+          color: var(--c-danger); font-weight: 800; font-size: var(--fs-xs);
+          background: #fdecea; padding: 1px 7px; border-radius: var(--r-pill);
+        }
+        .cart-item-card__total-old {
+          font-size: var(--fs-sm); color: var(--c-muted);
+          text-decoration: line-through; font-weight: 600; text-align: right;
+        }
+        .cart-summary-row .discount { color: var(--c-danger); }
         .cart-item-card:hover { border-color: var(--c-border-strong); box-shadow: var(--shadow-sm); }
         .cart-item-card__img {
-          width: 120px; height: 120px;
+          width: 110px; height: 110px;
           border-radius: var(--r-md);
           object-fit: cover;
           background: var(--c-bg-soft);
@@ -74,7 +106,7 @@
         }
         .cart-item-card__del:hover { color: var(--c-danger); background: #fdecea; }
         @media (max-width: 600px) {
-          .cart-item-card { grid-template-columns: 80px 1fr; }
+          .cart-item-card { grid-template-columns: auto 80px 1fr; }
           .cart-item-card__img { width: 80px; height: 80px; }
           .cart-item-card__controls {
             grid-column: 1 / -1; flex-direction: row; align-items: center; justify-content: space-between;
@@ -151,6 +183,7 @@
                 <h3>Ваш заказ</h3>
                 <div class="cart-summary-row"><span>Товаров</span><strong id="sumQty">0 шт.</strong></div>
                 <div class="cart-summary-row"><span>Стоимость</span><strong id="sumSubtotal">0 ₽</strong></div>
+                <div class="cart-summary-row" id="sumDiscountRow" style="display:none"><span>Скидка</span><strong class="discount" id="sumDiscount">−0 ₽</strong></div>
                 <div class="cart-summary-row"><span>Бронь</span><strong style="color:var(--c-success)">Бесплатно</strong></div>
                 <div class="cart-summary-divider"></div>
                 <div class="cart-summary-total"><span>К оплате</span><span class="value" id="sumTotal">0 ₽</span></div>
@@ -158,7 +191,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="flex-shrink:0"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     <div>Заказ хранится <strong>48 часов</strong>. Потом автоматически отменится и товар вернётся в наличие.</div>
                 </div>
-                <button class="btn btn--lg btn--block" onclick="checkout()">Оформить заказ</button>
+                <button class="btn btn--lg btn--block" id="checkoutBtn" onclick="checkout()">Оформить заказ</button>
                 <div class="cart-summary-trust">
                     <span>
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
@@ -186,24 +219,52 @@
 
 <script src="/static/js/header.js?v=2"></script>
 <script>
+// Корзина с выбором товаров (как в Ozon/WB). Поле selected у позиции — выбрана ли она.
+function getCart() {
+    let c;
+    try { c = JSON.parse(localStorage.getItem('cart') || '[]'); } catch (e) { c = []; }
+    let changed = false;
+    c.forEach(i => { if (i.selected === undefined) { i.selected = true; changed = true; } });
+    if (changed) localStorage.setItem('cart', JSON.stringify(c));
+    return c;
+}
+function setCart(c) { localStorage.setItem('cart', JSON.stringify(c)); updateHeaderBadge(c); }
+
+function updateHeaderBadge(cart) {
+    const count = cart.reduce((s, i) => s + (parseInt(i.quantity) || 0), 0);
+    const b = document.getElementById('headerCartCount');
+    if (!b) return;
+    if (count > 0) { b.textContent = count; b.style.display = 'grid'; }
+    else { b.style.display = 'none'; }
+}
+
+function plural(n) {
+    const a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) return 'товаров';
+    if (b > 1 && b < 5) return 'товара';
+    if (b === 1) return 'товар';
+    return 'товаров';
+}
+
 function clearCart() {
     if (!confirm('Очистить всю корзину?')) return;
-    localStorage.setItem('cart', '[]');
+    setCart([]);
     renderCart();
 }
 
 function formatPrice(n) { return (n || 0).toLocaleString('ru-RU'); }
 
 function renderCart() {
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const cart = getCart();
     const list = document.getElementById('cartContent');
     const summary = document.getElementById('cartSummary');
     const label = document.getElementById('cartCountLabel');
     const clearBtn = document.getElementById('cartClearBtn');
 
     const totalQty = cart.reduce((s, i) => s + (parseInt(i.quantity) || 0), 0);
-    label.textContent = totalQty + ' ' + (totalQty === 1 ? 'товар' : (totalQty < 5 ? 'товара' : 'товаров'));
+    label.textContent = totalQty + ' ' + plural(totalQty);
     clearBtn.style.display = cart.length > 0 ? 'inline-block' : 'none';
+    updateHeaderBadge(cart);
 
     if (cart.length === 0) {
         list.innerHTML = `<div class="cart-empty-state">
@@ -221,21 +282,44 @@ function renderCart() {
         return;
     }
 
-    summary.style.display = 'block';
-    const total = cart.reduce((s, i) => s + i.price * i.quantity, 0);
-    list.innerHTML = cart.map((item, idx) => {
+    const allSelected = cart.every(i => i.selected);
+    const noneSelected = cart.every(i => !i.selected);
+
+    const toolbar = `<div class="cart-toolbar">
+        <label class="cart-select-all">
+            <input type="checkbox" class="cart-check" id="selectAll" ${allSelected ? 'checked' : ''} onchange="toggleAll(this.checked)">
+            Выбрать все
+        </label>
+        <button class="cart-toolbar__remove" onclick="removeSelected()" ${noneSelected ? 'disabled' : ''}>Удалить выбранные</button>
+    </div>`;
+
+    const itemsHTML = cart.map((item, idx) => {
         const subtotal = item.price * item.quantity;
         const img = item.image || '';
+        const hasPromo = item.oldPrice && item.oldPrice > item.price;
+        const disc = item.discountPercent || (hasPromo ? Math.round((1 - item.price / item.oldPrice) * 100) : 0);
+
+        const priceRow = hasPromo
+            ? `<strong>${formatPrice(item.price)} ₽</strong>
+               <span class="cart-old">${formatPrice(item.oldPrice)} ₽</span>
+               <span class="cart-disc">−${disc}%</span>
+               <span style="color:var(--c-muted)">/ шт.</span>`
+            : `<span>${formatPrice(item.price)} ₽ / шт.</span>`;
+
+        const totalBlock = hasPromo
+            ? `<div class="cart-item-card__total-old">${formatPrice(item.oldPrice * item.quantity)} ₽</div>
+               <div class="cart-item-card__total">${formatPrice(subtotal)} ₽</div>`
+            : `<div class="cart-item-card__total">${formatPrice(subtotal)} ₽</div>`;
+
         return `
-        <div class="cart-item-card">
+        <div class="cart-item-card ${item.selected ? '' : 'is-unselected'}">
+            <input type="checkbox" class="cart-check" ${item.selected ? 'checked' : ''} onchange="toggleItem(${idx})" aria-label="Выбрать товар">
             ${img
                 ? `<img class="cart-item-card__img" src="${img}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cart-item-card__img cart-item-card__img--empty',textContent:'Нет фото'}))">`
                 : `<div class="cart-item-card__img cart-item-card__img--empty">Нет фото</div>`}
             <div class="cart-item-card__body">
                 <div class="cart-item-card__name"><a href="/product/${item.id}">${item.name}</a></div>
-                <div class="cart-item-card__price-row">
-                    <span>${formatPrice(item.price)} ₽ / шт.</span>
-                </div>
+                <div class="cart-item-card__price-row">${priceRow}</div>
                 <div class="qty" style="margin-top:10px">
                     <button onclick="changeQty(${idx}, -1)" aria-label="Уменьшить">−</button>
                     <span>${item.quantity}</span>
@@ -243,7 +327,7 @@ function renderCart() {
                 </div>
             </div>
             <div class="cart-item-card__controls">
-                <div class="cart-item-card__total">${formatPrice(subtotal)} ₽</div>
+                ${totalBlock}
                 <button class="cart-item-card__del" onclick="removeItem(${idx})" title="Удалить">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="14" height="14"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>
                     Удалить
@@ -252,13 +336,65 @@ function renderCart() {
         </div>`;
     }).join('');
 
-    document.getElementById('sumQty').textContent = totalQty + ' шт.';
-    document.getElementById('sumSubtotal').textContent = formatPrice(total) + ' ₽';
-    document.getElementById('sumTotal').textContent = formatPrice(total) + ' ₽';
+    list.innerHTML = toolbar + itemsHTML;
+
+    const sa = document.getElementById('selectAll');
+    if (sa) sa.indeterminate = !allSelected && !noneSelected;
+
+    // Сводка — только по выбранным товарам.
+    const sel = cart.filter(i => i.selected);
+    const selQty = sel.reduce((s, i) => s + i.quantity, 0);
+    const selTotal = sel.reduce((s, i) => s + i.price * i.quantity, 0);
+    const selOld = sel.reduce((s, i) => s + (i.oldPrice && i.oldPrice > i.price ? i.oldPrice : i.price) * i.quantity, 0);
+    const savings = selOld - selTotal;
+
+    summary.style.display = 'block';
+    document.getElementById('sumQty').textContent = selQty + ' шт.';
+    document.getElementById('sumSubtotal').textContent = formatPrice(selOld) + ' ₽';
+
+    const discRow = document.getElementById('sumDiscountRow');
+    if (savings > 0) {
+        discRow.style.display = 'flex';
+        document.getElementById('sumDiscount').textContent = '−' + formatPrice(savings) + ' ₽';
+    } else {
+        discRow.style.display = 'none';
+    }
+
+    document.getElementById('sumTotal').textContent = formatPrice(selTotal) + ' ₽';
+
+    const btn = document.getElementById('checkoutBtn');
+    if (btn) {
+        btn.disabled = selQty === 0;
+        btn.textContent = selQty === 0 ? 'Выберите товары' : 'Оформить заказ · ' + selQty + ' шт.';
+    }
+}
+
+function toggleItem(idx) {
+    const cart = getCart();
+    if (idx < 0 || idx >= cart.length) return;
+    cart[idx].selected = !cart[idx].selected;
+    setCart(cart);
+    renderCart();
+}
+
+function toggleAll(checked) {
+    const cart = getCart();
+    cart.forEach(i => { i.selected = checked; });
+    setCart(cart);
+    renderCart();
+}
+
+function removeSelected() {
+    const cart = getCart();
+    const remaining = cart.filter(i => !i.selected);
+    if (remaining.length === cart.length) return;
+    if (!confirm('Удалить выбранные товары из корзины?')) return;
+    setCart(remaining);
+    renderCart();
 }
 
 function changeQty(idx, delta) {
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const cart = getCart();
     if (idx < 0 || idx >= cart.length) return;
     if (delta > 0) {
         const item = cart[idx];
@@ -271,7 +407,7 @@ function changeQty(idx, delta) {
                     return;
                 }
                 item.quantity += delta;
-                localStorage.setItem('cart', JSON.stringify(cart));
+                setCart(cart);
                 renderCart();
             })
             .catch(() => alert('Не удалось проверить наличие товара'));
@@ -279,14 +415,14 @@ function changeQty(idx, delta) {
     }
     cart[idx].quantity += delta;
     if (cart[idx].quantity <= 0) cart.splice(idx, 1);
-    localStorage.setItem('cart', JSON.stringify(cart));
+    setCart(cart);
     renderCart();
 }
 
 function removeItem(idx) {
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    const cart = getCart();
     cart.splice(idx, 1);
-    localStorage.setItem('cart', JSON.stringify(cart));
+    setCart(cart);
     renderCart();
 }
 
@@ -375,9 +511,11 @@ function openModal() {
     m.querySelector('#coForm').onsubmit = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('auth_token');
-        const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        const cart = getCart();
+        const selected = cart.filter(i => i.selected);
         const fd = new FormData(e.target);
-        const items = cart.map(i => ({ product_id: i.id, quantity: i.quantity }));
+        const items = selected.map(i => ({ product_id: i.id, quantity: i.quantity }));
+        if (items.length === 0) { alert('Выберите хотя бы один товар'); return; }
         const btn = e.target.querySelector('button[type=submit]');
         btn.disabled = true; btn.textContent = 'Отправка...';
         const pickupAt = document.getElementById('coPickupTime')?.value || null;
@@ -389,7 +527,8 @@ function openModal() {
             });
             const d = await r.json();
             if (!r.ok) throw new Error(d.error || 'Ошибка');
-            localStorage.setItem('cart', '[]');
+            // Убираем из корзины только заказанные (выбранные) товары, остальное остаётся.
+            setCart(getCart().filter(i => !i.selected));
             m.remove();
             alert('✅ Заказ оформлен! Сейчас перейдём в личный кабинет.');
             location.href = '/profile';
@@ -404,8 +543,9 @@ function openModal() {
 function checkout() {
     const token = localStorage.getItem('auth_token');
     if (!token) { alert('Нужно войти для оформления заказа'); location.href = '/login?redirect=/cart'; return; }
-    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
-    if (cart.length === 0) { alert('Корзина пуста'); return; }
+    const cart = getCart();
+    const selected = cart.filter(i => i.selected);
+    if (selected.length === 0) { alert('Выберите хотя бы один товар для оформления'); return; }
     openModal();
 }
 
