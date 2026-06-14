@@ -18,7 +18,12 @@ type UserHandler struct {
 	emailService     *services.EmailService
 	blacklistService *services.TokenBlacklistService
 	logger           *zap.Logger
+	// codeAttempts — счётчик неверных попыток ввода кода по email (анти-брутфорс).
+	codeAttempts *attemptTracker
 }
+
+// maxCodeAttempts — после стольких неверных попыток код инвалидируется и нужен новый.
+const maxCodeAttempts = 5
 
 func NewUserHandler(userUC *usecase.UserUsecase, emailService *services.EmailService, blacklistService *services.TokenBlacklistService, logger *zap.Logger) *UserHandler {
 	return &UserHandler{
@@ -26,6 +31,7 @@ func NewUserHandler(userUC *usecase.UserUsecase, emailService *services.EmailSer
 		emailService:     emailService,
 		blacklistService: blacklistService,
 		logger:           logger,
+		codeAttempts:     newAttemptTracker(15 * time.Minute),
 	}
 }
 
@@ -35,6 +41,25 @@ var (
 	registrationAttempts = make(map[string]int)
 	lastRegistrationTime = make(map[string]time.Time)
 )
+
+// Периодически чистим карты тайминга регистрации/входа, чтобы они не росли
+// бесконечно по уникальным IP (защита от утечки памяти / OOM-DoS).
+func init() {
+	go func() {
+		for {
+			time.Sleep(10 * time.Minute)
+			registrationMu.Lock()
+			now := time.Now()
+			for ip, t := range lastRegistrationTime {
+				if now.Sub(t) > time.Hour {
+					delete(lastRegistrationTime, ip)
+					delete(registrationAttempts, ip)
+				}
+			}
+			registrationMu.Unlock()
+		}
+	}()
+}
 
 func (h *UserHandler) Register(c *gin.Context) {
 	var req usecase.RegisterRequest
@@ -317,6 +342,18 @@ type ResendCodeRequest struct {
 	Email string `json:"email" binding:"required,email"`
 }
 
+// invalidateCode стирает текущий код подтверждения пользователя (по email),
+// чтобы после превышения лимита попыток перебор был бесполезен.
+func (h *UserHandler) invalidateCode(c *gin.Context, email string) {
+	user, err := h.userUC.GetUserByEmail(c.Request.Context(), email)
+	if err != nil || user == nil {
+		return
+	}
+	if err := h.userUC.ClearVerificationCode(c.Request.Context(), user.ID); err != nil {
+		h.logger.Warn("Failed to invalidate verification code", zap.Int64("user_id", user.ID), zap.Error(err))
+	}
+}
+
 // VerifyEmail проверяет код верификации и активирует аккаунт
 func (h *UserHandler) VerifyEmail(c *gin.Context) {
 	var req VerifyEmailRequest
@@ -343,15 +380,30 @@ func (h *UserHandler) VerifyEmail(c *gin.Context) {
 		return
 	}
 
+	// Анти-брутфорс: лимит неверных попыток по email. После порога код
+	// инвалидируется, чтобы дальнейший перебор был бесполезен.
+	attemptKey := strings.ToLower(strings.TrimSpace(email))
+	if h.codeAttempts.get(attemptKey) >= maxCodeAttempts {
+		h.invalidateCode(c, attemptKey)
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Слишком много попыток. Запросите новый код."})
+		return
+	}
+
 	// Проверяем код и активируем аккаунт
 	user, err := h.userUC.VerifyEmailByCode(c.Request.Context(), email, code)
 	if err != nil {
+		n := h.codeAttempts.inc(attemptKey)
+		if n >= maxCodeAttempts {
+			h.invalidateCode(c, attemptKey)
+		}
 		h.logger.Warn("Email verification failed",
 			zap.String("email", email),
+			zap.Int("attempts", n),
 			zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный или просроченный код подтверждения"})
 		return
 	}
+	h.codeAttempts.reset(attemptKey)
 
 	// Генерируем JWT токен после успешной верификации
 	token, err := h.userUC.GenerateJWTToken(user.ID, user.Username, user.Email)
@@ -651,15 +703,29 @@ func (h *UserHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 
+	// Анти-брутфорс кода (как в VerifyEmail).
+	attemptKey := strings.ToLower(strings.TrimSpace(req.Email))
+	if h.codeAttempts.get(attemptKey) >= maxCodeAttempts {
+		h.invalidateCode(c, attemptKey)
+		c.JSON(http.StatusTooManyRequests, gin.H{"error": "Слишком много попыток. Запросите новый код."})
+		return
+	}
+
 	// Проверяем код
 	user, err := h.userUC.GetByEmailAndCode(c.Request.Context(), req.Email, req.Code)
 	if err != nil {
+		n := h.codeAttempts.inc(attemptKey)
+		if n >= maxCodeAttempts {
+			h.invalidateCode(c, attemptKey)
+		}
 		h.logger.Warn("Reset password - invalid code",
 			zap.String("email", req.Email),
+			zap.Int("attempts", n),
 			zap.Error(err))
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный или просроченный код"})
 		return
 	}
+	h.codeAttempts.reset(attemptKey)
 
 	if !strings.ContainsAny(req.NewPassword, "ABCDEFGHIJKLMNOPQRSTUVWXYZАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ") {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Пароль должен содержать хотя бы одну заглавную букву"})

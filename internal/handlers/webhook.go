@@ -48,21 +48,24 @@ func (h *WebhookHandler) idempotencyKey(c *gin.Context, kind string, body []byte
 }
 
 func (h *WebhookHandler) readVerifiedBody(c *gin.Context) ([]byte, error) {
-	if h.webhookSecret != "" {
-		signature := c.GetHeader("X-Moysklad-Signature")
-		if signature == "" {
-			return nil, errHTTP(http.StatusUnauthorized, "missing signature")
-		}
-		body, err := io.ReadAll(c.Request.Body)
-		if err != nil {
-			return nil, err
-		}
-		if !h.verifySignature(body, signature) {
-			return nil, errHTTP(http.StatusUnauthorized, "invalid signature")
-		}
-		return body, nil
+	// Fail-closed: без настроенного секрета вебхуки не принимаем — иначе это открытый
+	// эндпоинт, который может менять остатки/заказы. Требуется MOYSKLAD_WEBHOOK_SECRET.
+	if h.webhookSecret == "" {
+		h.logger.Error("MOYSKLAD_WEBHOOK_SECRET не задан — вебхуки отклоняются (fail-closed)")
+		return nil, errHTTP(http.StatusServiceUnavailable, "webhook secret not configured")
 	}
-	return io.ReadAll(c.Request.Body)
+	signature := c.GetHeader("X-Moysklad-Signature")
+	if signature == "" {
+		return nil, errHTTP(http.StatusUnauthorized, "missing signature")
+	}
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		return nil, err
+	}
+	if !h.verifySignature(body, signature) {
+		return nil, errHTTP(http.StatusUnauthorized, "invalid signature")
+	}
+	return body, nil
 }
 
 type httpStatusError struct {
@@ -203,7 +206,8 @@ func (h *WebhookHandler) ReplayDeadLetter(c *gin.Context) {
 
 func (h *WebhookHandler) verifySignature(body []byte, signature string) bool {
 	if h.webhookSecret == "" {
-		return true
+		// Fail-closed: без секрета подпись считаем невалидной.
+		return false
 	}
 	mac := hmac.New(sha256.New, []byte(h.webhookSecret))
 	mac.Write(body)

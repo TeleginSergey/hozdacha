@@ -135,7 +135,7 @@ func (u *UserUsecase) GenerateVerificationCode() string {
 
 // SaveVerificationCode сохраняет код верификации в БД
 func (u *UserUsecase) SaveVerificationCode(ctx context.Context, userID int64, code string) error {
-	expiresAt := time.Now().Add(30 * time.Minute) // Код действителен 30 минут
+	expiresAt := time.Now().Add(10 * time.Minute) // Код действителен 10 минут
 	return u.users.UpdateVerificationCode(ctx, userID, code, expiresAt)
 }
 
