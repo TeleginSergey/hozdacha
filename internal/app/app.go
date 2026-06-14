@@ -157,6 +157,15 @@ func NewApp() (*App, error) {
 		logger.Info("Token blacklist service initialized")
 	}
 
+	// Хранилище rate-limit / анти-брутфорса: Redis при наличии (корректно при
+	// нескольких репликах), иначе in-memory фолбэк.
+	var rateRedis *redis.Client
+	if stockCache != nil {
+		rateRedis = stockCache.GetRedisClient()
+	}
+	rateStore := cache.NewRateStore(rateRedis, logger)
+	middleware.SetRateStore(rateStore)
+
 	// Health check service
 	var healthCheckService *services.HealthCheckService
 	if database != nil {
@@ -172,7 +181,7 @@ func NewApp() (*App, error) {
 
 	// Handlers поверх usecase // Handlers
 	authHandler := handlers.NewAuthHandler(authService, logger)
-	userHandler := handlers.NewUserHandler(userUC, emailService, blacklistService, logger)
+	userHandler := handlers.NewUserHandler(userUC, emailService, blacklistService, rateStore, logger)
 	productHandler := handlers.NewProductHandlerWithUsecase(productUC, database, logger)
 	promotionHandler := handlers.NewPromotionHandler(promotionRepo, logger)
 	promotionHandler.SetPromotionLinkQuery(promotionLinkRepo)
