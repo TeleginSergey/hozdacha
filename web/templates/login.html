@@ -87,7 +87,7 @@ function goStep(n) {
 document.getElementById('btnStep1').addEventListener('click', async function() {
     var btn = this;
     hideMsgs();
-    var email = document.getElementById('email').value.trim();
+    var email = document.getElementById('email').value.trim().toLowerCase();
     if (!email) { showMsg('error', 'Введите почту'); return; }
 
     btn.disabled = true; btn.textContent = 'Отправка...';

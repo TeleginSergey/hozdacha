@@ -59,7 +59,16 @@ type AuthResponse struct {
 	User  *db.User `json:"user"`
 }
 
+// normalizeEmail приводит email к каноничному виду: без пробелов по краям и в нижнем
+// регистре. Email регистронезависим, поэтому храним и сравниваем его нормализованным.
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
+}
+
 func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.User, error) {
+	// Нормализуем email до всех проверок и сохранения.
+	req.Email = normalizeEmail(req.Email)
+
 	// Валидация
 	if req.Email == "" || req.Name == "" || req.Phone == "" {
 		return nil, fmt.Errorf("нужны почта, имя и телефон")
@@ -74,7 +83,7 @@ func (u *UserUsecase) Register(ctx context.Context, req RegisterRequest) (*db.Us
 	username := req.Username
 	if username == "" {
 		parts := strings.Split(req.Email, "@")
-		username = parts[0]
+		username = strings.ToLower(parts[0])
 		n, _ := rand.Int(rand.Reader, big.NewInt(10000))
 		username = fmt.Sprintf("%s%d", username, n.Int64())
 	}
@@ -132,6 +141,7 @@ func (u *UserUsecase) SaveVerificationCode(ctx context.Context, userID int64, co
 
 // VerifyEmailByCode проверяет код верификации и активирует аккаунт
 func (u *UserUsecase) VerifyEmailByCode(ctx context.Context, email, code string) (*db.User, error) {
+	email = normalizeEmail(email)
 	// Ищем пользователя с указанным email и кодом
 	user, err := u.users.GetByEmailAndCode(ctx, email, code)
 	if err != nil {
@@ -158,6 +168,9 @@ func (u *UserUsecase) VerifyEmailByCode(ctx context.Context, email, code string)
 
 // RegisterWithTransaction регистрирует пользователя в одной транзакции для защиты от race conditions
 func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterRequest) (*db.User, error) {
+	// Нормализуем email до всех проверок и сохранения.
+	req.Email = normalizeEmail(req.Email)
+
 	// Валидация
 	if req.Email == "" || req.Name == "" || req.Phone == "" {
 		return nil, fmt.Errorf("нужны почта, имя и телефон")
@@ -172,7 +185,7 @@ func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterR
 	username := req.Username
 	if username == "" {
 		parts := strings.Split(req.Email, "@")
-		username = parts[0]
+		username = strings.ToLower(parts[0])
 		n, _ := rand.Int(rand.Reader, big.NewInt(10000))
 		username = fmt.Sprintf("%s%d", username, n.Int64())
 	}
@@ -226,6 +239,7 @@ func (u *UserUsecase) RegisterWithTransaction(ctx context.Context, req RegisterR
 // Login находит пользователя по email (для отправки кода).
 // Сама проверка кода и выдача токена — в VerifyEmailByCode.
 func (u *UserUsecase) Login(ctx context.Context, req LoginRequest) (*db.User, error) {
+	req.Email = normalizeEmail(req.Email)
 	if req.Email == "" {
 		return nil, fmt.Errorf("нужна почта")
 	}
@@ -249,6 +263,7 @@ func (u *UserUsecase) GenerateJWTToken(userID int64, username, email string) (st
 
 // GetUserByEmail получает пользователя по email
 func (u *UserUsecase) GetUserByEmail(ctx context.Context, email string) (*db.User, error) {
+	email = normalizeEmail(email)
 	user, err := u.users.GetByEmail(ctx, email)
 	if err != nil {
 		return nil, err

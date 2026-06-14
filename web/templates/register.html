@@ -114,7 +114,7 @@ document.getElementById('btnStep1').addEventListener('click', async function() {
         return;
     }
 
-    var email = document.getElementById('email').value.trim();
+    var email = document.getElementById('email').value.trim().toLowerCase();
     var name = document.getElementById('name').value.trim();
     var phone = document.getElementById('phone').value.trim();
 
