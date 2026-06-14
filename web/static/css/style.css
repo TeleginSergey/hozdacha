@@ -1151,6 +1151,7 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
 .search-box svg { width: 18px; height: 18px; color: var(--c-muted); flex-shrink: 0; }
 .search-box input {
   flex: 1;
+  min-width: 0; /* позволяет инпуту сжиматься в flex и не распирать контейнер */
   border: none;
   outline: none;
   background: transparent;
@@ -1375,9 +1376,28 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
 
   .site-header__inner { flex-wrap: wrap; gap: 10px; padding: 10px 0; }
   .brand { font-size: var(--fs-lg); }
-  .main-nav { order: 3; width: 100%; justify-content: center; margin-left: 0; gap: 2px; }
-  .main-nav a { padding: 6px 12px; font-size: var(--fs-sm); }
+  .main-nav { order: 3; width: 100%; justify-content: center; margin-left: 0; gap: 2px; flex-wrap: wrap; }
+  .main-nav a { padding: 6px 10px; font-size: var(--fs-sm); }
   .user-greeting { display: none; }
+
+  /* --- Каталог: топбар и поиск --- */
+  .catalog-topbar { padding: var(--sp-3); gap: var(--sp-3); }
+  .sidebar-open-btn { width: 100%; justify-content: center; padding: 10px; }
+
+  .search-box {
+    flex-wrap: wrap;
+    border-radius: var(--r-lg);
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .search-box svg { display: none; }              /* экономим место — инпуту нужна вся ширина */
+  .search-box input {
+    flex: 1 1 100%;
+    order: -1;                                     /* поле поиска отдельной строкой сверху */
+    padding: 8px 4px;
+  }
+  .search-scope { flex: 1 1 auto; min-width: 0; padding: 10px 12px; }
+  .search-box button { flex: 0 0 auto; padding: 10px 18px; }
 
   .hero { padding: 40px 24px; border-radius: var(--r-lg); }
   .hero h1 { font-size: 32px; }
@@ -1392,6 +1412,7 @@ main { flex: 1; padding: var(--sp-7) 0 var(--sp-8); }
   .product-card__body { padding: 12px; }
   .product-card__title { font-size: var(--fs-sm); min-height: auto; }
   .product-card__price { font-size: var(--fs-lg); }
+  .product-card .btn--sm { padding: 10px 12px; }  /* удобнее попадать пальцем */
 
   .cart-row { flex-wrap: wrap; gap: 10px; }
   .cart-row__total { width: 100%; text-align: left; }
