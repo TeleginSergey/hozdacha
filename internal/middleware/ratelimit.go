@@ -133,6 +133,34 @@ func ProductRateLimit() gin.HandlerFunc {
 	}
 }
 
+// AuthRateLimit — жёсткий лимит для аутентификационных эндпоинтов
+// (login / verify / reset / register): гасит перебор кодов и спам.
+func AuthRateLimit() gin.HandlerFunc {
+	authLimiter := &rateLimiter{
+		visitors: make(map[string]*visitor),
+		rate:     time.Minute,
+		limit:    30, // 30 запросов в минуту на IP — с запасом для легитимного входа (и общих IP/CGNAT)
+	}
+
+	go func() {
+		for {
+			time.Sleep(5 * time.Minute)
+			authLimiter.cleanup()
+		}
+	}()
+
+	return func(c *gin.Context) {
+		if !authLimiter.allow(c.ClientIP()) {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error": "Слишком много запросов. Попробуйте позже.",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 // StrictRateLimit для админ-панели
 func StrictRateLimit() gin.HandlerFunc {
 	adminLimiter := &rateLimiter{

@@ -219,6 +219,14 @@
 
 <script src="/static/js/header.js?v=3"></script>
 <script>
+// Экранирование HTML (защита от XSS при вставке данных товара в innerHTML).
+function esc(s) {
+    if (s === null || s === undefined) return '';
+    return String(s).replace(/[&<>"']/g, function(m) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+    });
+}
+
 // Корзина с выбором товаров (как в Ozon/WB). Поле selected у позиции — выбрана ли она.
 function getCart() {
     let c;
@@ -315,10 +323,10 @@ function renderCart() {
         <div class="cart-item-card ${item.selected ? '' : 'is-unselected'}">
             <input type="checkbox" class="cart-check" ${item.selected ? 'checked' : ''} onchange="toggleItem(${idx})" aria-label="Выбрать товар">
             ${img
-                ? `<img class="cart-item-card__img" src="${img}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cart-item-card__img cart-item-card__img--empty',textContent:'Нет фото'}))">`
+                ? `<img class="cart-item-card__img" src="${esc(img)}" alt="" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'cart-item-card__img cart-item-card__img--empty',textContent:'Нет фото'}))">`
                 : `<div class="cart-item-card__img cart-item-card__img--empty">Нет фото</div>`}
             <div class="cart-item-card__body">
-                <div class="cart-item-card__name"><a href="/product/${item.id}">${item.name}</a></div>
+                <div class="cart-item-card__name"><a href="/product/${encodeURIComponent(item.id)}">${esc(item.name)}</a></div>
                 <div class="cart-item-card__price-row">${priceRow}</div>
                 <div class="qty" style="margin-top:10px">
                     <button onclick="changeQty(${idx}, -1)" aria-label="Уменьшить">−</button>
