@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}} — ХозДача</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=21">
+    <link rel="stylesheet" href="/static/css/style.css?v=22">
 </head>
 <body>
 
@@ -59,6 +59,12 @@
         </div>
     </div>
 </main>
+
+<!-- Floating categories button (mobile) -->
+<button class="cat-fab" id="catFab" onclick="toggleSidebar()" aria-label="Открыть категории">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+    Категории
+</button>
 
 <!-- Floating cart button -->
 <button class="cart-fab" onclick="window.location.href='/cart'" id="cartFab" style="display:none">
