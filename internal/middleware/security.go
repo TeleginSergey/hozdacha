@@ -25,6 +25,8 @@ func SecurityHeaders() gin.HandlerFunc {
 				"img-src 'self' data: https:; "+
 				"font-src 'self' data:; "+
 				"connect-src 'self'; "+
+				// Разрешаем встраивать виджет Яндекс.Карт (страница контактов).
+				"frame-src 'self' https://yandex.ru https://*.yandex.ru; "+
 				"frame-ancestors 'none';")
 
 		// Strict Transport Security (для HTTPS)
