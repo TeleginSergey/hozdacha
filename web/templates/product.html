@@ -3,7 +3,22 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{.product.Name}} - ХозДача</title>
+    <meta name="theme-color" content="#4a7c59">
+    <link rel="icon" type="image/svg+xml" href="/static/images/favicon.svg">
+    <link rel="icon" type="image/png" sizes="48x48" href="/static/images/favicon-48.png">
+    <link rel="apple-touch-icon" href="/static/images/apple-touch-icon.png">
+    <title>{{.product.Name}} — ХозДача, Сергач</title>
+    <meta name="description" content="{{if .product.Description}}{{.product.Description}}{{else}}{{.product.Name}} — в наличии в магазине ХозДача, г. Сергач. Бронируйте онлайн и забирайте без очередей.{{end}}">
+
+    <!-- Open Graph / Twitter для ссылки на товар -->
+    <meta property="og:type" content="product">
+    <meta property="og:site_name" content="ХозДача">
+    <meta property="og:locale" content="ru_RU">
+    <meta property="og:title" content="{{.product.Name}} — ХозДача">
+    <meta property="og:description" content="{{if .product.Description}}{{.product.Description}}{{else}}В наличии в магазине ХозДача, г. Сергач. Бронируйте онлайн и забирайте без очередей.{{end}}">
+    <meta property="og:image" content="{{if .product.ImageURL}}{{.product.ImageURL}}{{else}}https://hozdacha.ru/static/images/og-image.png{{end}}">
+    <meta name="twitter:card" content="summary_large_image">
+
     <link rel="stylesheet" href="/static/css/style.css?v=27">
     <link rel="stylesheet" href="/static/css/product-detail.css?v=2">
 </head>

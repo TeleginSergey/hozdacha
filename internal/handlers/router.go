@@ -81,6 +81,9 @@ func SetupRouter(
 
 	// Статические файлы
 	router.Static("/static", "./web/static")
+	// Иконки в корне (браузеры/краулеры запрашивают /favicon.ico).
+	router.StaticFile("/favicon.ico", "./web/static/images/favicon-48.png")
+	router.StaticFile("/favicon.svg", "./web/static/images/favicon.svg")
 	router.SetFuncMap(templateFuncs)
 	// Подключаем страничные шаблоны + partials (общий хедер и т.п.).
 	// Чтобы partials/header.html был доступен через {{ template "header.html" . }}
