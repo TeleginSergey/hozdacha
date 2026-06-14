@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}} — ХозДача</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=25">
+    <link rel="stylesheet" href="/static/css/style.css?v=26">
 </head>
 <body>
 
@@ -39,7 +39,7 @@
                             <input type="search" id="mSearchInput" placeholder="Поиск товаров…" autocomplete="off">
                         </div>
                     </div>
-                    <div class="mobile-catbar__active" id="catActiveFilters" hidden></div>
+                    <div class="mobile-catbar__active js-cat-active" id="catActiveFilters" hidden></div>
                 </div>
                 <div class="catalog-topbar">
                     <button class="btn btn--outline btn--sm sidebar-open-btn" id="sidebarOpenBtn" onclick="toggleSidebar()" title="Категории">
@@ -57,6 +57,7 @@
                     <div class="catalog-breadcrumb" id="breadcrumb">
                         <span class="breadcrumb-item active">Все товары</span>
                     </div>
+                    <div class="catalog-active-filters js-cat-active" id="catActiveFiltersDesktop" hidden></div>
                 </div>
 
                 <section class="products-grid" id="productsGrid">
@@ -147,7 +148,7 @@ window.addEventListener('storage', updateCartFab);
 <script src="/static/js/header.js?v=3"></script>
 <script src="/static/js/infinite-scroll.js?v=1"></script>
 <script src="/static/js/product-card.js?v=1"></script>
-<script src="/static/js/catalog.js?v=19"></script>
+<script src="/static/js/catalog.js?v=20"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
