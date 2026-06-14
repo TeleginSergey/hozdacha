@@ -697,14 +697,11 @@ function chooseCategory(id) {
     renderActiveFilters();
 
     currentCategoryId = activeCategoryId;
-    currentQuery = '';
-    const main = document.getElementById('searchInput');
-    if (main) main.value = '';
-    const mInput = document.getElementById('mSearchInput');
-    if (mInput) mInput.value = '';
+    // Поисковый запрос сохраняем: при снятии категории поиск продолжает
+    // действовать в новом скоупе (выбранная категория или все товары).
     const sentinel = document.getElementById('catalogScrollSentinel');
     if (sentinel) sentinel.style.display = 'block';
-    loadProducts();
+    loadProducts(currentQuery);
 }
 
 // Активные фильтры (выбранная категория и/или поиск) — чипы с крестиком.
