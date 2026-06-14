@@ -145,6 +145,8 @@ function searchProducts() {
 
     renderCategoryTree();
     updateBreadcrumb();
+    updateSearchScope(activeCategoryId);
+    renderActiveFilters();
 
     if (!currentQuery) {
         loadProducts();
@@ -514,15 +516,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Загружаем категории
     loadCategories();
 
-    // Мобильная полоса: выбор категории по чипу + поиск.
-    const chipBar = document.getElementById('mobileCatChips');
-    if (chipBar) {
-        chipBar.addEventListener('click', function(e) {
-            const btn = e.target.closest('.catchip');
-            if (!btn) return;
-            chooseCategory(btn.dataset.id || '');
-        });
-    }
+    // Мобильная полоса: поиск.
     const mInput = document.getElementById('mSearchInput');
     if (mInput) {
         mInput.addEventListener('keydown', function(e) {
@@ -561,7 +555,7 @@ async function loadCategories() {
         }
 
         renderCategoryTree();
-        renderMobileChips();
+        renderActiveFilters();
     } catch (e) {
         console.error('Failed to load categories:', e);
     }
@@ -664,7 +658,7 @@ function selectTreeCategory(event, categoryId) {
     renderCategoryTree();
     updateBreadcrumb();
     updateSearchScope(activeCategoryId);
-    renderMobileChips();
+    renderActiveFilters();
 
     currentCategoryId = activeCategoryId;
     currentQuery = '';
@@ -673,9 +667,19 @@ function selectTreeCategory(event, categoryId) {
     const sentinel = document.getElementById('catalogScrollSentinel');
     if (sentinel) sentinel.style.display = 'block';
     loadProducts();
+
+    // На телефоне закрываем выезжающую панель после выбора конечной категории / «Все»
+    // (для раскрытия родителя с подкатегориями оставляем открытой).
+    if (window.innerWidth <= 900) {
+        const isLeaf = idStr === '' || !childrenByParent.has(idStr);
+        if (isLeaf) {
+            const sb = document.getElementById('catalogSidebar');
+            if (sb) sb.classList.add('collapsed');
+        }
+    }
 }
 
-// Выбор категории из мобильной полосы чипов (плоский список: корни + подкатегории).
+// Выбор категории напрямую по id (крестик активного фильтра → сброс на «Все»).
 function chooseCategory(id) {
     const idStr = id ? String(id) : '';
     if (idStr === '') {
@@ -690,7 +694,7 @@ function chooseCategory(id) {
     renderCategoryTree();
     updateBreadcrumb();
     updateSearchScope(activeCategoryId);
-    renderMobileChips();
+    renderActiveFilters();
 
     currentCategoryId = activeCategoryId;
     currentQuery = '';
@@ -703,25 +707,37 @@ function chooseCategory(id) {
     loadProducts();
 }
 
-// Рендер чипов категорий в мобильной полосе: «Все» + корневые и их подкатегории.
-function renderMobileChips() {
-    const bar = document.getElementById('mobileCatChips');
-    if (!bar) return;
-    const roots = childrenByParent.get('root') || [];
-    let html = `<button type="button" class="catchip${activeCategoryId === '' ? ' active' : ''}" data-id="">Все</button>`;
-    roots.forEach(root => {
-        const rActive = activeCategoryId === String(root.id);
-        html += `<button type="button" class="catchip${rActive ? ' active' : ''}" data-id="${root.id}">${escapeHtml(root.name)}</button>`;
-        const kids = childrenByParent.get(String(root.id)) || [];
-        kids.forEach(k => {
-            const kActive = activeCategoryId === String(k.id);
-            html += `<button type="button" class="catchip catchip--sub${kActive ? ' active' : ''}" data-id="${k.id}">${escapeHtml(k.name)}</button>`;
-        });
-    });
-    bar.innerHTML = html;
+// Активные фильтры в мобильной полосе: выбранная категория и/или поиск — чипы с крестиком.
+function renderActiveFilters() {
+    const box = document.getElementById('catActiveFilters');
+    if (!box) return;
+    const xSvg = '<span class="filter-chip__x"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></span>';
+    let html = '';
+    if (activeCategoryId) {
+        const cat = allCategories.find(c => String(c.id) === String(activeCategoryId));
+        if (cat) {
+            html += `<button type="button" class="filter-chip" onclick="chooseCategory('')"><span>${escapeHtml(cat.name)}</span>${xSvg}</button>`;
+        }
+    }
+    if (currentQuery) {
+        html += `<button type="button" class="filter-chip" onclick="clearCatalogSearch()"><span>Поиск: ${escapeHtml(currentQuery)}</span>${xSvg}</button>`;
+    }
+    box.innerHTML = html;
+    box.hidden = !html;
+}
 
-    const active = bar.querySelector('.catchip.active');
-    if (active && active.scrollIntoView) active.scrollIntoView({ inline: 'center', block: 'nearest' });
+// Сброс только поискового запроса (крестик на чипе поиска).
+function clearCatalogSearch() {
+    currentQuery = '';
+    const main = document.getElementById('searchInput');
+    if (main) main.value = '';
+    const mInput = document.getElementById('mSearchInput');
+    if (mInput) mInput.value = '';
+    resetCatalogList();
+    const sentinel = document.getElementById('catalogScrollSentinel');
+    if (sentinel) sentinel.style.display = 'block';
+    loadProducts(currentQuery);
+    renderActiveFilters();
 }
 
 function updateBreadcrumb() {
@@ -786,7 +802,7 @@ document.addEventListener('click', function(e) {
     const sidebar = document.getElementById('catalogSidebar');
     if (!sidebar || sidebar.classList.contains('collapsed')) return;
     if (window.innerWidth > 768) return;
-    if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-open-btn')) {
+    if (!sidebar.contains(e.target) && !e.target.closest('.sidebar-open-btn') && !e.target.closest('.catbar-cats-btn')) {
         sidebar.classList.add('collapsed');
     }
 });

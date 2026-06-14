@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=24">
+    <link rel="stylesheet" href="/static/css/style.css?v=25">
     <link rel="stylesheet" href="/static/css/promotions.css?v=4">
 </head>
 <body>
@@ -33,11 +33,17 @@
 
         <section class="section promo-page">
             <div class="mobile-catbar" id="promoMobileCatBar">
-                <div class="mobile-catbar__search">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                    <input type="search" id="promoMobileSearch" placeholder="Поиск в акциях…" autocomplete="off">
+                <div class="mobile-catbar__row">
+                    <button type="button" class="catbar-cats-btn" id="promoCatsBtn" aria-label="Категории">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        Категории
+                    </button>
+                    <div class="mobile-catbar__search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                        <input type="search" id="promoMobileSearch" placeholder="Поиск в акциях…" autocomplete="off">
+                    </div>
                 </div>
-                <div class="mobile-catbar__chips" id="promoMobileChips"></div>
+                <div class="mobile-catbar__active" id="promoActiveFilters" hidden></div>
             </div>
             <div class="promo-page__toolbar">
                 <div class="promo-page__search">
@@ -101,6 +107,20 @@
     </div>
 </main>
 
+<!-- Выезжающая панель категорий (мобильная) -->
+<aside class="m-drawer" id="promoDrawer" aria-label="Категории акций">
+    <div class="m-drawer__head">
+        <h3>Категории</h3>
+        <button type="button" class="m-drawer__close" id="promoDrawerClose" aria-label="Закрыть">✕</button>
+    </div>
+    <div class="m-drawer__search">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="search" id="promoDrawerSearch" placeholder="Найти категорию…" autocomplete="off">
+    </div>
+    <div class="m-drawer__list" id="promoDrawerList"></div>
+</aside>
+<div class="m-drawer-overlay" id="promoDrawerOverlay"></div>
+
 <footer class="site-footer">
     <div class="container">
         <div class="site-footer__grid">
@@ -136,7 +156,7 @@
 <script src="/static/js/header.js?v=3"></script>
 <script src="/static/js/infinite-scroll.js?v=1"></script>
 <script src="/static/js/product-card.js?v=1"></script>
-<script src="/static/js/promotions.js?v=7"></script>
+<script src="/static/js/promotions.js?v=8"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>

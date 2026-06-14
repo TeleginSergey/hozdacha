@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{.title}} — ХозДача</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=24">
+    <link rel="stylesheet" href="/static/css/style.css?v=25">
 </head>
 <body>
 
@@ -29,11 +29,17 @@
 
             <div class="catalog-main">
                 <div class="mobile-catbar" id="mobileCatBar">
-                    <div class="mobile-catbar__search">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-                        <input type="search" id="mSearchInput" placeholder="Поиск товаров…" autocomplete="off">
+                    <div class="mobile-catbar__row">
+                        <button type="button" class="catbar-cats-btn" onclick="toggleSidebar()" aria-label="Категории">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                            Категории
+                        </button>
+                        <div class="mobile-catbar__search">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                            <input type="search" id="mSearchInput" placeholder="Поиск товаров…" autocomplete="off">
+                        </div>
                     </div>
-                    <div class="mobile-catbar__chips" id="mobileCatChips"></div>
+                    <div class="mobile-catbar__active" id="catActiveFilters" hidden></div>
                 </div>
                 <div class="catalog-topbar">
                     <button class="btn btn--outline btn--sm sidebar-open-btn" id="sidebarOpenBtn" onclick="toggleSidebar()" title="Категории">
@@ -141,7 +147,7 @@ window.addEventListener('storage', updateCartFab);
 <script src="/static/js/header.js?v=3"></script>
 <script src="/static/js/infinite-scroll.js?v=1"></script>
 <script src="/static/js/product-card.js?v=1"></script>
-<script src="/static/js/catalog.js?v=18"></script>
+<script src="/static/js/catalog.js?v=19"></script>
 <script>document.querySelectorAll(".footer-year").forEach(function(e){e.textContent=new Date().getFullYear()})</script>
 </body>
 </html>
