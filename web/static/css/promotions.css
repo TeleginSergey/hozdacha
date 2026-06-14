@@ -475,11 +475,11 @@
 
 @media (max-width: 768px) {
   .promo-page__toolbar { flex-direction: column; align-items: stretch; }
-  .promo-page__search { flex: 1 1 auto; }
+  /* На телефоне поиск и выбор категории живут в липкой полосе .mobile-catbar */
+  .promo-page__search { display: none; }
+  .promo-catselect { display: none; }
   .promo-page__select { width: 100%; }
   .promo-filter { align-self: flex-start; }
-  .promo-catselect { flex: 1 1 auto; min-width: 0; }
-  .promo-catselect__panel { width: 100%; }
 }
 
 /* ---------- Бесконечная лента акций с товарами ---------- */

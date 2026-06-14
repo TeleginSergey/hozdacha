@@ -205,10 +205,26 @@
         list.innerHTML = html;
     }
 
-    // Полное обновление UI категорий (подпись + список).
+    // Полное обновление UI категорий (подпись + список + мобильные чипы).
     function renderCategoryUI() {
         updateCategoryLabel();
         renderCategoryOptions();
+        renderMobileChips();
+    }
+
+    // Чипы категорий для мобильной липкой полосы.
+    function renderMobileChips() {
+        const bar = document.getElementById('promoMobileChips');
+        if (!bar) return;
+        let html = '<button type="button" class="catchip' + (state.categoryId === '' ? ' active' : '') + '" data-id="">Все</button>';
+        state.categories.forEach(function(cat) {
+            const active = String(cat.id) === String(state.categoryId);
+            html += '<button type="button" class="catchip' + (active ? ' active' : '') + '" data-id="' + cat.id + '">'
+                + escapeHtml(cat.name) + '</button>';
+        });
+        bar.innerHTML = html;
+        const a = bar.querySelector('.catchip.active');
+        if (a && a.scrollIntoView) a.scrollIntoView({ inline: 'center', block: 'nearest' });
     }
 
     function openCatPanel() {
@@ -388,6 +404,25 @@
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape' && isCatPanelOpen()) closeCatPanel();
         });
+
+        // Мобильная липкая полоса: чипы категорий + поиск.
+        const mobileChips = document.getElementById('promoMobileChips');
+        if (mobileChips) {
+            mobileChips.addEventListener('click', function(e) {
+                const btn = e.target.closest('.catchip');
+                if (!btn) return;
+                setCategory(btn.dataset.id || '');
+            });
+        }
+        const mobileSearch = document.getElementById('promoMobileSearch');
+        if (mobileSearch) {
+            mobileSearch.addEventListener('keydown', function(e) {
+                if (e.key !== 'Enter') return;
+                const main = document.getElementById('promoSearchInput');
+                if (main) main.value = mobileSearch.value;
+                applyFilters();
+            });
+        }
         if (kindFilter) {
             kindFilter.querySelectorAll('.promo-filter__btn').forEach(function(btn) {
                 btn.addEventListener('click', function() {
