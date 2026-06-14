@@ -62,10 +62,44 @@
         }
     }
 
+    function setupMobileNav() {
+        const toggle = document.getElementById('navToggle');
+        const header = document.querySelector('.site-header');
+        const nav = document.getElementById('siteMainNav');
+        if (!toggle || !header) return;
+
+        function close() {
+            header.classList.remove('nav-open');
+            toggle.setAttribute('aria-expanded', 'false');
+        }
+
+        toggle.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const open = header.classList.toggle('nav-open');
+            toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+        });
+
+        // Закрываем меню при выборе пункта.
+        if (nav) {
+            nav.addEventListener('click', function(e) {
+                if (e.target.closest('a')) close();
+            });
+        }
+
+        // Закрываем при клике вне шапки и по Escape.
+        document.addEventListener('click', function(e) {
+            if (header.classList.contains('nav-open') && !header.contains(e.target)) close();
+        });
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') close();
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         highlightActiveNav();
         refreshUserArea();
         refreshCartBadge();
+        setupMobileNav();
     });
 
     // Слушаем изменения localStorage между вкладками.
