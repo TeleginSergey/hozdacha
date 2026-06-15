@@ -53,6 +53,7 @@
                 <button class="tab-btn" data-tab="users" onclick="switchTab('users')">👥 Клиенты</button>
                 <button class="tab-btn" data-tab="promotions" onclick="switchTab('promotions')">🎁 Акции</button>
                 <button class="tab-btn" data-tab="sync" onclick="switchTab('sync')">🔄 Синхр.</button>
+                <button class="tab-btn" data-tab="metrics" onclick="switchTab('metrics')">📈 Метрики</button>
                 <button class="tab-btn tab-btn--logout" onclick="logoutAdmin()">Выйти</button>
             </div>
 
@@ -147,6 +148,17 @@
                     <button class="btn btn--ghost" onclick="syncProductsFull()" id="syncFullBtn">🔁 Полная пересинхронизация</button>
                 </div>
                 <div id="syncResult" class="sync-result"></div>
+            </section>
+
+            <section id="tab-metrics" class="tab-content" style="display:none">
+                <div class="dashboard-header">
+                    <h2 class="admin-section-title">Метрики приложения</h2>
+                    <button class="btn btn--ghost" onclick="loadMetrics()">⟳ Обновить</button>
+                </div>
+                <p class="admin-section-sub">Счётчики накапливаются с момента запуска сервиса. Те же данные доступны Prometheus на <code>/metrics</code>.</p>
+                <div id="metricsContent" class="orders-table-wrap">
+                    <p class="text-muted" style="padding:var(--sp-3)">Загрузка...</p>
+                </div>
             </section>
         </div>
     </div>

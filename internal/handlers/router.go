@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
 
 	"github.com/TeleginSergey/hozdacha/internal/db"
+	"github.com/TeleginSergey/hozdacha/internal/metrics"
 	"github.com/TeleginSergey/hozdacha/internal/middleware"
 	"github.com/TeleginSergey/hozdacha/internal/services"
 )
@@ -30,6 +32,19 @@ func trustedProxies() []string {
 		return out
 	}
 	return []string{"127.0.0.1/32", "::1/128", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"}
+}
+
+// metricsTokenOK проверяет токен доступа к /metrics: через заголовок
+// Authorization: Bearer <token> или query-параметр ?token=<token>.
+func metricsTokenOK(c *gin.Context, want string) bool {
+	if c.Query("token") == want {
+		return true
+	}
+	const prefix = "Bearer "
+	if h := c.GetHeader("Authorization"); strings.HasPrefix(h, prefix) {
+		return strings.TrimSpace(h[len(prefix):]) == want
+	}
+	return false
 }
 
 // templateFuncs — общие функции для всех HTML-шаблонов.
@@ -78,6 +93,9 @@ func SetupRouter(
 	router.Use(middleware.SecurityHeaders())
 	router.Use(middleware.CORS(corsOrigins))
 	router.Use(middleware.RateLimit())
+	// Сбор HTTP-метрик (RED) по каждому запросу — после CORS/RateLimit, чтобы
+	// учитывать в т.ч. отклонённые запросы.
+	router.Use(middleware.Metrics())
 
 	// Статические файлы
 	router.Static("/static", "./web/static")
@@ -221,6 +239,20 @@ func SetupRouter(
 	}
 	router.GET("/health/detail", healthDetailHandler)
 
+	// Prometheus scrape endpoint. По умолчанию выключен; включается заданием
+	// METRICS_TOKEN — тогда требует Authorization: Bearer <token> или ?token=.
+	// Сами метрики дублируются в админ-панель через /api/admin/metrics (под JWT).
+	if metricsToken := strings.TrimSpace(os.Getenv("METRICS_TOKEN")); metricsToken != "" {
+		promHandler := promhttp.HandlerFor(metrics.Registry, promhttp.HandlerOpts{})
+		router.GET("/metrics", func(c *gin.Context) {
+			if !metricsTokenOK(c, metricsToken) {
+				c.AbortWithStatus(http.StatusUnauthorized)
+				return
+			}
+			promHandler.ServeHTTP(c.Writer, c.Request)
+		})
+	}
+
 	// Публичные API
 	api := router.Group("/api")
 	{
@@ -344,6 +376,11 @@ func SetupRouter(
 			adminOrders.POST("/:id/cancel", orderHandler.CancelOrderByAdmin)
 			adminOrders.POST("/:id/expire", orderHandler.ExpireOrder)
 		}
+
+		// Метрики приложения для админ-панели (снимок Prometheus-реестра в JSON).
+		admin.GET("/metrics", func(c *gin.Context) {
+			c.JSON(http.StatusOK, metrics.GetSnapshot())
+		})
 
 		// Клиенты — поиск и статистика.
 		adminUsers := admin.Group("/users")

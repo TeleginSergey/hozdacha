@@ -16,6 +16,7 @@ import (
 	"github.com/TeleginSergey/hozdacha/internal/config"
 	"github.com/TeleginSergey/hozdacha/internal/db"
 	"github.com/TeleginSergey/hozdacha/internal/handlers"
+	"github.com/TeleginSergey/hozdacha/internal/metrics"
 	"github.com/TeleginSergey/hozdacha/internal/middleware"
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
 	"github.com/TeleginSergey/hozdacha/internal/resilience"
@@ -52,6 +53,16 @@ func NewApp() (*App, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize database: %w", err)
 	}
+
+	// Метрики пула соединений БД (отдаются в /metrics и в админ-снимок).
+	metrics.RegisterDBPool(func() metrics.DBPoolStat {
+		st := database.Pool.Stat()
+		return metrics.DBPoolStat{
+			Total: st.TotalConns(),
+			InUse: st.AcquiredConns(),
+			Idle:  st.IdleConns(),
+		}
+	})
 
 	// Redis
 	var stockCache *cache.StockCache

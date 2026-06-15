@@ -10,6 +10,7 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/TeleginSergey/hozdacha/internal/db"
+	"github.com/TeleginSergey/hozdacha/internal/metrics"
 	"github.com/TeleginSergey/hozdacha/internal/usecase"
 )
 
@@ -125,6 +126,7 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 		return
 	}
 
+	metrics.OrderCreated(order.TotalPrice)
 	c.JSON(http.StatusCreated, order)
 }
 
@@ -160,6 +162,7 @@ func (h *OrderHandler) CancelOrder(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отменить заказ"})
 		return
 	}
+	metrics.OrderTransition("cancelled")
 	c.JSON(http.StatusOK, gin.H{"status": "cancelled"})
 }
 
@@ -179,6 +182,7 @@ func (h *OrderHandler) ShipOrder(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отгрузить заказ"})
 		return
 	}
+	metrics.OrderTransition("completed")
 	c.JSON(http.StatusOK, gin.H{"status": "completed"})
 }
 
@@ -199,6 +203,7 @@ func (h *OrderHandler) CancelOrderByAdmin(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отменить заказ"})
 		return
 	}
+	metrics.OrderTransition("cancelled")
 	c.JSON(http.StatusOK, gin.H{"status": "cancelled"})
 }
 
@@ -218,6 +223,7 @@ func (h *OrderHandler) ExpireOrder(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось отменить просроченный заказ"})
 		return
 	}
+	metrics.OrderTransition("expired")
 	c.JSON(http.StatusOK, gin.H{"status": "expired"})
 }
 

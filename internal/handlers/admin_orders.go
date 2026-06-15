@@ -135,11 +135,22 @@ func (h *AdminOrdersHandler) Stats(c *gin.Context) {
 	if total > 0 {
 		noShowRate = float64(noShow) / float64(total)
 	}
+
+	// Денежные метрики (выручка/средний чек по выкупленным) — не валим весь
+	// дашборд, если этот запрос не удался: отдаём нули.
+	revenue, err := h.orders.RevenueByPeriod(c.Request.Context(), from, to)
+	if err != nil {
+		h.logger.Warn("Failed to compute revenue stats", zap.Error(err))
+		revenue = &db.RevenueStats{}
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"by_status":    stats,
 		"total":        total,
 		"no_show":      noShow,
 		"no_show_rate": noShowRate,
+		"revenue":      revenue.Revenue,
+		"avg_check":    revenue.AvgCheck,
 	})
 }
 

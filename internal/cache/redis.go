@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/TeleginSergey/hozdacha/internal/db"
+	"github.com/TeleginSergey/hozdacha/internal/metrics"
 	"github.com/redis/go-redis/v9"
 	"go.uber.org/zap"
 )
@@ -313,6 +314,9 @@ func (c *StockCache) BatchGetAvailableStocks(ctx context.Context, productIDs []i
 			reservedMap[pid] = r
 		}
 	}
+
+	// Метрика: попадания = всего − холодные, промахи = холодные.
+	metrics.StockCache(len(productIDs)-len(coldIDs), len(coldIDs))
 
 	// 3. Холодные — тянем из БД и греем кэш.
 	if len(coldIDs) > 0 {

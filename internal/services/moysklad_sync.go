@@ -13,6 +13,7 @@ import (
 
 	"github.com/TeleginSergey/hozdacha/internal/cache"
 	"github.com/TeleginSergey/hozdacha/internal/db"
+	"github.com/TeleginSergey/hozdacha/internal/metrics"
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
 )
 
@@ -95,12 +96,18 @@ func (s *MoyskladSyncService) SyncProductsDelta(ctx context.Context) (*SyncResul
 	return s.syncProducts(ctx, true, since)
 }
 
-func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, since *time.Time) (*SyncResult, error) {
+func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, since *time.Time) (result *SyncResult, err error) {
+	// Метрика прогона синхронизации: длительность + результат (success/error).
+	syncStart := time.Now()
+	defer func() {
+		metrics.MoyskladSync(err == nil, time.Since(syncStart))
+	}()
 	defer func() {
 		if r := recover(); r != nil {
 			s.logger.Error("syncProducts panicked",
 				zap.Any("panic", r),
 				zap.Bool("delta", delta))
+			err = fmt.Errorf("sync panicked: %v", r)
 		}
 	}()
 
@@ -123,7 +130,6 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 	}
 
 	var moyskladProducts []moysklad.MoyskladProduct
-	var err error
 	if delta && since != nil {
 		s.logger.Info("Starting delta sync", zap.Time("since", *since))
 		moyskladProducts, err = s.moyskladClient.GetProductsDelta(ctx, *since)
@@ -158,7 +164,7 @@ func (s *MoyskladSyncService) syncProducts(ctx context.Context, delta bool, sinc
 		categoriesUpserted int32
 	)
 
-	result := &SyncResult{}
+	result = &SyncResult{}
 
 	// Разумные батчи: 20 товаров за раз, пауза 100ms между батчами.
 	// МС API даёт 800 запросов/минуту — мы используем малую долю.
