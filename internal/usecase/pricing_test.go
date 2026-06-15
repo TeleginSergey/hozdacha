@@ -2,12 +2,13 @@ package usecase
 
 import (
 	"context"
-	"time"
 	"testing"
+	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/TeleginSergey/hozdacha/internal/db"
+	"github.com/TeleginSergey/hozdacha/internal/services"
 )
 
 func TestPromotionPricer_Apply_ProductLevel(t *testing.T) {
@@ -59,6 +60,40 @@ func TestPromotionPricer_CheckDayPromotionWindow(t *testing.T) {
 	// Пустой список.
 	if err := p.CheckDayPromotionWindow(context.Background(), nil, time.Now()); err != nil {
 		t.Errorf("empty list must be ok: %v", err)
+	}
+}
+
+func TestPromotionPricer_DayPromotionDeadline(t *testing.T) {
+	links := newMockLinkQuery()
+	now := time.Now()
+	// Дневная акция, заведённая «сегодня» → актуальна для текущего окна брони.
+	links.productPromos[10] = &db.Promotion{
+		ID: 1, Discount: 20, Kind: db.PromotionKindDay, Active: true, ValidFrom: &now,
+	}
+	p := NewPromotionPricer(links, nil, zap.NewNop())
+
+	hasDay, deadline, err := p.DayPromotionDeadline(context.Background(), []int64{10}, now)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !hasDay {
+		t.Fatal("expected a day promotion to be detected")
+	}
+	if want := services.ReservationDeadline(now); !deadline.Equal(want) {
+		t.Errorf("deadline = %v, want %v", deadline, want)
+	}
+
+	// Обычная (manual) акция не считается дневной.
+	manualLinks := newMockLinkQuery()
+	manualLinks.productPromos[11] = &db.Promotion{ID: 2, Discount: 10, Kind: db.PromotionKindManual, Active: true}
+	pm := NewPromotionPricer(manualLinks, nil, zap.NewNop())
+	if h, _, _ := pm.DayPromotionDeadline(context.Background(), []int64{11}, now); h {
+		t.Error("manual promo must not be treated as day promo")
+	}
+
+	// Пустой список товаров.
+	if h, _, _ := p.DayPromotionDeadline(context.Background(), nil, now); h {
+		t.Error("empty product list must yield no day promo")
 	}
 }
 

@@ -23,9 +23,9 @@ import (
 // Карта предков категорий кэшируется на короткий промежуток, чтобы не запрашивать БД
 // на каждый рендер каталога.
 type PromotionPricer struct {
-	links         db.PromotionLinkQuery
-	categories    *db.CategoryQuery
-	logger        *zap.Logger
+	links      db.PromotionLinkQuery
+	categories *db.CategoryQuery
+	logger     *zap.Logger
 
 	ancestorTTL  time.Duration
 	mu           sync.RWMutex
@@ -162,6 +162,7 @@ func setEffective(prod *db.Product, promo *db.Promotion, ptype string) {
 	prod.DiscountPercent = &d
 	prod.PromotionType = ptype
 	prod.PromotionTitle = promo.Title
+	prod.PromotionKind = promo.Kind
 }
 
 func (p *PromotionPricer) getAncestorMap(ctx context.Context) map[int64][]int64 {
@@ -214,6 +215,30 @@ func (p *PromotionPricer) InvalidateCategoryCache() {
 	p.ancestors = nil
 	p.ancestorsExp = time.Time{}
 	p.mu.Unlock()
+}
+
+// DayPromotionDeadline сообщает, есть ли среди товаров активная дневная акция
+// (kind=day), и если да — крайний срок самовывоза для неё (час закрытия магазина
+// в день брони по Москве). Бронь акционного заказа не должна жить дольше этого
+// срока: «акция действует один день».
+func (p *PromotionPricer) DayPromotionDeadline(ctx context.Context, productIDs []int64, now time.Time) (hasDay bool, deadline time.Time, err error) {
+	if p == nil || len(productIDs) == 0 {
+		return false, time.Time{}, nil
+	}
+	promos, err := p.links.BestActiveProductPromotions(ctx, productIDs)
+	if err != nil {
+		return false, time.Time{}, err
+	}
+	for _, promo := range promos {
+		if promo == nil || promo.Kind != db.PromotionKindDay {
+			continue
+		}
+		if !services.PromotionAppliesForReservation(promo, now) {
+			continue
+		}
+		return true, services.ReservationDeadline(now), nil
+	}
+	return false, time.Time{}, nil
 }
 
 // CheckDayPromotionWindow возвращает ошибку если хотя бы один товар из списка
