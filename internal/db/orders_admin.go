@@ -147,6 +147,47 @@ func (o *orderQuery) StatsByStatus(ctx context.Context, from, to *time.Time) (ma
 	return stats, rows.Err()
 }
 
+// RevenueStats — денежные метрики магазина за период (по выкупленным заказам).
+type RevenueStats struct {
+	Revenue        float64 `json:"revenue"`         // сумма по completed
+	AvgCheck       float64 `json:"avg_check"`       // средний чек по completed
+	CompletedCount int     `json:"completed_count"` // число выкупленных заказов
+}
+
+// RevenueByPeriod возвращает выручку и средний чек по completed-заказам за период.
+// from/to == nil — без ограничения снизу/сверху по orders_created_at.
+func (o *orderQuery) RevenueByPeriod(ctx context.Context, from, to *time.Time) (*RevenueStats, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	where := squirrel.And{squirrel.Eq{OrdersStatus: "completed"}}
+	if from != nil {
+		where = append(where, squirrel.GtOrEq{OrdersCreatedAt: *from})
+	}
+	if to != nil {
+		where = append(where, squirrel.LtOrEq{OrdersCreatedAt: *to})
+	}
+
+	qb := o.sq.Select(
+		"COALESCE(SUM("+OrdersTotalPrice+"), 0)",
+		"COALESCE(AVG("+OrdersTotalPrice+"), 0)",
+		"COUNT(*)",
+	).From(OrdersTable).Where(where)
+
+	sqlText, args, err := qb.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build revenue query: %w", err)
+	}
+
+	stats := &RevenueStats{}
+	if err := o.runner.QueryRow(ctx, sqlText, args...).Scan(
+		&stats.Revenue, &stats.AvgCheck, &stats.CompletedCount,
+	); err != nil {
+		return nil, fmt.Errorf("failed to get revenue stats: %w", err)
+	}
+	return stats, nil
+}
+
 // UserOrderStats — агрегаты по заказам конкретного клиента.
 type UserOrderStats struct {
 	TotalOrders    int     `json:"total_orders"`

@@ -356,6 +356,7 @@ const tabLoaders = {
     users: loadUsers,
     promotions: loadPromotions,
     sync: () => {}, // Sync — статичный, ничего грузить не надо
+    metrics: loadMetrics,
 };
 
 function switchTab(name) {
@@ -363,7 +364,11 @@ function switchTab(name) {
         b.classList.toggle('active', b.dataset.tab === name);
     });
     document.querySelectorAll('.tab-content').forEach(s => {
-        s.classList.toggle('active', s.id === `tab-${name}`);
+        const active = s.id === `tab-${name}`;
+        s.classList.toggle('active', active);
+        // Управляем видимостью напрямую: у секций стоит инлайн style="display:none",
+        // который перебивает любой класс из стайлшита — поэтому переключаем display здесь.
+        s.style.display = active ? '' : 'none';
     });
     const loader = tabLoaders[name];
     if (loader) loader();
@@ -462,6 +467,15 @@ async function loadDashboardStats() {
                 <div class="stat-label">❌ Не выкуплены</div>
                 <div class="stat-value">${data.no_show || 0}</div>
                 <div class="stat-sub">${noShowPercent}% от всех</div>
+            </div>
+            <div class="stat-card stat-good">
+                <div class="stat-label">💰 Выручка</div>
+                <div class="stat-value">${fmtMoney(data.revenue)}</div>
+                <div class="stat-sub">по выкупленным</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">🧾 Средний чек</div>
+                <div class="stat-value">${fmtMoney(data.avg_check)}</div>
             </div>`;
     } catch (e) {
         if (e.message !== 'unauthorized') {
@@ -488,6 +502,97 @@ async function loadTodayOrders() {
     } catch (e) {
         if (e.message !== 'unauthorized') {
             wrap.innerHTML = '<p style="color: red;">Ошибка</p>';
+        }
+    }
+}
+
+// =============================================================================
+// МЕТРИКИ ПРИЛОЖЕНИЯ
+// =============================================================================
+function fmtInt(v) {
+    return Math.round(Number(v) || 0).toLocaleString('ru-RU');
+}
+
+function fmtPct(v) {
+    return ((Number(v) || 0) * 100).toFixed(1) + '%';
+}
+
+function fmtUptime(sec) {
+    sec = Math.floor(Number(sec) || 0);
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    if (d > 0) return `${d}д ${h}ч ${m}м`;
+    if (h > 0) return `${h}ч ${m}м`;
+    return `${m}м`;
+}
+
+function metricCard(label, value, sub, mod) {
+    const subHtml = sub ? `<div class="stat-sub">${sub}</div>` : '';
+    return `
+        <div class="stat-card ${mod || ''}">
+            <div class="stat-label">${label}</div>
+            <div class="stat-value">${value}</div>
+            ${subHtml}
+        </div>`;
+}
+
+async function loadMetrics() {
+    const wrap = document.getElementById('metricsContent');
+    wrap.innerHTML = '<p class="text-muted" style="padding:var(--sp-3)">Загрузка...</p>';
+    try {
+        const resp = await adminFetch('/api/admin/metrics');
+        if (!resp.ok) {
+            wrap.innerHTML = '<p style="color: red;">Не удалось загрузить метрики</p>';
+            return;
+        }
+        const m = await resp.json();
+        const http = m.http || {};
+        const orders = m.orders || {};
+        const ms = m.moysklad || {};
+        const cache = m.cache || {};
+        const pool = m.db_pool || {};
+        const rt = m.runtime || {};
+        const cls = http.by_class || {};
+
+        const section = (title, cards) => `
+            <h3 class="today-orders-title">${title}</h3>
+            <div class="stats-grid">${cards.join('')}</div>`;
+
+        wrap.innerHTML = `
+            <p class="admin-section-sub">⏱ Аптайм: <b>${fmtUptime(m.uptime_seconds)}</b></p>
+            ${section('🌐 HTTP', [
+                metricCard('Всего запросов', fmtInt(http.total)),
+                metricCard('Сейчас в обработке', fmtInt(http.in_flight)),
+                metricCard('Средняя задержка', (Number(http.avg_latency_ms) || 0).toFixed(1) + ' мс'),
+                metricCard('Ошибки 5xx', fmtInt(http.errors_5xx), `2xx: ${fmtInt(cls['2xx'])} · 4xx: ${fmtInt(cls['4xx'])}`, Number(http.errors_5xx) > 0 ? 'stat-bad' : 'stat-good'),
+            ])}
+            ${section('🛒 Заказы (с момента старта)', [
+                metricCard('Создано', fmtInt(orders.created), null, 'stat-good'),
+                metricCard('Выкуплено', fmtInt(orders.completed)),
+                metricCard('Отменено', fmtInt(orders.cancelled)),
+                metricCard('Истекло', fmtInt(orders.expired), null, 'stat-warn'),
+                metricCard('Сумма заказов', fmtMoney(orders.revenue)),
+            ])}
+            ${section('🗄 Кэш остатков', [
+                metricCard('Попадания', fmtInt(cache.hits), null, 'stat-good'),
+                metricCard('Промахи', fmtInt(cache.misses)),
+                metricCard('Hit-rate', fmtPct(cache.hit_rate)),
+            ])}
+            ${section('🔄 Синхронизация МойСклад', [
+                metricCard('Успешных прогонов', fmtInt(ms.sync_success), null, 'stat-good'),
+                metricCard('Ошибок', fmtInt(ms.sync_error), null, Number(ms.sync_error) > 0 ? 'stat-bad' : ''),
+                metricCard('Средняя длительность', (Number(ms.avg_duration_seconds) || 0).toFixed(1) + ' с'),
+            ])}
+            ${section('⚙️ Ресурсы', [
+                metricCard('Пул БД (занято/всего)', `${fmtInt(pool.in_use)} / ${fmtInt(pool.total)}`, `свободно: ${fmtInt(pool.idle)}`),
+                metricCard('Горутины', fmtInt(rt.goroutines)),
+                metricCard('Память (alloc)', (Number(rt.alloc_mb) || 0).toFixed(1) + ' МБ'),
+                metricCard('Сборок мусора', fmtInt(rt.num_gc)),
+            ])}`;
+    } catch (e) {
+        if (e.message !== 'unauthorized') {
+            wrap.innerHTML = '<p style="color: red;">Ошибка загрузки метрик</p>';
         }
     }
 }
