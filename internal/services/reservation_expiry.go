@@ -9,6 +9,7 @@ import (
 
 	"github.com/TeleginSergey/hozdacha/internal/cache"
 	"github.com/TeleginSergey/hozdacha/internal/db"
+	"github.com/TeleginSergey/hozdacha/internal/metrics"
 	"github.com/TeleginSergey/hozdacha/internal/moysklad"
 )
 
@@ -103,6 +104,7 @@ func (s *ReservationExpiryService) tick(ctx context.Context) {
 			s.logger.Error("Failed to expire order", zap.Int64("order_id", id), zap.Error(err))
 			continue
 		}
+		metrics.OrderTransition("expired")
 		expiredCount++
 	}
 

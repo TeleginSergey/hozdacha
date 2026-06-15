@@ -120,6 +120,8 @@ type OrderQuery interface {
 	ListOrders(ctx context.Context, f OrderListFilter) ([]*Order, int, error)
 	// StatsByStatus — счётчики заказов по статусам за период (для дашборда).
 	StatsByStatus(ctx context.Context, from, to *time.Time) (map[string]int, error)
+	// RevenueByPeriod — выручка и средний чек по выкупленным заказам за период (для дашборда).
+	RevenueByPeriod(ctx context.Context, from, to *time.Time) (*RevenueStats, error)
 	// GetUserStats — агрегаты по конкретному клиенту.
 	GetUserStats(ctx context.Context, userID int64) (*UserOrderStats, error)
 	// GetUserTopProducts — топ-N товаров клиента по completed-заказам.
