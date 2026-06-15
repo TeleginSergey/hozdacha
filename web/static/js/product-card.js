@@ -68,6 +68,7 @@
                 discountPercent: hasPromo ? parseFloat(discountPercent || 0) : 0,
                 promotionTitle: pickField(product, 'PromotionTitle', 'promotion_title') || '',
                 promotionType: pickField(product, 'PromotionType', 'promotion_type') || '',
+                promotionKind: pickField(product, 'PromotionKind', 'promotion_kind') || '',
             };
         },
 

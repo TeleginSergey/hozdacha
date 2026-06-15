@@ -168,6 +168,31 @@
         .cart-empty-state h2 { font-size: var(--fs-2xl); font-weight: 800; margin-bottom: var(--sp-2); }
         .cart-empty-state p { color: var(--c-muted); margin-bottom: var(--sp-5); font-size: var(--fs-md); }
         .cart-empty-state .empty-actions { display: flex; gap: var(--sp-2); justify-content: center; flex-wrap: wrap; }
+
+        /* ---- Окно подтверждения заказа ---- */
+        .co-summary {
+          background: var(--c-bg-soft); border: 1px solid var(--c-border);
+          border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4); margin-bottom: var(--sp-4);
+        }
+        .co-line {
+          display: flex; justify-content: space-between; gap: var(--sp-3);
+          font-size: var(--fs-sm); color: var(--c-text-soft); padding: 3px 0;
+        }
+        .co-line__name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .co-line strong { color: var(--c-text); font-weight: 600; white-space: nowrap; }
+        .co-summary__divider { height: 1px; background: var(--c-border); margin: var(--sp-2) 0; }
+        .co-total { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; font-size: var(--fs-lg); }
+        .co-total .value { color: var(--c-primary); }
+        .co-save { color: var(--c-danger); font-weight: 600; }
+        .co-notice {
+          display: flex; align-items: flex-start; gap: 8px;
+          padding: 10px 14px; border-radius: var(--r-md);
+          font-size: var(--fs-sm); margin-bottom: var(--sp-4); line-height: 1.5;
+        }
+        .co-notice--promo { background: #fff4e5; color: #9a5b00; border: 1px solid #fde2b8; }
+        .co-notice--info  { background: var(--c-primary-light); color: var(--c-primary); }
+        .co-notice b { font-weight: 700; }
+        .co-field-hint { font-size: var(--fs-xs); color: var(--c-muted); margin-top: 4px; }
     </style>
 </head>
 <body>
@@ -193,7 +218,7 @@
                 <div class="cart-summary-total"><span>К оплате</span><span class="value" id="sumTotal">0 ₽</span></div>
                 <div class="cart-summary-hint">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18" style="flex-shrink:0"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                    <div>Заказ хранится <strong>48 часов</strong>. Потом автоматически отменится и товар вернётся в наличие.</div>
+                    <div>Бронь хранится <strong>до 3 дней</strong>. Акционные товары — только в день акции. Потом заказ отменится и товар вернётся в наличие.</div>
                 </div>
                 <button class="btn btn--lg btn--block" id="checkoutBtn" onclick="checkout()">Оформить заказ</button>
                 <div class="cart-summary-trust">
@@ -443,23 +468,57 @@ function _closeH(d) {
     if (d.getMonth()===0 && (d.getDate()===1 || d.getDate()===2)) return -1;
     return (d.getDay()===0 || d.getDay()===6) ? 16 : 18;
 }
-function _initPicker(dateId, timeId) {
+// _promoPickupDay — день, на который действует дневная акция: до закрытия
+// магазина (18:00 будни / 16:00 выходные) это сегодня, после — завтра.
+// Совпадает с серверной логикой services.ReservationDate.
+function _promoPickupDay(now) {
+    const closeH = _closeH(now);
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    return now.getHours() < closeH ? today : new Date(today.getTime() + 86400000);
+}
+function _dayValue(d) {
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function _dayLabel(d, today, tomorrow) {
+    const pre = d.toDateString()===today.toDateString() ? 'Сегодня, '
+        : d.toDateString()===tomorrow.toDateString() ? 'Завтра, ' : '';
+    return pre + d.getDate() + ' ' + _PM[d.getMonth()];
+}
+// _initPicker(dateId, timeId, promoDay) — если promoDay задан (Date), выбор
+// ограничен этим единственным днём (дневная акция), иначе — до 3 дней вперёд.
+function _initPicker(dateId, timeId, promoDay) {
     const now = new Date();
-    const expDay = new Date(now); expDay.setDate(expDay.getDate()+3);
-    const max = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate(), 3, 0, 0);
     const dEl = document.getElementById(dateId), tEl = document.getElementById(timeId);
     if (!dEl || !tEl) return;
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const maxDay = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate());
     const tomorrow = new Date(today.getTime() + 86400000);
+
+    if (promoDay) {
+        // Дневная акция: единственный день, час закрытия — потолок брони.
+        const closeH = _closeH(promoDay);
+        const max = new Date(promoDay.getFullYear(), promoDay.getMonth(), promoDay.getDate(), closeH, 0, 0);
+        dEl.innerHTML = '';
+        const o = document.createElement('option');
+        o.value = _dayValue(promoDay);
+        o.textContent = _dayLabel(promoDay, today, tomorrow);
+        dEl.appendChild(o);
+        dEl.value = o.value;
+        dEl.disabled = true;
+        dEl.onchange = null;
+        _fillTimes(dateId, timeId, now, max);
+        return;
+    }
+
+    const expDay = new Date(now); expDay.setDate(expDay.getDate()+3);
+    const max = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate(), 3, 0, 0);
+    const maxDay = new Date(expDay.getFullYear(), expDay.getMonth(), expDay.getDate());
+    dEl.disabled = false;
     dEl.innerHTML = '<option value="">— дата —</option>';
     for (let d = new Date(today); d <= maxDay; d = new Date(d.getTime()+86400000)) {
         if (_closeH(d) < 0) continue;
         const o = document.createElement('option');
-        o.value = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-        const pre = d.toDateString()===today.toDateString() ? 'Сегодня, '
-            : d.toDateString()===tomorrow.toDateString() ? 'Завтра, ' : '';
-        o.textContent = pre + d.getDate() + ' ' + _PM[d.getMonth()];
+        o.value = _dayValue(d);
+        o.textContent = _dayLabel(d, today, tomorrow);
         dEl.appendChild(o);
     }
     dEl.onchange = () => _fillTimes(dateId, timeId, now, max);
@@ -489,14 +548,55 @@ function _fillTimes(dateId, timeId, now, max) {
 }
 
 function openModal() {
+    const selected = getCart().filter(i => i.selected);
+    const now = new Date();
+    const hasDayPromo = selected.some(i => i.promotionKind === 'day');
+    const promoDay = hasDayPromo ? _promoPickupDay(now) : null;
+
+    // Сводка по выбранным товарам.
+    const totalNow = selected.reduce((s, i) => s + i.price * i.quantity, 0);
+    const totalOld = selected.reduce((s, i) => s + ((i.oldPrice && i.oldPrice > i.price) ? i.oldPrice : i.price) * i.quantity, 0);
+    const savings = totalOld - totalNow;
+    const totalQty = selected.reduce((s, i) => s + i.quantity, 0);
+
+    const lines = selected.map(i =>
+        `<div class="co-line">
+            <span class="co-line__name">${esc(i.name)} <span style="color:var(--c-muted)">× ${i.quantity}</span></span>
+            <strong>${formatPrice(i.price * i.quantity)} ₽</strong>
+        </div>`).join('');
+
+    // Подсказка по сроку брони/самовывоза.
+    let notice;
+    if (hasDayPromo) {
+        const closeH = _closeH(promoDay);
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const when = promoDay.toDateString() === today.toDateString() ? 'сегодня' : 'завтра';
+        notice = `<div class="co-notice co-notice--promo">
+            <span>🎁</span>
+            <div>В заказе есть товар по <b>акции дня</b>. Забрать его нужно <b>${when} до ${closeH}:00</b> — иначе бронь отменится и товар вернётся в продажу.</div>
+        </div>`;
+    } else {
+        notice = `<div class="co-notice co-notice--info">
+            <span>⏳</span>
+            <div>Бронь хранится <b>до 3 дней</b>. Потом заказ автоматически отменится и товар вернётся в наличие.</div>
+        </div>`;
+    }
+
     const m = document.createElement('div');
     m.className = 'modal open';
     m.innerHTML = `<div class="modal__content">
         <button class="modal__close" onclick="this.closest('.modal').remove()" aria-label="Закрыть">✕</button>
         <h2>Оформление заказа</h2>
-        <p style="background:var(--c-warn-bg);color:var(--c-warn);border:1px solid #fde2b8;padding:10px 14px;border-radius:var(--r-md);font-size:var(--fs-sm);margin-bottom:var(--sp-4)">
-            ⏳ Заказ хранится 3 дня. Потом автоматически отменится.
-        </p>
+
+        <div class="co-summary">
+            ${lines}
+            <div class="co-summary__divider"></div>
+            ${savings > 0 ? `<div class="co-line"><span>Скидка</span><span class="co-save">−${formatPrice(savings)} ₽</span></div>` : ''}
+            <div class="co-total"><span>Итого · ${totalQty} шт.</span><span class="value">${formatPrice(totalNow)} ₽</span></div>
+        </div>
+
+        ${notice}
+
         <form id="coForm">
             <div class="form-row">
                 <label>Когда заберёте? <span style="color:var(--c-muted);font-weight:400">(необязательно)</span></label>
@@ -508,27 +608,28 @@ function openModal() {
                         <option value="">— время —</option>
                     </select>
                 </div>
+                ${hasDayPromo ? '<div class="co-field-hint">Дата фиксирована: акция действует только в этот день.</div>' : ''}
             </div>
             <div class="form-row">
                 <label>Примечание к заказу <span style="color:var(--c-muted);font-weight:400">(необязательно)</span></label>
                 <textarea name="comment" placeholder="Например: позвоните за 30 минут"></textarea>
             </div>
-            <button type="submit" class="btn btn--accent btn--block">Подтвердить заказ</button>
+            <button type="submit" class="btn btn--accent btn--block">Подтвердить заказ · ${formatPrice(totalNow)} ₽</button>
         </form>
     </div>`;
     document.body.appendChild(m);
     m.addEventListener('click', e => { if (e.target === m) m.remove(); });
-    _initPicker('coPickupDate', 'coPickupTime');
+    _initPicker('coPickupDate', 'coPickupTime', promoDay);
 
     m.querySelector('#coForm').onsubmit = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('auth_token');
-        const cart = getCart();
-        const selected = cart.filter(i => i.selected);
+        const sel = getCart().filter(i => i.selected);
         const fd = new FormData(e.target);
-        const items = selected.map(i => ({ product_id: i.id, quantity: i.quantity }));
+        const items = sel.map(i => ({ product_id: i.id, quantity: i.quantity }));
         if (items.length === 0) { alert('Выберите хотя бы один товар'); return; }
         const btn = e.target.querySelector('button[type=submit]');
+        const btnText = btn.textContent;
         btn.disabled = true; btn.textContent = 'Отправка...';
         const pickupAt = document.getElementById('coPickupTime')?.value || null;
         try {
@@ -538,7 +639,8 @@ function openModal() {
                 body: JSON.stringify({ comment: fd.get('comment') || null, pickup_at: pickupAt, items })
             });
             const d = await r.json();
-            if (!r.ok) throw new Error(d.error || 'Ошибка');
+            // Бэкенд отдаёт человекочитаемое message для бизнес-ошибок (акции, сток).
+            if (!r.ok) throw new Error(d.message || d.error || 'Ошибка');
             // Убираем из корзины только заказанные (выбранные) товары, остальное остаётся.
             setCart(getCart().filter(i => !i.selected));
             m.remove();
@@ -546,7 +648,7 @@ function openModal() {
             location.href = '/profile';
         } catch (err) {
             alert(err.message);
-            btn.disabled = false; btn.textContent = 'Подтвердить заказ';
+            btn.disabled = false; btn.textContent = btnText;
         }
     };
     return m;

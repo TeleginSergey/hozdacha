@@ -103,15 +103,24 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		return nil, fmt.Errorf("moysklad integration is not fully configured (missing organization/agent IDs)")
 	}
 
-	// Проверяем окно акций: если в заказе есть товары с дневной акцией,
-	// которая уже не актуальна для текущего окна бронирования — блокируем.
+	now := time.Now()
+
+	productIDs := make([]int64, 0, len(req.Items))
+	for _, item := range req.Items {
+		productIDs = append(productIDs, item.ProductID)
+	}
+
+	// Окно акций: если в заказе есть дневная акция, уже не актуальная для
+	// текущего окна бронирования — блокируем заказ целиком.
+	// dayPromoDeadline != nil — в заказе есть актуальная дневная акция, и забрать
+	// товар нужно до закрытия магазина в день брони (нельзя «на 2 дня вперёд»).
+	var dayPromoDeadline *time.Time
 	if u.pricer != nil {
-		productIDs := make([]int64, 0, len(req.Items))
-		for _, item := range req.Items {
-			productIDs = append(productIDs, item.ProductID)
-		}
-		if err := u.pricer.CheckDayPromotionWindow(ctx, productIDs, time.Now()); err != nil {
+		if err := u.pricer.CheckDayPromotionWindow(ctx, productIDs, now); err != nil {
 			return nil, err
+		}
+		if hasDay, deadline, err := u.pricer.DayPromotionDeadline(ctx, productIDs, now); err == nil && hasDay {
+			dayPromoDeadline = &deadline
 		}
 	}
 
@@ -145,14 +154,23 @@ func (u *OrderUsecase) CreateOrder(ctx context.Context, req CreateOrderRequest) 
 		})
 	}
 
-	reservedUntil := reservedUntilFor(time.Now())
+	// Обычная бронь живёт 3 дня. Для дневной акции она ограничена днём акции:
+	// после закрытия магазина сток возвращается, а забрать товар нужно в этот день.
+	reservedUntil := reservedUntilFor(now)
+	if dayPromoDeadline != nil {
+		reservedUntil = *dayPromoDeadline
+	}
 
 	// Валидация желаемого времени визита.
 	if req.PickupAt != nil {
-		if !req.PickupAt.After(time.Now()) {
+		if !req.PickupAt.After(now) {
 			return nil, fmt.Errorf("pickup time must be in the future")
 		}
 		if req.PickupAt.After(reservedUntil) {
+			if dayPromoDeadline != nil {
+				return nil, fmt.Errorf("promotion_pickup_window: акционные товары нужно забрать в день акции, до %s",
+					dayPromoDeadline.Format("15:04"))
+			}
 			return nil, fmt.Errorf("pickup time must be before reservation expires (%s)", reservedUntil.Format(time.RFC3339))
 		}
 	}

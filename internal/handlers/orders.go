@@ -103,6 +103,15 @@ func (h *OrderHandler) CreateOrder(c *gin.Context) {
 			})
 			return
 		}
+		// Время самовывоза вне дня дневной акции.
+		if strings.HasPrefix(err.Error(), "promotion_pickup_window:") {
+			msg := strings.TrimPrefix(err.Error(), "promotion_pickup_window: ")
+			c.JSON(http.StatusConflict, gin.H{
+				"error":   "promotion_pickup_window",
+				"message": "Акция действует один день. " + msg + ".",
+			})
+			return
+		}
 		// Окно акций закрыто — дневная акция уже не действует.
 		if strings.HasPrefix(err.Error(), "promotion_window_closed:") {
 			msg := strings.TrimPrefix(err.Error(), "promotion_window_closed: ")

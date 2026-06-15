@@ -55,6 +55,7 @@ type Product struct {
 	DiscountPercent *float64 `db:"-" json:"DiscountPercent,omitempty"`
 	PromotionType   string   `db:"-" json:"PromotionType,omitempty"` // "product" | "category" | ""
 	PromotionTitle  string   `db:"-" json:"PromotionTitle,omitempty"`
+	PromotionKind   string   `db:"-" json:"PromotionKind,omitempty"` // "day" | "manual" | "permanent" | ""
 }
 
 var (

@@ -64,6 +64,16 @@ func ReservationDate(now time.Time) time.Time {
 	return day.AddDate(0, 0, 1)
 }
 
+// ReservationDeadline — крайний срок самовывоза для текущего окна брони:
+// час закрытия магазина (18:00 будни / 16:00 выходные) в день брони по Москве.
+// До 18/16 это сегодня, после — завтра. Используется для дневных акций, чтобы
+// акционный заказ нельзя было забрать «через 2 дня как обычный».
+func ReservationDeadline(now time.Time) time.Time {
+	day := ReservationDate(now)
+	cutoff := reservationCutoffHour(day)
+	return time.Date(day.Year(), day.Month(), day.Day(), cutoff, 0, 0, 0, moscowLocation)
+}
+
 // EndOfMoscowDay — конец календарного дня по Москве (23:59:59.999999999).
 func EndOfMoscowDay(day time.Time) time.Time {
 	msk := day.In(moscowLocation)

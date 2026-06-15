@@ -51,6 +51,24 @@ func TestReservationTarget_weekendCutoff(t *testing.T) {
 	}
 }
 
+func TestReservationDeadline(t *testing.T) {
+	// Будний день до закрытия — крайний срок сегодня 18:00.
+	wd := mskTime(2026, time.June, 10, 14, 0) // среда
+	if got := ReservationDeadline(wd); !got.Equal(mskTime(2026, time.June, 10, 18, 0)) {
+		t.Errorf("weekday before cutoff: %v, want 2026-06-10 18:00 MSK", got)
+	}
+	// Будний день после закрытия — крайний срок завтра 18:00.
+	wdLate := mskTime(2026, time.June, 10, 19, 0)
+	if got := ReservationDeadline(wdLate); !got.Equal(mskTime(2026, time.June, 11, 18, 0)) {
+		t.Errorf("weekday after cutoff: %v, want 2026-06-11 18:00 MSK", got)
+	}
+	// Выходной до закрытия — крайний срок сегодня 16:00.
+	we := mskTime(2026, time.June, 13, 12, 0) // суббота
+	if got := ReservationDeadline(we); !got.Equal(mskTime(2026, time.June, 13, 16, 0)) {
+		t.Errorf("weekend before cutoff: %v, want 2026-06-13 16:00 MSK", got)
+	}
+}
+
 func TestPromotionAppliesForReservation_dayKind(t *testing.T) {
 	// Акция синкнута в понедельник 19:00 → бронь на вторник.
 	syncedMonEvening := mskTime(2026, time.June, 8, 19, 0)

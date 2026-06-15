@@ -88,6 +88,7 @@
                     price: hasPromo ? eff : base,
                     oldPrice: hasPromo ? base : null,
                     discountPercent: hasPromo ? Math.round(disc) : 0,
+                    promotionKind: hasPromo ? (product.PromotionKind || product.promotion_kind || '') : '',
                     quantity: 1,
                     image: product.ImageURL || product.products_image_url || '',
                     selected: true
