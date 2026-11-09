@@ -20,8 +20,7 @@ import (
 var errNoImage = errors.New("product has no images in MoySklad")
 
 // ImageSyncService скачивает изображения товаров из МойСклад и сохраняет локально.
-// Рассчитан на слабый сервер: батчи по 5 товаров, паузы 500ms между батчами,
-// только миниатюры (небольшой размер).
+// Только миниатюры (небольшой размер).
 type ImageSyncService struct {
 	moyskladClient *moysklad.Client
 	productQuery   db.ProductQuery
@@ -62,24 +61,45 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 		return fmt.Errorf("failed to get products: %w", err)
 	}
 
-	// Фильтруем: нужны товары с Moysklad ID, у которых ещё нет локального изображения.
+	// Фильтруем: нужны товары с Moysklad ID, у которых либо:
+	// 1. нет локального изображения, либо
+	// 2. локальное изображение устарело (изменилось в МойСклад после последней синхронизации).
 	// image_sync работает независимо от product_sync — не требует image_url с MoySklad URL.
 	var toDownload []*db.Product
 	for _, p := range products {
 		if p.MoyskladID == nil || *p.MoyskladID == "" {
 			continue
 		}
-		// Если уже есть локальное изображение — проверяем что файл реально существует на диске.
-		// После редеплоя DB хранит старый путь, но файл может отсутствовать.
+
+		// Проверяем, есть ли локальное изображение и существует ли файл на диске
+		hasLocalImage := false
+		localFilePath := ""
 		if p.ImageURL != nil && strings.HasPrefix(*p.ImageURL, "/static") {
 			filename := filepath.Base(*p.ImageURL)
-			filePath := filepath.Join(s.imagesDir, filename)
-			if _, err := os.Stat(filePath); err == nil {
-				continue // файл есть — пропускаем
+			localFilePath = filepath.Join(s.imagesDir, filename)
+			if fileInfo, err := os.Stat(localFilePath); err == nil {
+				hasLocalImage = true
+
+				// Если файл существует, проверяем дату обновления из LastSyncUpdated.
+				// Если изображение в МойСклад обновилось после LastSyncUpdated — перекачиваем.
+				// LastSyncUpdated содержит дату последнего изменения товара в МойСклад,
+				// включая изменение изображений.
+				if p.LastSyncUpdated != nil && !p.LastSyncUpdated.IsZero() {
+					// Сравниваем время модификации файла с LastSyncUpdated.
+					// Если LastSyncUpdated новее файла — значит изображение могло измениться.
+					fileModTime := fileInfo.ModTime()
+					if p.LastSyncUpdated.After(fileModTime) {
+						// Товар обновлялся в МойСклад после создания локального файла.
+						// Добавляем на скачивание для проверки.
+						hasLocalImage = false
+					}
+				}
 			}
-			// файл исчез (редеплой/смена тома) — скачиваем заново
 		}
-		toDownload = append(toDownload, p)
+
+		if !hasLocalImage {
+			toDownload = append(toDownload, p)
+		}
 	}
 
 	if len(toDownload) == 0 {
@@ -211,17 +231,41 @@ func (s *ImageSyncService) cleanupOrphanedFiles(ctx context.Context) error {
 }
 
 func (s *ImageSyncService) downloadProductImage(ctx context.Context, product *db.Product) error {
-	// Получаем URL оригинального изображения (meta.downloadHref) из коллекции МойСклад.
-	// Это 1 запрос вместо 2 (старый подход через JSON-метаданные изображения).
-	downloadURL, err := s.moyskladClient.GetProductFirstDownloadURL(ctx, *product.MoyskladID)
+	// Получаем информацию об изображении из МойСклад (URL + дата обновления).
+	imageInfo, err := s.moyskladClient.GetProductFirstImageInfo(ctx, *product.MoyskladID)
 	if err != nil {
-		return fmt.Errorf("get download url failed: %w", err)
+		return fmt.Errorf("get image info failed: %w", err)
 	}
-	if downloadURL == "" {
+	if imageInfo == nil || imageInfo.DownloadURL == "" {
 		return errNoImage
 	}
 
-	data, contentType, err := s.moyskladClient.DownloadRawFile(ctx, downloadURL)
+	// Если у товара уже есть локальное изображение, проверяем его актуальность.
+	if product.ImageURL != nil && strings.HasPrefix(*product.ImageURL, "/static") {
+		filename := filepath.Base(*product.ImageURL)
+		filePath := filepath.Join(s.imagesDir, filename)
+		if fileInfo, err := os.Stat(filePath); err == nil {
+			// Файл существует. Сравниваем дату обновления изображения в МойСклад
+			// с датой модификации локального файла.
+			fileModTime := fileInfo.ModTime()
+			if !imageInfo.UpdatedAt.After(fileModTime) {
+				// Изображение в МойСклад не новее локального — пропускаем.
+				s.logger.Debug("Image is up to date, skipping",
+					zap.Int64("product_id", product.ID),
+					zap.String("name", product.Name),
+					zap.Time("local_mod_time", fileModTime),
+					zap.Time("moysklad_updated", imageInfo.UpdatedAt))
+				return nil
+			}
+			s.logger.Debug("Image outdated, re-downloading",
+				zap.Int64("product_id", product.ID),
+				zap.String("name", product.Name),
+				zap.Time("local_mod_time", fileModTime),
+				zap.Time("moysklad_updated", imageInfo.UpdatedAt))
+		}
+	}
+
+	data, contentType, err := s.moyskladClient.DownloadRawFile(ctx, imageInfo.DownloadURL)
 	if err != nil {
 		return fmt.Errorf("download failed: %w", err)
 	}
@@ -257,6 +301,7 @@ func (s *ImageSyncService) downloadProductImage(ctx context.Context, product *db
 		zap.Int64("product_id", product.ID),
 		zap.String("name", product.Name),
 		zap.String("local_url", localURL),
-		zap.Int("size_bytes", len(data)))
+		zap.Int("size_bytes", len(data)),
+		zap.Time("moysklad_updated", imageInfo.UpdatedAt))
 	return nil
 }
