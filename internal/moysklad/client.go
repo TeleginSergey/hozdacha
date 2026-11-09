@@ -803,51 +803,79 @@ func (c *Client) GetBaseURL() string {
 	return c.baseURL
 }
 
-// GetProductFirstDownloadURL возвращает meta.downloadHref (ссылку на оригинал изображения)
-// первого фото товара из /entity/product/{id}/images.
-// Возвращает пустую строку если у товара нет изображений.
-func (c *Client) GetProductFirstDownloadURL(ctx context.Context, moyskladProductID string) (string, error) {
+// ProductImageInfo содержит информацию об изображении товара из МойСклад.
+type ProductImageInfo struct {
+	DownloadURL string
+	UpdatedAt   time.Time
+}
+
+// GetProductFirstImageInfo возвращает информацию о первом изображении товара:
+// URL для скачивания и дату последнего обновления изображения.
+// Возвращает nil если у товара нет изображений.
+func (c *Client) GetProductFirstImageInfo(ctx context.Context, moyskladProductID string) (*ProductImageInfo, error) {
 	endpoint := fmt.Sprintf("%s/entity/product/%s/images?limit=1", c.baseURL, moyskladProductID)
 	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+c.token)
 	req.Header.Set("Accept", "application/json;charset=utf-8")
 
 	resp, err := c.doRequestWithRetry(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("failed to get product images: %w", err)
+		return nil, fmt.Errorf("failed to get product images: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return "", nil
+		return nil, nil
 	}
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("moysklad images API error: %s, body: %s", resp.Status, string(body))
+		return nil, fmt.Errorf("moysklad images API error: %s, body: %s", resp.Status, string(body))
 	}
 
 	var result struct {
 		Rows []struct {
-			Meta struct {
+			Updated time.Time `json:"updated"`
+			Meta    struct {
 				DownloadHref string `json:"downloadHref"`
 				Href         string `json:"href"`
 			} `json:"meta"`
 		} `json:"rows"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return "", fmt.Errorf("failed to decode images response: %w", err)
+		return nil, fmt.Errorf("failed to decode images response: %w", err)
 	}
 	if len(result.Rows) == 0 {
+		return nil, nil
+	}
+
+	// Предпочитаем downloadHref (оригинал), fallback на href если downloadHref пуст.
+	downloadURL := result.Rows[0].Meta.DownloadHref
+	if downloadURL == "" {
+		downloadURL = result.Rows[0].Meta.Href
+	}
+
+	return &ProductImageInfo{
+		DownloadURL: downloadURL,
+		UpdatedAt:   result.Rows[0].Updated,
+	}, nil
+}
+
+// GetProductFirstDownloadURL возвращает meta.downloadHref (ссылку на оригинал изображения)
+// первого фото товара из /entity/product/{id}/images.
+// Возвращает пустую строку если у товара нет изображений.
+// Deprecated: используйте GetProductFirstImageInfo для получения URL и даты обновления.
+func (c *Client) GetProductFirstDownloadURL(ctx context.Context, moyskladProductID string) (string, error) {
+	info, err := c.GetProductFirstImageInfo(ctx, moyskladProductID)
+	if err != nil {
+		return "", err
+	}
+	if info == nil {
 		return "", nil
 	}
-	// Предпочитаем downloadHref (оригинал), fallback на href если downloadHref пуст.
-	if result.Rows[0].Meta.DownloadHref != "" {
-		return result.Rows[0].Meta.DownloadHref, nil
-	}
-	return result.Rows[0].Meta.Href, nil
+	return info.DownloadURL, nil
 }
 
 // DownloadRawFile скачивает файл по URL с авторизацией.
