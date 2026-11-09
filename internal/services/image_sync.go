@@ -117,10 +117,17 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 	var mu sync.Mutex
 
 	for i := 0; i < len(toDownload); i += batchSize {
+		// Проверяем отмену только между батчами, но НЕ прерываем из-за общего таймаута.
+		// Если родительский контекст отменён — продолжаем с новым контекстом.
+		workCtx := ctx
 		select {
 		case <-ctx.Done():
-			s.logger.Info("Image sync cancelled", zap.Int("downloaded", downloaded))
-			return ctx.Err()
+			// Родительский контекст истёк (например, таймаут 30 минут при старте).
+			// Продолжаем работу с background контекстом, чтобы довести до конца.
+			s.logger.Info("Parent context cancelled, continuing with background context",
+				zap.Int("processed", i),
+				zap.Int("remaining", len(toDownload)-i))
+			workCtx = context.Background()
 		default:
 		}
 
@@ -135,7 +142,10 @@ func (s *ImageSyncService) SyncImages(ctx context.Context) error {
 			wg.Add(1)
 			go func(p *db.Product) {
 				defer wg.Done()
-				err := s.downloadProductImage(ctx, p)
+				// Каждый запрос получает свой таймаут (2 минуты на товар).
+				reqCtx, cancel := context.WithTimeout(workCtx, 2*time.Minute)
+				defer cancel()
+				err := s.downloadProductImage(reqCtx, p)
 				mu.Lock()
 				defer mu.Unlock()
 				if err != nil {

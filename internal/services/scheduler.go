@@ -157,12 +157,12 @@ func (s *Scheduler) runReseedFullLoop(ctx context.Context) {
 
 func (s *Scheduler) runImageSyncLoop(ctx context.Context) {
 	// Первый запуск при деплое — не ждём расписания.
+	// Используем context.Background() без таймаута, чтобы дать синхронизации завершиться полностью.
+	// Внутри SyncImages каждый HTTP-запрос имеет свой таймаут (2 минуты), так что зависание невозможно.
 	s.logger.Info("Running initial image sync on startup")
-	rctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
-	if err := s.imageSync.SyncImages(rctx); err != nil {
+	if err := s.imageSync.SyncImages(context.Background()); err != nil && err != context.Canceled {
 		s.logger.Error("Initial image sync failed", zap.Error(err))
 	}
-	cancel()
 
 	// Определяем режим: точное время суток или интервал.
 	if s.imageSyncTime != "" {
@@ -189,12 +189,10 @@ func (s *Scheduler) runImageSyncAtTime(ctx context.Context) {
 		case <-time.After(wait):
 		}
 
-		rctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 		s.logger.Info("Starting daily image sync with cleanup")
-		if err := s.imageSync.SyncImagesWithCleanup(rctx); err != nil {
+		if err := s.imageSync.SyncImagesWithCleanup(context.Background()); err != nil && err != context.Canceled {
 			s.logger.Error("Image sync failed", zap.Error(err))
 		}
-		cancel()
 	}
 }
 
@@ -210,12 +208,10 @@ func (s *Scheduler) runImageSyncByInterval(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			rctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 			s.logger.Info("Starting periodic image sync with cleanup")
-			if err := s.imageSync.SyncImagesWithCleanup(rctx); err != nil {
+			if err := s.imageSync.SyncImagesWithCleanup(context.Background()); err != nil && err != context.Canceled {
 				s.logger.Error("Image sync failed", zap.Error(err))
 			}
-			cancel()
 		}
 	}
 }
